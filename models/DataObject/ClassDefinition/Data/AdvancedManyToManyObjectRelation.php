@@ -76,6 +76,21 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     public $enableBatchEdit;
 
     /**
+     * @var bool
+     */
+    public $disableDelete = false;
+
+    /**
+     * @var bool
+     */
+    public $disableAdd = false;
+
+    /**
+     * @var bool
+     */
+    public $disableCreate = false;
+
+    /**
      * @internal
      *
      * @var bool
@@ -1042,6 +1057,60 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     public function getPhpdocInputType(): ?string
     {
         return '\\'.DataObject\Data\ObjectMetadata::class.'[]';
+    }
+
+    /**
+     * @return bool
+     */
+    public function getDisableDelete(): bool
+    {
+        return $this->disableDelete;
+    }
+
+    /**
+     * @param bool $disableDelete
+     * @return $this
+     */
+    public function setDisableDelete(bool $disableDelete): self
+    {
+        $this->disableDelete = $disableDelete;
+        return $this;
+    }
+
+    /**
+     * @return bool
+     */
+    public function getDisableAdd(): bool
+    {
+        return $this->disableAdd;
+    }
+
+    /**
+     * @param bool $disableAdd
+     * @return $this
+     */
+    public function setDisableAdd(bool $disableAdd): self
+    {
+        $this->disableAdd = $disableAdd;
+        return $this;
+    }
+
+    /**
+     * @return bool
+     */
+    public function getDisableCreate(): bool
+    {
+        return $this->disableCreate;
+    }
+
+    /**
+     * @param bool $disableCreate
+     * @return $this
+     */
+    public function setDisableCreate(bool $disableCreate): self
+    {
+        $this->disableCreate = $disableCreate;
+        return $this;
     }
 
     /**
