@@ -61,6 +61,7 @@ pimcore.object.classes.data.localizedfields = Class.create(pimcore.object.classe
         this.specificPanel.removeAll();
 
         this.layout = new Ext.Panel({
+            autoScroll: true,
             items: [
                 {
                     xtype: "form",
@@ -136,6 +137,7 @@ pimcore.object.classes.data.localizedfields = Class.create(pimcore.object.classe
                             fieldLabel: t('tab_position'),
                             name: 'tabPosition',
                             value: this.datax.tabPosition,
+                            editable: false,
                             store: [['top', t('top')], ['left', t('left')], ['right', t('right')], ['bottom', t('bottom')]]
                         },
                         {
@@ -176,11 +178,6 @@ pimcore.object.classes.data.localizedfields = Class.create(pimcore.object.classe
                     name: "labelWidth",
                     fieldLabel: t("label_width"),
                     value: this.datax.labelWidth
-                },
-                {
-                    xtype: "displayfield",
-                    hideLabel: true,
-                    value: t('width_explanation')
                 },
                 {
                     xtype: "combo",

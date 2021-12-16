@@ -141,6 +141,12 @@ pimcore.settings.system = Class.create({
                                 value: this.getValue("branding.color_admin_interface"),
                                 name: 'branding.color_admin_interface'
                             }, {
+                                xtype: "textfield",
+                                fieldLabel: t('admin_interface_background'),
+                                width: 330,
+                                value: this.getValue("branding.color_admin_interface_background"),
+                                name: 'branding.color_admin_interface_background'
+                            }, {
                                 xtype: "checkbox",
                                 boxLabel: t('invert_colors_on_login_screen'),
                                 width: 330,
@@ -230,7 +236,11 @@ pimcore.settings.system = Class.create({
                             valueField: 'language',
                             forceSelection: true,
                             triggerAction: 'all',
-                            name: 'general.language'
+                            name: 'general.language',
+                            cls: "pimcore_extra_label_bottom"
+                        }, {
+                            xtype: "container",
+                            html: '<strong>' + t('frontend_languages') + '</strong>'
                         }, {
                             xtype: "displayfield",
                             hideLabel: true,

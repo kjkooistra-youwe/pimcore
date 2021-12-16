@@ -145,7 +145,7 @@ class LoginController extends AdminController implements BruteforceProtectedCont
     }
 
     /**
-     * @Route("/logout", name="pimcore_admin_logout")
+     * @Route("/logout", name="pimcore_admin_logout" , methods={"POST"})
      */
     public function logoutAction()
     {
@@ -336,7 +336,7 @@ class LoginController extends AdminController implements BruteforceProtectedCont
         if ($browser->getBrowser() == \Browser::BROWSER_SAFARI && $browserVersion >= 13.1) {
             $supported = true;
         }
-        if ($browser->getBrowser() == \Browser::BROWSER_OPERA && $browserVersion >= 67) {
+        if ($browser->getBrowser() == \Browser::BROWSER_EDGE && $browserVersion >= 90) {
             $supported = true;
         }
 

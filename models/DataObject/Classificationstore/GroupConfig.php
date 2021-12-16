@@ -22,11 +22,10 @@ use Pimcore\Model;
 
 /**
  * @method \Pimcore\Model\DataObject\Classificationstore\GroupConfig\Dao getDao()
+ * @method int hasChildren()
  */
 final class GroupConfig extends Model\AbstractModel
 {
-    use Model\Element\ChildsCompatibilityTrait;
-
     /**
      * @var int
      */
@@ -61,12 +60,12 @@ final class GroupConfig extends Model\AbstractModel
     protected $description;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $creationDate;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $modificationDate;
 
@@ -120,14 +119,6 @@ final class GroupConfig extends Model\AbstractModel
         } catch (Model\Exception\NotFoundException $e) {
             return null;
         }
-    }
-
-    /**
-     * @return int
-     */
-    public function hasChildren()
-    {
-        return $this->getDao()->hasChildren();
     }
 
     /**
@@ -277,7 +268,7 @@ final class GroupConfig extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getModificationDate()
     {
@@ -297,7 +288,7 @@ final class GroupConfig extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getCreationDate()
     {

@@ -195,12 +195,7 @@ class DataObjectHelperController extends AdminController
     public function gridDeleteColumnConfigAction(Request $request, Config $config)
     {
         $gridConfigId = $request->get('gridConfigId');
-        $gridConfig = null;
-
-        try {
-            $gridConfig = GridConfig::getById($gridConfigId);
-        } catch (\Exception $e) {
-        }
+        $gridConfig = GridConfig::getById($gridConfigId);
         $success = false;
         if ($gridConfig) {
             if ($gridConfig->getOwnerId() != $this->getAdminUser()->getId() && !$this->getAdminUser()->isAdmin()) {
@@ -291,57 +286,33 @@ class DataObjectHelperController extends AdminController
 
         if (strlen($requestedGridConfigId) == 0 && $class) {
             // check if there is a favourite view
-            $favourite = null;
+            $favourite = GridConfigFavourite::getByOwnerAndClassAndObjectId($userId, $class->getId(), $objectId ?: 0, $searchType);
+            if (!$favourite && $objectId) {
+                $favourite = GridConfigFavourite::getByOwnerAndClassAndObjectId($userId, $class->getId(), 0, $searchType);
+            }
 
-            try {
-                try {
-                    $favourite = GridConfigFavourite::getByOwnerAndClassAndObjectId($userId, $class->getId(), $objectId ? $objectId : 0, $searchType);
-                } catch (\Exception $e) {
-                }
-                if (!$favourite && $objectId) {
-                    $favourite = GridConfigFavourite::getByOwnerAndClassAndObjectId($userId, $class->getId(), 0, $searchType);
-                }
-
-                if ($favourite) {
-                    $requestedGridConfigId = $favourite->getGridConfigId();
-                }
-            } catch (\Exception $e) {
+            if ($favourite) {
+                $requestedGridConfigId = $favourite->getGridConfigId();
             }
         }
 
         if (is_numeric($requestedGridConfigId) && $requestedGridConfigId > 0) {
             $db = Db::get();
-            $configListingConditionParts = [];
-            $configListingConditionParts[] = 'ownerId = ' . $userId;
-            $configListingConditionParts[] = 'classId = ' . $db->quote($class->getId());
-
-            if ($searchType) {
-                $configListingConditionParts[] = 'searchType = ' . $db->quote($searchType);
-            }
-
-            $savedGridConfig = null;
-
-            try {
-                $savedGridConfig = GridConfig::getById($requestedGridConfigId);
-            } catch (\Exception $e) {
-            }
+            $savedGridConfig = GridConfig::getById($requestedGridConfigId);
 
             if ($savedGridConfig) {
                 $shared = false;
                 if (!$this->getAdminUser()->isAdmin()) {
-                    try {
-                        $userIds = [$this->getAdminUser()->getId()];
-                        if ($this->getAdminUser()->getRoles()) {
-                            $userIds = array_merge($userIds, $this->getAdminUser()->getRoles());
-                        }
-                        $userIds = implode(',', $userIds);
-                        $shared = ($savedGridConfig->getOwnerId() != $userId && $savedGridConfig->isShareGlobally()) || $db->fetchOne('select 1 from gridconfig_shares where sharedWithUserId IN ('.$userIds.') and gridConfigId = '.$savedGridConfig->getId());
-//                    $shared = $savedGridConfig->isShareGlobally() ||GridConfigShare::getByGridConfigAndSharedWithId($savedGridConfig->getId(), $this->getUser()->getId());
-                    } catch (\Exception $e) {
+                    $userIds = [$this->getAdminUser()->getId()];
+                    if ($this->getAdminUser()->getRoles()) {
+                        $userIds = array_merge($userIds, $this->getAdminUser()->getRoles());
                     }
+                    $userIds = implode(',', $userIds);
+                    $shared = ($savedGridConfig->getOwnerId() != $userId && $savedGridConfig->isShareGlobally()) || $db->fetchOne('select 1 from gridconfig_shares where sharedWithUserId IN ('.$userIds.') and gridConfigId = '.$savedGridConfig->getId());
+//                  $shared = $savedGridConfig->isShareGlobally() || GridConfigShare::getByGridConfigAndSharedWithId($savedGridConfig->getId(), $this->getUser()->getId());
 
                     if (!$shared && $savedGridConfig->getOwnerId() != $this->getAdminUser()->getId()) {
-                        throw new \Exception('you are neither the onwner of this config nor it is shared with you');
+                        throw new \Exception('You are neither the owner of this config nor it is shared with you');
                     }
                 }
 
@@ -357,6 +328,7 @@ class DataObjectHelperController extends AdminController
                 $modificationDate = $savedGridConfig->getModificationDate();
                 $gridConfigDescription = $savedGridConfig->getDescription();
                 $sharedGlobally = $savedGridConfig->isShareGlobally();
+                $setAsFavourite = $savedGridConfig->isSetAsFavourite();
             }
         }
 
@@ -542,6 +514,7 @@ class DataObjectHelperController extends AdminController
         $settings['owner'] = $owner ?? null;
         $settings['modificationDate'] = $modificationDate ?? null;
         $settings['shareGlobally'] = $sharedGlobally ?? null;
+        $settings['setAsFavourite'] = $setAsFavourite ?? null;
         $settings['isShared'] = !$gridConfigId || ($shared ?? null);
 
         $context = $gridConfig['context'] ?? null;
@@ -787,7 +760,6 @@ class DataObjectHelperController extends AdminController
 
         if ($object->isAllowed('list')) {
             $classId = $request->get('classId');
-            $gridConfigId = $request->get('gridConfigId');
             $searchType = $request->get('searchType');
             $user = $this->getAdminUser();
             $db = Db::get();
@@ -905,7 +877,8 @@ class DataObjectHelperController extends AdminController
      */
     public function gridSaveColumnConfigAction(Request $request)
     {
-        $object = DataObject::getById($request->get('id'));
+        $objectId = $request->get('id');
+        $object   = DataObject::getById($objectId);
 
         if ($object->isAllowed('list')) {
             try {
@@ -927,18 +900,17 @@ class DataObjectHelperController extends AdminController
                 $metadata = json_decode($metadata, true);
 
                 $gridConfigId = $metadata['gridConfigId'];
-                $gridConfig = null;
-                if ($gridConfigId) {
-                    try {
-                        $gridConfig = GridConfig::getById($gridConfigId);
-                    } catch (\Exception $e) {
-                    }
-                }
+                $gridConfig = GridConfig::getById($gridConfigId);
+
                 if ($gridConfig && $gridConfig->getOwnerId() != $this->getAdminUser()->getId() && !$this->getAdminUser()->isAdmin()) {
                     throw new \Exception("don't mess around with somebody elses configuration");
                 }
 
                 $this->updateGridConfigShares($gridConfig, $metadata);
+
+                if ($metadata['setAsFavourite'] && $this->getAdminUser()->isAdmin()) {
+                    $this->updateGridConfigFavourites($gridConfig, $metadata, $objectId);
+                }
 
                 if (!$gridConfig) {
                     $gridConfig = new GridConfig();
@@ -953,6 +925,7 @@ class DataObjectHelperController extends AdminController
                     $gridConfig->setName($metadata['gridConfigName']);
                     $gridConfig->setDescription($metadata['gridConfigDescription']);
                     $gridConfig->setShareGlobally($metadata['shareGlobally'] && $this->getAdminUser()->isAdmin());
+                    $gridConfig->setSetAsFavourite($metadata['setAsFavourite'] && $this->getAdminUser()->isAdmin());
                 }
 
                 $gridConfigData = json_encode($gridConfigData);
@@ -969,6 +942,7 @@ class DataObjectHelperController extends AdminController
                 $settings['gridConfigName'] = $gridConfig->getName();
                 $settings['gridConfigDescription'] = $gridConfig->getDescription();
                 $settings['shareGlobally'] = $gridConfig->isShareGlobally();
+                $settings['setAsFavourite'] = $gridConfig->isSetAsFavourite();
                 $settings['isShared'] = $gridConfig->getOwnerId() != $this->getAdminUser()->getId() && !$this->getAdminUser()->isAdmin();
 
                 return $this->adminJson([
@@ -1023,6 +997,111 @@ class DataObjectHelperController extends AdminController
             $share->setGridConfigId($gridConfig->getId());
             $share->setSharedWithUserId($id);
             $share->save();
+        }
+    }
+
+    /**
+     * @param GridConfig|null $gridConfig
+     * @param array $metadata
+     * @param int $objectId
+     *
+     * @throws \Exception
+     */
+    protected function updateGridConfigFavourites($gridConfig, $metadata, $objectId)
+    {
+        $currentUser = $this->getAdminUser();
+
+        if (!$gridConfig || $currentUser === null || !$currentUser->isAllowed('share_configurations')) {
+            // nothing to do
+            return;
+        }
+
+        if (!$currentUser->isAdmin() && (int) $gridConfig->getOwnerId() !== $currentUser->getId()) {
+            throw new \Exception("don't mess with someone elses grid config");
+        }
+
+        $sharedUsers = [];
+
+        if ($metadata['shareGlobally'] === false) {
+            $sharedUserIds = $metadata['sharedUserIds'];
+
+            if ($sharedUserIds) {
+                $sharedUsers = explode(',', $sharedUserIds);
+            }
+        }
+
+        if ($metadata['shareGlobally'] === true) {
+            $users = new User\Listing();
+            $users->setCondition('id = ?', $currentUser->getId());
+
+            foreach ($users as $user) {
+                $sharedUsers[] = $user->getId();
+            }
+        }
+
+        foreach ($sharedUsers as $id) {
+            $global    = true;
+            $favourite = GridConfigFavourite::getByOwnerAndClassAndObjectId(
+                (int) $id,
+                $gridConfig->getClassId(),
+                (int) $objectId,
+                $gridConfig->getSearchType()
+            );
+
+            // If the user has already a favourite for that object we check the current favourite and decide if we update
+            if ($favourite instanceof GridConfigFavourite) {
+                $favouriteGridConfig = GridConfig::getById($favourite->getGridConfigId());
+
+                if ($favouriteGridConfig instanceof GridConfig) {
+                    // Check if the grid config was shared globally if that is *not* the case we also not update
+                    if ((bool) $favouriteGridConfig->isShareGlobally() === false) {
+                        continue;
+                    }
+
+                    // Check if the user is the owner. If that is the case we do not update the favourite
+                    if ((int) $favouriteGridConfig->getOwnerId() === (int) $id) {
+                        continue;
+                    }
+                }
+            }
+
+            // Check if the user has already a global favourite then we do not save the favourite as global
+            $favourite = GridConfigFavourite::getByOwnerAndClassAndObjectId(
+                (int) $id,
+                $gridConfig->getClassId(),
+                0,
+                $gridConfig->getSearchType()
+            );
+
+            if ($favourite instanceof GridConfigFavourite) {
+                $favouriteGridConfig = GridConfig::getById($favourite->getGridConfigId());
+
+                if ($favouriteGridConfig instanceof GridConfig) {
+                    // Check if the grid config was shared globally if that is *not* the case we also not update
+                    if ($favouriteGridConfig->isShareGlobally() === false) {
+                        $global = false;
+                    }
+
+                    // Check if the user is the owner. If that is the case we do not update the global favourite
+                    if ($favouriteGridConfig->getOwnerId() === (int) $id) {
+                        $global = false;
+                    }
+                }
+            }
+
+            $favourite = new GridConfigFavourite();
+            $favourite->setGridConfigId($gridConfig->getId());
+            $favourite->setClassId($gridConfig->getClassId());
+            $favourite->setObjectId($objectId);
+            $favourite->setOwnerId($id);
+            $favourite->setType($gridConfig->getType());
+            $favourite->setSearchType($gridConfig->getSearchType());
+            $favourite->save();
+
+            if ($global === true) {
+                $favourite->setObjectId(0);
+                $favourite->save();
+            }
         }
     }
 

@@ -20,6 +20,7 @@ use Pimcore\Event\DocumentEvents;
 use Pimcore\Event\Model\DocumentEvent;
 use Pimcore\Http\RequestHelper;
 use Pimcore\Logger;
+use Pimcore\Messenger\VersionDeleteMessage;
 use Pimcore\Model;
 use Pimcore\Model\Document;
 use Pimcore\Model\Document\Editable\Loader\EditableLoaderInterface;
@@ -222,10 +223,10 @@ abstract class PageSnippet extends Model\Document
      */
     protected function doDelete()
     {
-        $versions = $this->getVersions();
-        foreach ($versions as $version) {
-            $version->delete();
-        }
+        // Dispatch Symfony Message Bus to delete versions
+        \Pimcore::getContainer()->get('messenger.bus.pimcore-core')->dispatch(
+            new VersionDeleteMessage(Service::getElementType($this), $this->getId())
+        );
 
         // remove all tasks
         $this->getDao()->deleteAllTasks();
@@ -595,7 +596,12 @@ abstract class PageSnippet extends Model\Document
             }
         }
 
-        $url = $scheme . $hostname . $this->getFullPath();
+        $url = $scheme . $hostname;
+        if ($this instanceof Page && $this->getPrettyUrl()) {
+            $url .= $this->getPrettyUrl();
+        } else {
+            $url .= $this->getFullPath();
+        }
 
         $site = \Pimcore\Tool\Frontend::getSiteForDocument($this);
         if ($site instanceof Model\Site && $site->getMainDomain()) {

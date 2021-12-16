@@ -27,9 +27,7 @@ use Pimcore\Normalizer\NormalizerInterface;
 class QuantityValue extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface, TypeDeclarationSupportInterface, EqualComparisonInterface, VarExporterInterface, NormalizerInterface
 {
     use Extension\ColumnType;
-
     use Extension\QueryColumnType;
-
     use Model\DataObject\Traits\DefaultValueTrait;
 
     /**
@@ -157,7 +155,9 @@ class QuantityValue extends Data implements ResourcePersistenceAwareInterface, Q
      */
     public function getDefaultValue()
     {
-        if ($this->defaultValue !== null) {
+        // Default values such as "0" and "0.0" should be accepted and returned as float,
+        // while empty strings and nulls should not
+        if (is_numeric($this->defaultValue)) {
             return (float) $this->defaultValue;
         }
 
@@ -169,7 +169,7 @@ class QuantityValue extends Data implements ResourcePersistenceAwareInterface, Q
      */
     public function setDefaultValue($defaultValue)
     {
-        if ($defaultValue !== null) {
+        if (is_numeric($defaultValue)) {
             $this->defaultValue = (float) $defaultValue;
         } else {
             $this->defaultValue = null;
@@ -329,7 +329,7 @@ class QuantityValue extends Data implements ResourcePersistenceAwareInterface, Q
     }
 
     /**
-     * @param float $data
+     * @param array $data
      * @param Model\DataObject\Concrete $object
      * @param mixed $params
      *

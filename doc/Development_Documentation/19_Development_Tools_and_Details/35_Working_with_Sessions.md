@@ -14,7 +14,7 @@ or application.
 namespace TestBundle\Session\Configurator;
  
 use Pimcore\Session\SessionConfiguratorInterface;
-use Symfony\Component\HttpFoundation\Session\Attribute\NamespacedAttributeBag;
+use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBag;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
  
 class SessionCartConfigurator implements SessionConfiguratorInterface
@@ -24,7 +24,7 @@ class SessionCartConfigurator implements SessionConfiguratorInterface
      */
     public function configure(SessionInterface $session)
     {
-        $bag = new NamespacedAttributeBag('_session_cart');
+        $bag = new AttributeBag('_session_cart');
         $bag->setName('session_cart');
  
         $session->registerBag($bag);
@@ -46,13 +46,13 @@ services:
 if ($request->hasSession()) {
     $session = $request->getSession();
      
-    /** @var NamespacedAttributeBag $bag */
+    /** @var AttributeBag $bag */
     $bag = $session->getBag('session_cart');
     $bag->set('foo', 1);
 }
 ```
 
-Symfony framework session is configured by default, so you don't need to configure the session in your `config.yml`.
+Symfony framework session is configured by default, so you don't need to configure the session in your `config.yaml`.
 
 
 Admin sessions `Pimcore\Tool\Session::getReadonly()` returns an `AttributeBagInterface`. 

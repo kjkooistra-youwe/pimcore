@@ -16,16 +16,16 @@
 namespace Pimcore\Config;
 
 use Pimcore\Config;
-use Pimcore\Console\Application;
 use Pimcore\Db\PhpArrayFileTable;
 use Pimcore\File;
+use Pimcore\Helper\StopMessengerWorkersTrait;
 use Pimcore\Model\Tool\SettingsStore;
-use Symfony\Component\Console\Input\ArrayInput;
-use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Yaml\Yaml;
 
 class LocationAwareConfigRepository
 {
+    use StopMessengerWorkersTrait;
+
     /**
      * @deprecated Will be removed in Pimcore 11
      */
@@ -260,9 +260,40 @@ class LocationAwareConfigRepository
             }
         }
 
+        $this->searchAndReplaceMissingParameters($data);
+
         File::put($yamlFilename, Yaml::dump($data, 50));
 
         $this->invalidateConfigCache();
+    }
+
+    private function searchAndReplaceMissingParameters(array &$data): void
+    {
+        $container = \Pimcore::getContainer();
+
+        foreach ($data as $key => &$value) {
+            if (is_array($value)) {
+                $this->searchAndReplaceMissingParameters($value);
+
+                continue;
+            }
+
+            if (!is_scalar($value)) {
+                continue;
+            }
+
+            if (preg_match('/%([^%\s]+)%/', $value, $match)) {
+                $key = $match[1];
+
+                if (str_starts_with($key, 'env(') && str_ends_with($key, ')')  && 'env()' !== $key) {
+                    continue;
+                }
+
+                if (!$container->hasParameter($key)) {
+                    $value = preg_replace('/%([^%\s]+)%/', '%%$1%%', $value);
+                }
+            }
+        }
     }
 
     /**
@@ -331,28 +362,6 @@ class LocationAwareConfigRepository
         $systemConfigFile = Config::locateConfigFile('system.yml');
         if ($systemConfigFile) {
             touch($systemConfigFile);
-        }
-    }
-
-    private function stopMessengerWorkers(): void
-    {
-        $app = new Application(\Pimcore::getKernel());
-        $app->setAutoExit(false);
-
-        $input = new ArrayInput([
-            'command' => 'messenger:stop-workers',
-            '--no-ansi' => null,
-            '--no-interaction' => null,
-        ]);
-
-        $output = new BufferedOutput();
-        $return = $app->run($input, $output);
-
-        if (0 !== $return) {
-            // return the output, don't use if you used NullOutput()
-            $content = $output->fetch();
-
-            throw new \Exception('Running messenger:stop-workers failed, output was: ' . $content);
         }
     }
 }

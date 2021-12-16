@@ -29,9 +29,7 @@ use Pimcore\Tool\Serialize;
 class Block extends Data implements CustomResourcePersistingInterface, ResourcePersistenceAwareInterface, LazyLoadingSupportInterface, TypeDeclarationSupportInterface, VarExporterInterface, NormalizerInterface, DataContainerAwareInterface, PreGetDataInterface, PreSetDataInterface
 {
     use Element\ChildsCompatibilityTrait;
-
     use Extension\ColumnType;
-
     use DataObject\Traits\ClassSavedTrait;
 
     /**
@@ -1124,10 +1122,14 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
                 }
 
                 if ($validationExceptions) {
-                    $aggregatedExceptions = new Model\Element\ValidationException();
-                    $aggregatedExceptions->setSubItems($validationExceptions);
+                    $errors = [];
+                    /** @var Element\ValidationException $e */
+                    foreach ($validationExceptions as $e) {
+                        $errors[] = $e->getAggregatedMessage();
+                    }
+                    $message = implode(' / ', $errors);
 
-                    throw $aggregatedExceptions;
+                    throw new Model\Element\ValidationException($message);
                 }
             }
         }

@@ -25,12 +25,10 @@ use Pimcore\Normalizer\NormalizerInterface;
 class ManyToManyObjectRelation extends AbstractRelations implements QueryResourcePersistenceAwareInterface, OptimizedAdminLoadingInterface, TypeDeclarationSupportInterface, VarExporterInterface, NormalizerInterface, IdRewriterInterface, PreGetDataInterface, PreSetDataInterface, LayoutDefinitionEnrichmentInterface
 {
     use Model\DataObject\ClassDefinition\Data\Extension\Relation;
-
     use Extension\QueryColumnType;
-
     use DataObject\ClassDefinition\Data\Relations\AllowObjectRelationTrait;
-
     use DataObject\ClassDefinition\Data\Relations\ManyToManyRelationTrait;
+    use DataObject\ClassDefinition\Data\Extension\RelationFilterConditionParser;
 
     /**
      * Static type of this element
@@ -388,7 +386,7 @@ class ManyToManyObjectRelation extends AbstractRelations implements QueryResourc
                         $id = '??';
                     }
 
-                    throw new Element\ValidationException('Invalid object relation to object ['.$id.'] in field ' . $this->getName(). ' , tried to assign ' . $o->getId(), null, null);
+                    throw new Element\ValidationException('Invalid object relation to object ['.$id.'] in field ' . $this->getName(). ' , tried to assign ' . $o->getId());
                 }
             }
 
@@ -899,5 +897,21 @@ class ManyToManyObjectRelation extends AbstractRelations implements QueryResourc
         }
 
         return parent::addListingFilter($listing, $data, $operator);
+    }
+
+    /**
+     * Filter by relation feature
+     *
+     * @param array|string|null $value
+     * @param string            $operator
+     * @param array             $params
+     *
+     * @return string
+     */
+    public function getFilterConditionExt($value, $operator, $params = [])
+    {
+        $name = $params['name'] ?: $this->name;
+
+        return $this->getRelationFilterCondition($value, $operator, $name);
     }
 }

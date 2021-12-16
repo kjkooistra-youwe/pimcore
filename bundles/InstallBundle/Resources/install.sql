@@ -19,7 +19,8 @@ CREATE TABLE `application_logs` (
   KEY `component` (`component`),
   KEY `timestamp` (`timestamp`),
   KEY `relatedobject` (`relatedobject`),
-  KEY `priority` (`priority`)
+  KEY `priority` (`priority`),
+  KEY `maintenanceChecked` (`maintenanceChecked`)
 ) DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `assets`;
@@ -940,14 +941,14 @@ DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `object_url_slugs`;
 CREATE TABLE `object_url_slugs` (
-      `objectId` INT(11) NOT NULL DEFAULT '0',
-	    `classId` VARCHAR(50) NOT NULL DEFAULT '0',
+      `objectId` INT(11) UNSIGNED NOT NULL DEFAULT '0',
+      `classId` VARCHAR(50) NOT NULL DEFAULT '0',
       `fieldname` VARCHAR(70) NOT NULL DEFAULT '0',
       `index` INT(11) UNSIGNED NOT NULL DEFAULT '0',
       `ownertype` ENUM('object','fieldcollection','localizedfield','objectbrick') NOT NULL DEFAULT 'object',
       `ownername` VARCHAR(70) NOT NULL DEFAULT '',
       `position` VARCHAR(70) NOT NULL DEFAULT '0',
-      `slug` varchar(765) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL, /* slug in utf8 (3-byte) using the full key length of 3072 bytes */
+      `slug` varchar(765) NOT NULL, /* slug in utf8mb4 (4-byte) using the full key length of 3072 bytes */
       `siteId` INT(11) NOT NULL DEFAULT '0',
       PRIMARY KEY (`slug`, `siteId`),
       INDEX `index` (`index`),
@@ -958,7 +959,8 @@ CREATE TABLE `object_url_slugs` (
       INDEX `ownertype` (`ownertype`),
       INDEX `ownername` (`ownername`),
       INDEX `slug` (`slug`),
-      INDEX `siteId` (`siteId`)
+      INDEX `siteId` (`siteId`),
+      CONSTRAINT `fk_object_url_slugs__objectId` FOREIGN KEY (`objectId`) REFERENCES objects (`o_id`) ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC;
 
 DROP TABLE IF EXISTS `webdav_locks`;

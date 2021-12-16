@@ -38,11 +38,8 @@ final class Localizedfield extends Model\AbstractModel implements
     OwnerAwareFieldInterface
 {
     use Model\DataObject\Traits\OwnerAwareFieldTrait;
-
     use Model\DataObject\Traits\LazyLoadedRelationTrait;
-
     use Model\Element\Traits\DirtyIndicatorTrait;
-
     use Model\Element\ElementDumpStateTrait;
 
     /**
@@ -70,9 +67,9 @@ final class Localizedfield extends Model\AbstractModel implements
     /**
      * @internal
      *
-     * @var Concrete|null
+     * @var Concrete|Model\Element\ElementDescriptor|null
      */
-    protected $object = null;
+    protected $object;
 
     /**
      * @internal
@@ -84,9 +81,9 @@ final class Localizedfield extends Model\AbstractModel implements
     /**
      * @internal
      *
-     * @var array
+     * @var array|null
      */
-    protected array $context = [];
+    protected ?array $context = [];
 
     /**
      * @internal
@@ -530,7 +527,7 @@ final class Localizedfield extends Model\AbstractModel implements
                                 }
                             }
 
-                            if (method_exists($parentContainer, $method)) {
+                            if ($parentContainer && method_exists($parentContainer, $method)) {
                                 $localizedFields = $parentContainer->getLocalizedFields();
                                 if ($localizedFields instanceof Localizedfield) {
                                     if ($localizedFields->getObject()->getId() != $this->getObject()->getId()) {
@@ -720,15 +717,15 @@ final class Localizedfield extends Model\AbstractModel implements
      */
     public function getContext(): array
     {
-        return $this->context;
+        return $this->context ?? [];
     }
 
     /**
-     * @param array $context
+     * @param array|null $context
      */
-    public function setContext(array $context): void
+    public function setContext(?array $context): void
     {
-        $this->context = $context;
+        $this->context = $context ?? [];
     }
 
     /**

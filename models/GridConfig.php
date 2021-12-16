@@ -26,12 +26,12 @@ use Pimcore\Model\Exception\NotFoundException;
 class GridConfig extends AbstractModel
 {
     /**
-     * @var int
+     * @var int|null
      */
     protected $id;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $ownerId;
 
@@ -61,12 +61,12 @@ class GridConfig extends AbstractModel
     protected $description;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $creationDate;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $modificationDate;
 
@@ -76,6 +76,11 @@ class GridConfig extends AbstractModel
     protected $shareGlobally;
 
     /**
+     * @var bool
+     */
+    protected $setAsFavourite;
+
+    /**
      * @var string
      */
     protected $type = 'object';
@@ -83,19 +88,22 @@ class GridConfig extends AbstractModel
     /**
      * @param int $id
      *
-     * @return GridConfig
-     *
-     * @throws NotFoundException
+     * @return GridConfig|null
      */
     public static function getById($id)
     {
         if (!$id) {
-            throw new NotFoundException('config not found');
+            return null;
         }
-        $config = new self();
-        $config->getDao()->getById($id);
 
-        return $config;
+        try {
+            $config = new self();
+            $config->getDao()->getById($id);
+
+            return $config;
+        } catch (NotFoundException) {
+            return null;
+        }
     }
 
     /**
@@ -126,7 +134,7 @@ class GridConfig extends AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getId()
     {
@@ -142,7 +150,7 @@ class GridConfig extends AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getOwnerId()
     {
@@ -238,7 +246,7 @@ class GridConfig extends AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getCreationDate()
     {
@@ -254,7 +262,7 @@ class GridConfig extends AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getModificationDate()
     {
@@ -283,6 +291,22 @@ class GridConfig extends AbstractModel
     public function setShareGlobally($shareGlobally)
     {
         $this->shareGlobally = $shareGlobally;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isSetAsFavourite()
+    {
+        return $this->setAsFavourite;
+    }
+
+    /**
+     * @param bool $setAsFavourite
+     */
+    public function setSetAsFavourite($setAsFavourite)
+    {
+        $this->setAsFavourite = $setAsFavourite;
     }
 
     /**

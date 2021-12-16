@@ -29,9 +29,7 @@ use Pimcore\Model\DataObject\Exception\InheritanceParentNotFoundException;
 abstract class AbstractData extends Model\AbstractModel implements Model\DataObject\LazyLoadedFieldsInterface, Model\Element\ElementDumpStateInterface, Model\Element\DirtyIndicatorInterface
 {
     use Model\DataObject\Traits\LazyLoadedRelationTrait;
-
     use Model\Element\ElementDumpStateTrait;
-
     use Model\Element\Traits\DirtyIndicatorTrait;
 
     /**
@@ -49,12 +47,12 @@ abstract class AbstractData extends Model\AbstractModel implements Model\DataObj
     /**
      * @var bool
      */
-    protected bool $doDelete = false;
+    protected $doDelete = false;
 
     /**
-     * @var Concrete|null
+     * @var Concrete|Model\Element\ElementDescriptor|null
      */
-    protected ?Concrete $object = null;
+    protected $object;
 
     /**
      * @var int|null
@@ -115,7 +113,7 @@ abstract class AbstractData extends Model\AbstractModel implements Model\DataObj
     public function setDoDelete($doDelete)
     {
         $this->flushContainer();
-        $this->doDelete = $doDelete;
+        $this->doDelete = (bool)$doDelete;
 
         return $this;
     }
@@ -174,7 +172,7 @@ abstract class AbstractData extends Model\AbstractModel implements Model\DataObj
     {
         $object = $this->getObject();
         if ($object) {
-            $parent = DataObject\Service::hasInheritableParentObject($object);
+            $parent = DataObject\Service::hasInheritableParentObject($object, $key);
 
             if (!empty($parent)) {
                 $containerGetter = 'get' . ucfirst($this->fieldname);
