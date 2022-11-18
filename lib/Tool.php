@@ -42,11 +42,6 @@ final class Tool
     protected static $validLanguages = [];
 
     /**
-     * @var null
-     */
-    protected static $isFrontend = null;
-
-    /**
      * Sets the current request to operate on
      *
      * @param Request|null $request
@@ -165,7 +160,7 @@ final class Tool
     }
 
     /**
-     * @return array|mixed
+     * @return array<string, string>
      *
      * @throws \Exception
      */
@@ -268,12 +263,7 @@ final class Tool
         return $iconPath;
     }
 
-    /**
-     * @param Request|null $request
-     *
-     * @return null|Request
-     */
-    private static function resolveRequest(Request $request = null)
+    private static function resolveRequest(Request $request = null): ?Request
     {
         if (null === $request) {
             // do an extra check for the container as we might be in a state where no container is set yet
@@ -395,8 +385,10 @@ final class Tool
     {
         $request = self::resolveRequest($request);
 
-        if (null === $request) {
-            return null;
+        if (null === $request || !$request->getHost()) {
+            $domain = \Pimcore\Config::getSystemConfiguration('general')['domain'];
+
+            return $domain ?: null;
         }
 
         return $request->getHost();
@@ -444,7 +436,7 @@ final class Tool
         }
 
         // get it from System settings
-        if (!$hostname || $hostname == 'localhost') {
+        if (!$hostname || $hostname === 'localhost') {
             $systemConfig = Config::getSystemConfiguration('general');
             $hostname = $systemConfig['domain'] ?? null;
 
@@ -536,7 +528,7 @@ final class Tool
         }
 
         if ($subject) {
-            $mail->setSubject($subject);
+            $mail->subject($subject);
         }
 
         return $mail;
@@ -560,14 +552,17 @@ final class Tool
         }
 
         if (is_array($paramsGet) && count($paramsGet) > 0) {
-
-            //need to insert get params from url to $paramsGet because otherwise the would be ignored
+            //need to insert get params from url to $paramsGet because otherwise they would be ignored
             $urlParts = parse_url($url);
-            $urlParams = [];
-            parse_str($urlParts['query'], $urlParams);
 
-            if ($urlParams) {
-                $paramsGet = array_merge($urlParams, $paramsGet);
+            if (isset($urlParts['query'])) {
+                $urlParams = [];
+
+                parse_str($urlParts['query'], $urlParams);
+
+                if ($urlParams) {
+                    $paramsGet = array_merge($urlParams, $paramsGet);
+                }
             }
 
             $options[RequestOptions::QUERY] = $paramsGet;
@@ -627,12 +622,9 @@ final class Tool
     }
 
     /**
-     * @param string $class
      * @param string $type (e.g. 'class', 'interface', 'trait')
-     *
-     * @return bool
      */
-    private static function classInterfaceExists($class, $type)
+    private static function classInterfaceExists(string $class, string $type): bool
     {
         $functionName = $type . '_exists';
 
@@ -653,8 +645,9 @@ final class Tool
         // Pimcore\Tool::ClassMapAutoloader(), but don't know what actual conditions causes this problem.
         // but to be save we log the errors into the debug.log, so if anything else happens we can see it there
         // the normal warning is e.g. Warning: include_once(Path/To/Class.php): failed to open stream: No such file or directory in ...
-        set_error_handler(function ($errno, $errstr, $errfile, $errline) {
+        set_error_handler(function (int $errno, string $errstr, string $errfile, int $errline): bool {
             //Logger::debug(implode(" ", [$errno, $errstr, $errfile, $errline]));
+            return true;
         });
 
         $exists = $functionName($class);

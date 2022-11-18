@@ -16,8 +16,10 @@
 namespace Pimcore\Model\DataObject\Data;
 
 use DeepCopy\DeepCopy;
+use DeepCopy\Filter\SetNullFilter;
+use DeepCopy\Matcher\PropertyNameMatcher;
 use Pimcore\Cache\Core\CacheMarshallerInterface;
-use Pimcore\Cache\Runtime;
+use Pimcore\Cache\RuntimeCache;
 use Pimcore\Model\AbstractModel;
 use Pimcore\Model\DataObject\OwnerAwareFieldInterface;
 use Pimcore\Model\DataObject\Traits\OwnerAwareFieldTrait;
@@ -141,12 +143,12 @@ class BlockElement extends AbstractModel implements OwnerAwareFieldInterface, Ca
                         $cacheKey = $currentValue->getCacheKey();
                         $cacheKeyRenewed = $cacheKey . '_blockElementRenewed';
 
-                        if (!Runtime::isRegistered($cacheKeyRenewed)) {
-                            if (Runtime::isRegistered($cacheKey)) {
+                        if (!RuntimeCache::isRegistered($cacheKeyRenewed)) {
+                            if (RuntimeCache::isRegistered($cacheKey)) {
                                 // we don't want the copy from the runtime but cache is fine
-                                Runtime::getInstance()->offsetUnset($cacheKey);
+                                RuntimeCache::getInstance()->offsetUnset($cacheKey);
                             }
-                            Runtime::save(true, $cacheKeyRenewed);
+                            RuntimeCache::save(true, $cacheKeyRenewed);
                         }
 
                         $renewedElement = Service::getElementById($currentValue->getType(), $currentValue->getId());
@@ -217,6 +219,9 @@ class BlockElement extends AbstractModel implements OwnerAwareFieldInterface, Ca
         $this->_language = $language;
     }
 
+    /**
+     * @return mixed
+     */
     public function marshalForCache()
     {
         $this->needsRenewReferences = true;
@@ -243,6 +248,8 @@ class BlockElement extends AbstractModel implements OwnerAwareFieldInterface, Ca
             ),
             new \Pimcore\Model\Element\DeepCopy\MarshalMatcher(null, null)
         );
+        $copier->addFilter(new SetNullFilter(), new PropertyNameMatcher('_owner'));
+
         $data = $copier->copy($this);
 
         return $data;

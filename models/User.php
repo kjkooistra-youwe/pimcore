@@ -33,22 +33,22 @@ final class User extends User\UserRole
     protected $type = 'user';
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $password;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $firstname;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $lastname;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $email;
 
@@ -133,7 +133,7 @@ final class User extends User\UserRole
     protected $twoFactorAuthentication;
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getPassword()
     {
@@ -141,13 +141,13 @@ final class User extends User\UserRole
     }
 
     /**
-     * @param string $password
+     * @param string|null $password
      *
      * @return $this
      */
     public function setPassword($password)
     {
-        if (strlen($password) > 4) {
+        if (strlen((string) $password) > 4) {
             $this->password = $password;
         }
 
@@ -157,7 +157,7 @@ final class User extends User\UserRole
     /**
      * Alias for getName()
      *
-     * @return string
+     * @return string|null
      */
     public function getUsername()
     {
@@ -165,7 +165,7 @@ final class User extends User\UserRole
     }
 
     /**
-     * @param string $username
+     * @param string|null $username
      *
      * @return $this
      */
@@ -177,8 +177,7 @@ final class User extends User\UserRole
     }
 
     /**
-     *
-     * @return string
+     * @return string|null
      */
     public function getFirstname()
     {
@@ -186,7 +185,7 @@ final class User extends User\UserRole
     }
 
     /**
-     * @param string $firstname
+     * @param string|null $firstname
      *
      * @return $this
      */
@@ -198,8 +197,7 @@ final class User extends User\UserRole
     }
 
     /**
-     *
-     * @return string
+     * @return string|null
      */
     public function getLastname()
     {
@@ -207,7 +205,7 @@ final class User extends User\UserRole
     }
 
     /**
-     * @param string $lastname
+     * @param string|null $lastname
      *
      * @return $this
      */
@@ -218,9 +216,13 @@ final class User extends User\UserRole
         return $this;
     }
 
+    public function getFullName(): string
+    {
+        return trim($this->getFirstname() . ' ' . $this->getLastname());
+    }
+
     /**
-     *
-     * @return string
+     * @return string|null
      */
     public function getEmail()
     {
@@ -228,7 +230,7 @@ final class User extends User\UserRole
     }
 
     /**
-     * @param string $email
+     * @param string|null $email
      *
      * @return $this
      */
@@ -400,11 +402,11 @@ final class User extends User\UserRole
      */
     public function setRoles($roles)
     {
-        if (is_string($roles) && !empty($roles)) {
+        if (is_string($roles) && $roles !== '') {
             $this->roles = explode(',', $roles);
         } elseif (is_array($roles)) {
             $this->roles = $roles;
-        } elseif (empty($roles)) {
+        } else {
             $this->roles = [];
         }
 
@@ -414,7 +416,7 @@ final class User extends User\UserRole
     /**
      * @return array
      */
-    public function getRoles()
+    public function getRoles(): array
     {
         if (empty($this->roles)) {
             return [];
@@ -599,14 +601,14 @@ final class User extends User\UserRole
      */
     public function setContentLanguages($contentLanguages)
     {
-        if ($contentLanguages && is_array($contentLanguages)) {
+        if (is_array($contentLanguages)) {
             $contentLanguages = implode(',', $contentLanguages);
         }
         $this->contentLanguages = $contentLanguages;
     }
 
     /**
-     * @return null|string
+     * @return string
      */
     public function getActivePerspective()
     {
@@ -628,9 +630,9 @@ final class User extends User\UserRole
     /**
      * Returns array of perspectives names related to user and all related roles
      *
-     * @return array|string[]
+     * @return string[]
      */
-    private function getMergedPerspectives()
+    private function getMergedPerspectives(): array
     {
         if (null === $this->mergedPerspectives) {
             $this->mergedPerspectives = $this->getPerspectives();
@@ -642,7 +644,7 @@ final class User extends User\UserRole
             $this->mergedPerspectives = array_values($this->mergedPerspectives);
             if (!$this->mergedPerspectives) {
                 // $perspectives = \Pimcore\Config::getAvailablePerspectives($this);
-                $allPerspectives = \Pimcore\Perspective\Config::get()->toArray();
+                $allPerspectives = \Pimcore\Perspective\Config::get();
                 $this->mergedPerspectives = [];
 
                 $this->mergedPerspectives = array_keys($allPerspectives);
@@ -686,7 +688,7 @@ final class User extends User\UserRole
                 $userRole = User\UserRole::getById($role);
                 $this->mergedWebsiteTranslationLanguagesEdit = array_merge($this->mergedWebsiteTranslationLanguagesEdit, $userRole->getWebsiteTranslationLanguagesEdit());
             }
-            $this->mergedWebsiteTranslationLanguagesEdit = array_values($this->mergedWebsiteTranslationLanguagesEdit);
+            $this->mergedWebsiteTranslationLanguagesEdit = array_values(array_unique($this->mergedWebsiteTranslationLanguagesEdit));
         }
 
         return $this->mergedWebsiteTranslationLanguagesEdit;
@@ -727,7 +729,8 @@ final class User extends User\UserRole
                 $userRole = User\UserRole::getById($role);
                 $this->mergedWebsiteTranslationLanguagesView = array_merge($this->mergedWebsiteTranslationLanguagesView, $userRole->getWebsiteTranslationLanguagesView());
             }
-            $this->mergedWebsiteTranslationLanguagesView = array_values($this->mergedWebsiteTranslationLanguagesView);
+
+            $this->mergedWebsiteTranslationLanguagesView = array_values(array_unique($this->mergedWebsiteTranslationLanguagesView));
         }
 
         return $this->mergedWebsiteTranslationLanguagesView;
@@ -1003,7 +1006,7 @@ final class User extends User\UserRole
     /**
      * @param string|null $key
      *
-     * @return array|mixed|null|string
+     * @return mixed
      */
     public function getTwoFactorAuthentication($key = null)
     {

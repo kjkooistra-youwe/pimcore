@@ -37,10 +37,10 @@ class Dao extends Model\Document\PageSnippet\Dao
             $this->model->setId($id);
         }
 
-        $data = $this->db->fetchRow("SELECT documents.*, documents_email.*, tree_locks.locked FROM documents
+        $data = $this->db->fetchAssociative("SELECT documents.*, documents_email.*, tree_locks.locked FROM documents
             LEFT JOIN documents_email ON documents.id = documents_email.id
             LEFT JOIN tree_locks ON documents.id = tree_locks.id AND tree_locks.type = 'document'
-                WHERE documents.id = ?", $this->model->getId());
+                WHERE documents.id = ?", [$this->model->getId()]);
 
         if (!empty($data['id'])) {
             $this->assignVariablesToModel($data);
@@ -64,9 +64,6 @@ class Dao extends Model\Document\PageSnippet\Dao
     public function delete()
     {
         $this->deleteAllProperties();
-
-        $this->db->delete('documents_email', ['id' => $this->model->getId()]);
-        $this->db->delete('email_log', ['documentId' => $this->model->getId()]);
 
         parent::delete();
     }

@@ -174,20 +174,6 @@ to decide buffer pool size and update `my.cnf`:
     innodb_buffer_pool_size=5G # needs to be adjusted according to your data
 ```
 
-#### MySQL Query Cache
-MySQL server features a Query Cache. When enabled, the query cache stores SELECT statements together 
-with the retrieved record set in memory, then if another identical query is received, the server can 
- retrieve the results from the query cache rather than parsing and executing the same query again.
-
-- you can check if query cache is enabled with command `SHOW VARIABLES LIKE 'have_query_cache';`. 
-- In order to enable the query caching, update `my.cnf`:
-```ini
-[mysqld] 
-query_cache_type=1 
-query_cache_size = 10M 
-query_cache_limit=256K
-```
-
 - you can also use Mysql Tuning script for more optimizations [mysqltuner.pl](https://github.com/rackerhacker/MySQLTuner-perl)
 
 #### Benchmarks:
@@ -239,7 +225,7 @@ and fail-over support.
 
 Configure `Redis` adapter for `Pimcore\Cache` using these settings:
 ```yaml
-# config/cache.yaml
+# config/packages/cache.yaml
 framework:
     cache:
         pools:
@@ -250,6 +236,8 @@ framework:
                 adapter: pimcore.cache.adapter.redis_tag_aware
                 provider: 'redis://localhost'
 ```
+
+Beware that element data gets added to the cache on first request of the data. To warm-up the cache after clearing the cache (e.g. caused by a deployment), execute `bin/console pimcore:cache:warming` so users experience optimal performance even on first access of an element.
 
 #### Benchmarks:
 On running command, `ab -n 100 -c 20 http://localhost/en/shop/Products/Cars~c390`

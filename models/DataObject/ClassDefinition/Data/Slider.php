@@ -53,35 +53,33 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
     /**
      * @internal
      *
-     * @var float
+     * @var float|null
      */
     public $minValue;
 
     /**
      * @internal
      *
-     * @var float
+     * @var float|null
      */
     public $maxValue;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $vertical;
+    public bool $vertical = false;
 
     /**
-     * v
+     * @internal
      *
-     * @var float
+     * @var float|null
      */
     public $increment;
 
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $decimalPrecision;
 
@@ -158,7 +156,7 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @param float $minValue
+     * @param float|null $minValue
      *
      * @return $this
      */
@@ -170,7 +168,7 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @return float
+     * @return float|null
      */
     public function getMaxValue()
     {
@@ -178,11 +176,9 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @param string|int|null $maxValue
+     * @param float|null $maxValue
      *
      * @return $this
-     *
-     * @internal param float $minValue
      */
     public function setMaxValue($maxValue)
     {
@@ -220,7 +216,7 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @return float
+     * @return float|null
      */
     public function getIncrement()
     {
@@ -228,7 +224,7 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @param float $increment
+     * @param float|null $increment
      *
      * @return $this
      */
@@ -240,7 +236,7 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getDecimalPrecision()
     {
@@ -248,7 +244,7 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @param int $decimalPrecision
+     * @param int|null $decimalPrecision
      *
      * @return $this
      */

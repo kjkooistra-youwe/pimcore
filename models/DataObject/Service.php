@@ -17,7 +17,7 @@ namespace Pimcore\Model\DataObject;
 
 use DeepCopy\Filter\SetNullFilter;
 use DeepCopy\Matcher\PropertyNameMatcher;
-use Pimcore\Cache\Runtime;
+use Pimcore\Cache\RuntimeCache;
 use Pimcore\DataObject\GridColumnConfig\ConfigElementInterface;
 use Pimcore\DataObject\GridColumnConfig\Operator\AbstractOperator;
 use Pimcore\DataObject\GridColumnConfig\Service as GridColumnConfigService;
@@ -32,6 +32,7 @@ use Pimcore\Model\DataObject\ClassDefinition\Data\IdRewriterInterface;
 use Pimcore\Model\DataObject\ClassDefinition\Data\LayoutDefinitionEnrichmentInterface;
 use Pimcore\Model\Element;
 use Pimcore\Model\Element\DirtyIndicatorInterface;
+use Pimcore\Tool;
 use Pimcore\Tool\Admin as AdminTool;
 use Pimcore\Tool\Session;
 use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
@@ -111,11 +112,8 @@ class Service extends Model\Element\Service
             $objects = $list->load();
             $userObjects[] = $objects;
         }
-        if ($userObjects) {
-            $userObjects = \array_merge(...$userObjects);
-        }
 
-        return $userObjects;
+        return \array_merge(...$userObjects);
     }
 
     /**
@@ -138,28 +136,14 @@ class Service extends Model\Element\Service
         //load all in case of lazy loading fields
         self::loadAllObjectFields($source);
 
-        /** @var Concrete $new */
-        $new = Element\Service::cloneMe($source);
-        $new->setId(null);
-        $new->setChildren(null);
-        $new->setKey(Element\Service::getSafeCopyName($new->getKey(), $target));
-        $new->setParentId($target->getId());
-        $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
-        $new->setUserModification($this->_user ? $this->_user->getId() : 0);
-        $new->setDao(null);
-        $new->setLocked(false);
-        $new->setCreationDate(time());
+        // triggers actions before object cloning
+        $event = new DataObjectEvent($source, [
+            'target_element' => $target,
+        ]);
+        \Pimcore::getEventDispatcher()->dispatch($event, DataObjectEvents::PRE_COPY);
+        $target = $event->getArgument('target_element');
 
-        if ($new instanceof Concrete) {
-            foreach ($new->getClass()->getFieldDefinitions() as $fieldDefinition) {
-                if ($fieldDefinition->getUnique()) {
-                    $new->set($fieldDefinition->getName(), null);
-                    $new->setPublished(false);
-                }
-            }
-        }
-
-        $new->save();
+        $new = $this->copy($source, $target);
 
         // add to store
         $this->_copyRecursiveIds[] = $new->getId();
@@ -202,29 +186,14 @@ class Service extends Model\Element\Service
         //load all in case of lazy loading fields
         self::loadAllObjectFields($source);
 
-        /** @var Concrete $new */
-        $new = Element\Service::cloneMe($source);
-        $new->setId(null);
+        // triggers actions before object cloning
+        $event = new DataObjectEvent($source, [
+            'target_element' => $target,
+        ]);
+        \Pimcore::getEventDispatcher()->dispatch($event, DataObjectEvents::PRE_COPY);
+        $target = $event->getArgument('target_element');
 
-        $new->setChildren(null);
-        $new->setKey(Element\Service::getSafeCopyName($new->getKey(), $target));
-        $new->setParentId($target->getId());
-        $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
-        $new->setUserModification($this->_user ? $this->_user->getId() : 0);
-        $new->setDao(null);
-        $new->setLocked(false);
-        $new->setCreationDate(time());
-
-        if ($new instanceof Concrete) {
-            foreach ($new->getClass()->getFieldDefinitions() as $fieldDefinition) {
-                if ($fieldDefinition->getUnique()) {
-                    $new->set($fieldDefinition->getName(), null);
-                    $new->setPublished(false);
-                }
-            }
-        }
-
-        $new->save();
+        $new = $this->copy($source, $target);
 
         DataObject::setDisableDirtyDetection($isDirtyDetectionDisabled);
 
@@ -235,6 +204,43 @@ class Service extends Model\Element\Service
             'base_element' => $source, // the element used to make a copy
         ]);
         \Pimcore::getEventDispatcher()->dispatch($event, DataObjectEvents::POST_COPY);
+
+        return $new;
+    }
+
+    private function copy(AbstractObject $source, AbstractObject $target): AbstractObject
+    {
+        /** @var AbstractObject $new */
+        $new = Element\Service::cloneMe($source);
+        $new->setId(null);
+        $new->setChildren(null);
+        $new->setKey(Element\Service::getSafeCopyName($new->getKey(), $target));
+        $new->setParentId($target->getId());
+        $new->setUserOwner($this->_user ? $this->_user->getId() : 0);
+        $new->setUserModification($this->_user ? $this->_user->getId() : 0);
+        $new->setDao(null);
+        $new->setLocked(null);
+        $new->setCreationDate(time());
+
+        if ($new instanceof Concrete) {
+            foreach ($new->getClass()->getFieldDefinitions() as $fieldDefinition) {
+                if ($fieldDefinition instanceof DataObject\ClassDefinition\Data\Localizedfields) {
+                    foreach ($fieldDefinition->getFieldDefinitions() as $localizedFieldDefinition) {
+                        if ($localizedFieldDefinition->getUnique()) {
+                            foreach (Tool::getValidLanguages() as $language) {
+                                $new->set($localizedFieldDefinition->getName(), null, $language);
+                            }
+                            $new->setPublished(false);
+                        }
+                    }
+                } elseif ($fieldDefinition->getUnique()) {
+                    $new->set($fieldDefinition->getName(), null);
+                    $new->setPublished(false);
+                }
+            }
+        }
+
+        $new->save();
 
         return $new;
     }
@@ -267,7 +273,7 @@ class Service extends Model\Element\Service
         $new->setKey($target->getKey());
         $new->setParentId($target->getParentId());
         $new->setScheduledTasks($source->getScheduledTasks());
-        $new->setProperties($source->getProperties());
+        $new->setProperties(self::cloneProperties($source->getProperties()));
         $new->setUserModification($this->_user ? $this->_user->getId() : 0);
 
         $new->save();
@@ -307,16 +313,16 @@ class Service extends Model\Element\Service
         $csvMode = $params['csvMode'] ?? false;
 
         if ($object instanceof Concrete) {
+            $user = AdminTool::getCurrentUser();
+
             $context = ['object' => $object,
                 'purpose' => 'gridview',
                 'language' => $requestedLanguage, ];
             $data['classname'] = $object->getClassName();
             $data['idPath'] = Element\Service::getIdPath($object);
             $data['inheritedFields'] = [];
-            $data['permissions'] = $object->getUserPermissions();
+            $data['permissions'] = $object->getUserPermissions($user);
             $data['locked'] = $object->isLocked();
-
-            $user = AdminTool::getCurrentUser();
 
             if (is_null($fields)) {
                 $fields = array_keys($object->getclass()->getFieldDefinitions());
@@ -443,7 +449,7 @@ class Service extends Model\Element\Service
                         $type = $keyParts[1];
 
                         if ($type === 'classificationstore') {
-                            $parent = self::hasInheritableParentObject($object, $key);
+                            $parent = self::hasInheritableParentObject($object);
 
                             if (!empty($parent)) {
                                 $data[$dataKey] = self::getStoreValueForObject($parent, $key, $requestedLanguage);
@@ -504,7 +510,7 @@ class Service extends Model\Element\Service
      * @param string $key
      * @param array $context
      *
-     * @return mixed|null|ConfigElementInterface|ConfigElementInterface[]
+     * @return ConfigElementInterface|null
      *
      * @internal
      */
@@ -514,8 +520,8 @@ class Service extends Model\Element\Service
         if (isset($context['language'])) {
             $cacheKey .= '_' . $context['language'];
         }
-        if (Runtime::isRegistered($cacheKey)) {
-            $config = Runtime::get($cacheKey);
+        if (RuntimeCache::isRegistered($cacheKey)) {
+            $config = RuntimeCache::get($cacheKey);
         } else {
             $definition = $helperDefinitions[$key];
             $attributes = json_decode(json_encode($definition->attributes));
@@ -528,7 +534,7 @@ class Service extends Model\Element\Service
                 return null;
             }
             $config = $config[0];
-            Runtime::save($config, $cacheKey);
+            RuntimeCache::save($config, $cacheKey);
         }
 
         return $config;
@@ -674,19 +680,9 @@ class Service extends Model\Element\Service
     /**
      * gets value for given object and getter, including inherited values
      *
-     * @static
-     *
-     * @param Concrete $object
-     * @param string $key
-     * @param string|null $brickType
-     * @param string|null $brickKey
-     * @param ClassDefinition\Data|null $fieldDefinition
-     * @param array $context
-     * @param array|null $brickDescriptor
-     *
-     * @return \stdClass, value and objectid where the value comes from
+     * @return \stdClass value and objectid where the value comes from
      */
-    private static function getValueForObject($object, $key, $brickType = null, $brickKey = null, $fieldDefinition = null, $context = [], $brickDescriptor = null)
+    private static function getValueForObject(Concrete $object, string $key, string $brickType = null, string $brickKey = null, ClassDefinition\Data $fieldDefinition = null, array $context = [], array $brickDescriptor = null): \stdClass
     {
         $getter = 'get' . ucfirst($key);
         $value = $object->$getter();
@@ -720,7 +716,7 @@ class Service extends Model\Element\Service
         }
 
         if ($fieldDefinition->isEmpty($value)) {
-            $parent = self::hasInheritableParentObject($object, $key);
+            $parent = self::hasInheritableParentObject($object);
             if (!empty($parent)) {
                 return self::getValueForObject($parent, $key, $brickType, $brickKey, $fieldDefinition, $context, $brickDescriptor);
             }
@@ -735,16 +731,8 @@ class Service extends Model\Element\Service
 
     /**
      * gets store value for given object and key
-     *
-     * @static
-     *
-     * @param Concrete $object
-     * @param string $key
-     * @param string|null $requestedLanguage
-     *
-     * @return string|null
      */
-    private static function getStoreValueForObject($object, $key, $requestedLanguage)
+    private static function getStoreValueForObject(Concrete $object, string $key, ?string $requestedLanguage): ?string
     {
         $keyParts = explode('~', $key);
 
@@ -754,8 +742,8 @@ class Service extends Model\Element\Service
                 $field = $keyParts[2];
                 $groupKeyId = explode('-', $keyParts[3]);
 
-                $groupId = $groupKeyId[0];
-                $keyid = $groupKeyId[1];
+                $groupId = (int) $groupKeyId[0];
+                $keyid = (int) $groupKeyId[1];
                 $getter = 'get' . ucfirst($field);
 
                 if (method_exists($object, $getter)) {
@@ -792,12 +780,12 @@ class Service extends Model\Element\Service
     /**
      * @param Concrete $object
      *
-     * @return AbstractObject|null
+     * @return Concrete|null
      */
-    public static function hasInheritableParentObject(Concrete $object, $fieldName = null)
+    public static function hasInheritableParentObject(Concrete $object)
     {
         if ($object->getClass()->getAllowInherit()) {
-            return $object->getNextParentForInheritance($fieldName);
+            return $object->getNextParentForInheritance();
         }
 
         return null;
@@ -903,6 +891,10 @@ class Service extends Model\Element\Service
      */
     public static function pathExists($path, $type = null)
     {
+        if (!$path) {
+            return false;
+        }
+
         $path = Element\Service::correctPath($path);
 
         try {
@@ -951,13 +943,7 @@ class Service extends Model\Element\Service
             $fields = $object->getClass()->getFieldDefinitions();
 
             foreach ($fields as $field) {
-                //TODO Pimcore 11: remove method_exists BC layer
-                if ($field instanceof IdRewriterInterface || method_exists($field, 'rewriteIds')) {
-                    if (!$field instanceof IdRewriterInterface) {
-                        trigger_deprecation('pimcore/pimcore', '10.1',
-                            sprintf('Usage of method_exists is deprecated since version 10.1 and will be removed in Pimcore 11.' .
-                            'Implement the %s interface instead.', IdRewriterInterface::class));
-                    }
+                if ($field instanceof IdRewriterInterface) {
                     $setter = 'set' . ucfirst($field->getName());
                     if (method_exists($object, $setter)) { // check for non-owner-objects
                         $object->$setter($field->rewriteIds($object, $rewriteConfig));
@@ -983,6 +969,7 @@ class Service extends Model\Element\Service
      */
     public static function getValidLayouts(Concrete $object)
     {
+        $layoutIds = null;
         $user = AdminTool::getCurrentUser();
 
         $resultList = [];
@@ -996,27 +983,36 @@ class Service extends Model\Element\Service
 
         if ($user->getAdmin()) {
             $superLayout = new ClassDefinition\CustomLayout();
-            $superLayout->setId(-1);
+            $superLayout->setId('-1');
             $superLayout->setName('Master (Admin Mode)');
             $resultList[-1] = $superLayout;
         }
 
         if ($isMasterAllowed) {
             $master = new ClassDefinition\CustomLayout();
-            $master->setId(0);
+            $master->setId('0');
             $master->setName('Master');
             $resultList[0] = $master;
         }
 
         $classId = $object->getClassId();
         $list = new ClassDefinition\CustomLayout\Listing();
-        $list->setOrderKey('name');
-        $condition = 'classId = ' . $list->quote($classId);
+        $list->setOrder(function (ClassDefinition\CustomLayout $a, ClassDefinition\CustomLayout $b) {
+            return strcmp($a->getName(), $b->getName());
+        });
         if (is_array($layoutPermissions) && count($layoutPermissions)) {
             $layoutIds = array_values($layoutPermissions);
-            $condition .= ' AND id IN (' . implode(',', array_map([$list, 'quote'], $layoutIds)) . ')';
         }
-        $list->setCondition($condition);
+        $list->setFilter(function (DataObject\ClassDefinition\CustomLayout $layout) use ($classId, $layoutIds) {
+            $currentLayoutClassId = $layout->getClassId();
+            $currentLayoutId = $layout->getId();
+            $keep = $currentLayoutClassId === $classId && !str_contains($currentLayoutId, '.brick.');
+            if ($keep && $layoutIds !== null) {
+                $keep = in_array($currentLayoutId, $layoutIds);
+            }
+
+            return $keep;
+        });
         $list = $list->load();
 
         if ((!count($resultList) && !count($list)) || (count($resultList) == 1 && !count($list))) {
@@ -1050,7 +1046,7 @@ class Service extends Model\Element\Service
 
         if (method_exists($layout, 'getChildren')) {
             $children = $layout->getChildren();
-            $insideDataType |= is_a($layout, $targetClass);
+            $insideDataType = $insideDataType || is_a($layout, $targetClass);
             if (is_array($children)) {
                 foreach ($children as $child) {
                     $targetList = self::extractFieldDefinitions($child, $targetClass, $targetList, $insideDataType);
@@ -1101,13 +1097,7 @@ class Service extends Model\Element\Service
         }
     }
 
-    /**
-     * @param ClassDefinition\Data[] $masterDefinition
-     * @param ClassDefinition\Data|ClassDefinition\Layout|null $layout
-     *
-     * @return bool
-     */
-    private static function synchronizeCustomLayoutFieldWithMaster($masterDefinition, &$layout)
+    private static function synchronizeCustomLayoutFieldWithMaster(array $masterDefinition, ClassDefinition\Data|ClassDefinition\Layout|null &$layout): bool
     {
         if (is_null($layout)) {
             return true;
@@ -1190,7 +1180,7 @@ class Service extends Model\Element\Service
 
         $permissionList = [];
 
-        $parentPermissionSet = $object->getPermissions(null, $user, true);
+        $parentPermissionSet = $object->getPermissions(null, $user);
         if ($parentPermissionSet) {
             $permissionList[] = $parentPermissionSet;
         }
@@ -1220,18 +1210,18 @@ class Service extends Model\Element\Service
         $mergedFieldDefinition = self::cloneDefinition($masterFieldDefinition);
 
         if (count($layoutDefinitions)) {
-            foreach ($mergedFieldDefinition as $key => $def) {
+            foreach ($mergedFieldDefinition as $def) {
                 if ($def instanceof ClassDefinition\Data\Localizedfields) {
-                    $mergedLocalizedFieldDefinitions = $mergedFieldDefinition[$key]->getFieldDefinitions();
+                    $mergedLocalizedFieldDefinitions = $def->getFieldDefinitions();
 
-                    foreach ($mergedLocalizedFieldDefinitions as $locKey => $locValue) {
-                        $mergedLocalizedFieldDefinitions[$locKey]->setInvisible(false);
-                        $mergedLocalizedFieldDefinitions[$locKey]->setNotEditable(false);
+                    foreach ($mergedLocalizedFieldDefinitions as $locValue) {
+                        $locValue->setInvisible(false);
+                        $locValue->setNotEditable(false);
                     }
-                    $mergedFieldDefinition[$key]->setChildren($mergedLocalizedFieldDefinitions);
+                    $def->setChildren($mergedLocalizedFieldDefinitions);
                 } else {
-                    $mergedFieldDefinition[$key]->setInvisible(false);
-                    $mergedFieldDefinition[$key]->setNotEditable(false);
+                    $def->setInvisible(false);
+                    $def->setNotEditable(false);
                 }
             }
         }
@@ -1270,9 +1260,11 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * @param mixed $definition
+     * @template T
      *
-     * @return array
+     * @param T $definition
+     *
+     * @return T
      */
     public static function cloneDefinition($definition)
     {
@@ -1283,14 +1275,9 @@ class Service extends Model\Element\Service
         return $theCopy;
     }
 
-    /**
-     * @param array $mergedFieldDefinition
-     * @param array $customFieldDefinitions
-     * @param string $key
-     */
-    private static function mergeFieldDefinition(&$mergedFieldDefinition, &$customFieldDefinitions, $key)
+    private static function mergeFieldDefinition(array &$mergedFieldDefinition, array &$customFieldDefinitions, string $key): void
     {
-        if (!$customFieldDefinitions[$key]) {
+        if (empty($customFieldDefinitions[$key])) {
             unset($mergedFieldDefinition[$key]);
         } elseif (isset($mergedFieldDefinition[$key])) {
             $def = $customFieldDefinitions[$key];
@@ -1313,13 +1300,7 @@ class Service extends Model\Element\Service
         }
     }
 
-    /**
-     * @param ClassDefinition\Data|ClassDefinition\Layout $layout
-     * @param ClassDefinition\Data[] $fieldDefinitions
-     *
-     * @return bool
-     */
-    private static function doFilterCustomGridFieldDefinitions(&$layout, $fieldDefinitions)
+    private static function doFilterCustomGridFieldDefinitions(ClassDefinition\Data|ClassDefinition\Layout &$layout, array $fieldDefinitions): bool
     {
         if ($layout instanceof ClassDefinition\Data) {
             $name = $layout->getName();
@@ -1327,7 +1308,7 @@ class Service extends Model\Element\Service
                 return false;
             }
 
-            $layout->setNoteditable($layout->getNoteditable() | $fieldDefinitions[$name]->getNoteditable());
+            $layout->setNoteditable($layout->getNoteditable() || $fieldDefinitions[$name]->getNoteditable());
         }
 
         if (method_exists($layout, 'getChildren')) {
@@ -1376,9 +1357,9 @@ class Service extends Model\Element\Service
         $mergedFieldDefinition = self::getCustomGridFieldDefinitions($class->getId(), $objectId);
         if (is_array($mergedFieldDefinition)) {
             if (isset($mergedFieldDefinition['localizedfields'])) {
-                $childs = $mergedFieldDefinition['localizedfields']->getFieldDefinitions();
-                if (is_array($childs)) {
-                    foreach ($childs as $locKey => $locValue) {
+                $children = $mergedFieldDefinition['localizedfields']->getFieldDefinitions();
+                if (is_array($children)) {
+                    foreach ($children as $locKey => $locValue) {
                         $mergedFieldDefinition[$locKey] = $locValue;
                     }
                 }
@@ -1449,13 +1430,7 @@ class Service extends Model\Element\Service
 
         $context['object'] = $object;
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($layout instanceof LayoutDefinitionEnrichmentInterface || method_exists($layout, 'enrichLayoutDefinition')) {
-            if (!$layout instanceof LayoutDefinitionEnrichmentInterface) {
-                trigger_deprecation('pimcore/pimcore', '10.1',
-                    sprintf('Usage of method_exists is deprecated since version 10.1 and will be removed in Pimcore 11.' .
-                    'Implement the %s interface instead.', LayoutDefinitionEnrichmentInterface::class));
-            }
+        if ($layout instanceof LayoutDefinitionEnrichmentInterface) {
             $layout->enrichLayoutDefinition($object, $context);
         }
 
@@ -1546,7 +1521,7 @@ class Service extends Model\Element\Service
         }
     }
 
-    private static function evaluateExpression(Model\DataObject\ClassDefinition\Data\CalculatedValue $fd, Concrete $object, ?DataObject\Data\CalculatedValue $data)
+    private static function evaluateExpression(Model\DataObject\ClassDefinition\Data\CalculatedValue $fd, Concrete $object, ?DataObject\Data\CalculatedValue $data): mixed
     {
         $expressionLanguage = new ExpressionLanguage();
         //overwrite constant function to aviod exposing internal information
@@ -1620,7 +1595,6 @@ class Service extends Model\Element\Service
 
             default:
                 return null;
-
         }
 
         Model\DataObject\Concrete::setGetInheritedValues($inheritanceEnabled);
@@ -1632,7 +1606,7 @@ class Service extends Model\Element\Service
      * @param Concrete|Model\DataObject\Fieldcollection\Data\AbstractData|Model\DataObject\Objectbrick\Data\AbstractData $object
      * @param Model\DataObject\Data\CalculatedValue|null $data
      *
-     * @return mixed|null
+     * @return mixed
      */
     public static function getCalculatedFieldValue($object, $data)
     {
@@ -1692,7 +1666,6 @@ class Service extends Model\Element\Service
 
             default:
                 return null;
-
         }
 
         Model\DataObject\Concrete::setGetInheritedValues($inheritanceEnabled);
@@ -1709,7 +1682,7 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * @param Concrete $container
+     * @param Model\AbstractModel $container
      * @param ClassDefinition|ClassDefinition\Data $fd
      */
     public static function doResetDirtyMap($container, $fd)
@@ -1728,7 +1701,7 @@ class Service extends Model\Element\Service
                     $value->resetLanguageDirtyMap();
                 }
 
-                if ($value instanceof DirtyIndicatorInterface) {
+                if ($value instanceof Model\AbstractModel && $value instanceof DirtyIndicatorInterface) {
                     $value->resetDirtyMap();
                     self::doResetDirtyMap($value, $fieldDefinitions[$fieldDefinition->getName()]);
                 }
@@ -1774,7 +1747,7 @@ class Service extends Model\Element\Service
     }
 
     /**
-     * @param AbstractObject $object
+     * @param Concrete $object
      * @param string $requestedLanguage
      * @param array $fields
      * @param array $helperDefinitions
@@ -1786,7 +1759,7 @@ class Service extends Model\Element\Service
      *
      * @internal
      */
-    public static function getCsvDataForObject(AbstractObject $object, $requestedLanguage, $fields, $helperDefinitions, LocaleServiceInterface $localeService, $returnMappedFieldNames = false, $context = [])
+    public static function getCsvDataForObject(Concrete $object, $requestedLanguage, $fields, $helperDefinitions, LocaleServiceInterface $localeService, $returnMappedFieldNames = false, $context = [])
     {
         $objectData = [];
         $mappedFieldnames = [];
@@ -1853,8 +1826,6 @@ class Service extends Model\Element\Service
      */
     public static function getCsvData($requestedLanguage, LocaleServiceInterface $localeService, $list, $fields, $addTitles = true, $context = [])
     {
-        $mappedFieldnames = [];
-
         $data = [];
         Logger::debug('objects in list:' . count($list->getObjects()));
 
@@ -1871,7 +1842,7 @@ class Service extends Model\Element\Service
                     $data[] = $tmp;
                 }
 
-                $rowData = self::getCsvDataForObject($object, $requestedLanguage, $fields, $helperDefinitions, $localeService, $context);
+                $rowData = self::getCsvDataForObject($object, $requestedLanguage, $fields, $helperDefinitions, $localeService, false, $context);
                 $rowData = self::escapeCsvRecord($rowData);
                 $data[] = $rowData;
             }
@@ -1903,8 +1874,8 @@ class Service extends Model\Element\Service
             if ($type == 'classificationstore') {
                 $fieldname = $fieldParts[2];
                 $groupKeyId = explode('-', $fieldParts[3]);
-                $groupId = $groupKeyId[0];
-                $keyId = $groupKeyId[1];
+                $groupId = (int) $groupKeyId[0];
+                $keyId = (int) $groupKeyId[1];
 
                 $groupConfig = DataObject\Classificationstore\GroupConfig::getById($groupId);
                 $keyConfig = DataObject\Classificationstore\KeyConfig::getById($keyId);
@@ -1970,8 +1941,8 @@ class Service extends Model\Element\Service
                     if ($type == 'classificationstore') {
                         $fieldname = $fieldParts[2];
                         $groupKeyId = explode('-', $fieldParts[3]);
-                        $groupId = $groupKeyId[0];
-                        $keyId = $groupKeyId[1];
+                        $groupId = (int) $groupKeyId[0];
+                        $keyId = (int) $groupKeyId[1];
                         $getter = 'get' . ucfirst($fieldname);
                         if (method_exists($object, $getter)) {
                             $keyConfig = DataObject\Classificationstore\KeyConfig::getById($keyId);
@@ -1998,7 +1969,7 @@ class Service extends Model\Element\Service
                             );
                         }
                     }
-                    //key value store - ignore for now
+                //key value store - ignore for now
                 } elseif (count($fieldParts) > 1) {
                     // brick
                     $brickType = $fieldParts[0];

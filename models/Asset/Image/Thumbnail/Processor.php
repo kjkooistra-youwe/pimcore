@@ -15,6 +15,8 @@
 
 namespace Pimcore\Model\Asset\Image\Thumbnail;
 
+use League\Flysystem\FilesystemException;
+use Pimcore\Config as PimcoreConfig;
 use Pimcore\File;
 use Pimcore\Helper\TemporaryFileHelperTrait;
 use Pimcore\Logger;
@@ -59,14 +61,7 @@ class Processor
         'mirror' => ['mode'],
     ];
 
-    /**
-     * @param string $format
-     * @param array $allowed
-     * @param string $fallback
-     *
-     * @return string
-     */
-    private static function getAllowedFormat($format, $allowed = [], $fallback = 'png')
+    private static function getAllowedFormat(string $format, array $allowed = [], string $fallback = 'png'): string
     {
         $typeMappings = [
             'jpg' => 'jpeg',
@@ -94,6 +89,8 @@ class Processor
      * @param bool $generated
      *
      * @return array
+     *
+     * @throws \Exception
      */
     public static function process(Asset $asset, Config $config, $fileSystemPath = null, $deferred = false, &$generated = false)
     {
@@ -150,7 +147,7 @@ class Processor
         }
 
         $image = Asset\Image::getImageTransformInstance();
-        $thumbDir = rtrim($asset->getRealPath(), '/') . '/image-thumb__' . $asset->getId() . '__' . $config->getName();
+        $thumbDir = rtrim($asset->getRealPath(), '/').'/'.$asset->getId().'/image-thumb__'.$asset->getId().'__'.$config->getName();
         $filename = preg_replace("/\." . preg_quote(File::getFileExtension($asset->getFilename()), '/') . '$/i', '', $asset->getFilename());
 
         // add custom suffix if available
@@ -175,18 +172,33 @@ class Processor
         $storage = Storage::get('thumbnail');
 
         // check for existing and still valid thumbnail
-        if ($storage->fileExists($storagePath)) {
-            if ($storage->lastModified($storagePath) >= $asset->getModificationDate()) {
-                return [
-                    'src' => $storagePath,
-                    'type' => 'thumbnail',
-                    'storagePath' => $storagePath,
-                ];
-            } else {
-                // delete the file if it's not valid anymore, otherwise writing the actual data from
-                // the local tmp-file to the real storage a bit further down doesn't work, as it has a
-                // check for race-conditions & locking, so it needs to check for the existence of the thumbnail
-                $storage->delete($storagePath);
+
+        $modificationDate = null;
+        $statusCacheEnabled = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['image']['thumbnails']['status_cache'];
+        if ($statusCacheEnabled && $deferred) {
+            $modificationDate = $asset->getDao()->getCachedThumbnailModificationDate($config->getName(), $filename);
+        } else {
+            if ($storage->fileExists($storagePath)) {
+                $modificationDate = $storage->lastModified($storagePath);
+            }
+        }
+
+        if ($modificationDate) {
+            try {
+                if ($modificationDate >= $asset->getModificationDate()) {
+                    return [
+                        'src' => $storagePath,
+                        'type' => 'thumbnail',
+                        'storagePath' => $storagePath,
+                    ];
+                } else {
+                    // delete the file if it's not valid anymore, otherwise writing the actual data from
+                    // the local tmp-file to the real storage a bit further down doesn't work, as it has a
+                    // check for race-conditions & locking, so it needs to check for the existence of the thumbnail
+                    $storage->delete($storagePath);
+                }
+            } catch (FilesystemException $e) {
+                // nothing to do
             }
         }
 
@@ -213,7 +225,20 @@ class Processor
         $image->setPreserveMetaData($config->isPreserveMetaData());
         $image->setPreserveAnimation($config->getPreserveAnimation());
 
-        if (!$storage->fileExists($storagePath)) {
+        $fileExists = false;
+
+        try {
+            // check if file is already on the file-system and if it is still valid
+            $modificationDate = $storage->lastModified($storagePath);
+            if ($modificationDate < $asset->getModificationDate()) {
+                $storage->delete($storagePath);
+            } else {
+                $fileExists = true;
+            }
+        } catch (\Exception $e) {
+        }
+
+        if ($fileExists === false) {
             $lockKey = 'image_thumbnail_' . $asset->getId() . '_' . md5($storagePath);
             $lock = \Pimcore::getContainer()->get(LockFactory::class)->createLock($lockKey);
 
@@ -223,7 +248,6 @@ class Processor
 
             // after we got the lock, check again if the image exists in the meantime - if not - generate it
             if (!$storage->fileExists($storagePath)) {
-
                 // all checks on the file system should be below the deferred part for performance reasons (remote file systems)
                 if (!$fileSystemPath) {
                     $fileSystemPath = $asset->getLocalFile();
@@ -327,10 +351,9 @@ class Processor
                                     foreach ($transformation['arguments'] as $key => $value) {
                                         $position = array_search($key, $mapping);
                                         if ($position !== false) {
-
                                             // high res calculations if enabled
                                             if (!in_array($transformation['method'], ['cropPercent']) && in_array($key,
-                                                    ['width', 'height', 'x', 'y'])) {
+                                                ['width', 'height', 'x', 'y'])) {
                                                 if ($highResFactor && $highResFactor > 1) {
                                                     $value *= $highResFactor;
                                                     $value = (int)ceil($value);
@@ -397,13 +420,21 @@ class Processor
                 if (is_resource($stream)) {
                     fclose($stream);
                 }
+
+                if ($statusCacheEnabled) {
+                    if ($imageInfo = @getimagesize($tmpFsPath)) {
+                        $asset->getDao()->addToThumbnailCache($config->getName(), $filename, filesize($tmpFsPath), $imageInfo[0], $imageInfo[1]);
+                    }
+                }
+
                 unlink($tmpFsPath);
 
                 $generated = true;
 
-                if ($optimizeContent) {
+                $isImageOptimizersEnabled = PimcoreConfig::getSystemConfiguration('assets')['image']['thumbnails']['image_optimizers']['enabled'];
+                if ($optimizedFormat && $optimizeContent && $isImageOptimizersEnabled) {
                     \Pimcore::getContainer()->get('messenger.bus.pimcore-core')->dispatch(
-                      new OptimizeImageMessage($storagePath)
+                        new OptimizeImageMessage($storagePath)
                     );
                 }
 
@@ -419,6 +450,7 @@ class Processor
         // if the file is corrupted the file will be created on the fly when requested by the browser (because it's deleted here)
         if ($storage->fileExists($storagePath) && $storage->fileSize($storagePath) < 50) {
             $storage->delete($storagePath);
+            $asset->getDao()->deleteFromThumbnailCache($config->getName(), $filename);
 
             return [
                 'src' => $storagePath,
@@ -433,12 +465,6 @@ class Processor
         ];
     }
 
-    /**
-     * @param Config $config
-     * @param string $transformationType
-     *
-     * @return bool
-     */
     private static function containsTransformationType(Config $config, string $transformationType): bool
     {
         $transformations = $config->getItems();

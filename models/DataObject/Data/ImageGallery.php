@@ -30,54 +30,53 @@ class ImageGallery implements \Iterator, OwnerAwareFieldInterface
     /**
      * @param Hotspotimage[] $items
      */
-    public function __construct($items)
+    public function __construct($items = [])
     {
         $this->setItems($items);
         $this->markMeDirty();
     }
 
     /**
-     * {@inheritdoc}
+     * @return Hotspotimage|false
      */
-    public function current()
+    #[\ReturnTypeWillChange]
+    public function current()// : Hotspotimage|false
     {
-        $var = current($this->items);
-
-        return $var;
+        return current($this->items);
     }
 
     /**
-     * {@inheritdoc}
+     * @return void
      */
-    public function next()
+    #[\ReturnTypeWillChange]
+    public function next()// : void
     {
         next($this->items);
     }
 
     /**
-     * {@inheritdoc}
+     * @return int|string|null
      */
-    public function key()
+    #[\ReturnTypeWillChange]
+    public function key()// : mixed
     {
-        $var = key($this->items);
-
-        return $var;
+        return key($this->items);
     }
 
     /**
-     * {@inheritdoc}
+     * @return bool
      */
-    public function valid()
+    #[\ReturnTypeWillChange]
+    public function valid()// : bool
     {
-        $var = $this->current() !== false;
-
-        return $var;
+        return $this->current() !== false;
     }
 
     /**
-     * {@inheritdoc}
+     * @return void
      */
-    public function rewind()
+    #[\ReturnTypeWillChange]
+    public function rewind()// : void
     {
         reset($this->items);
     }
@@ -101,5 +100,19 @@ class ImageGallery implements \Iterator, OwnerAwareFieldInterface
         $this->items = $items;
         $this->rewind();
         $this->markMeDirty();
+    }
+
+    /**
+     * @return bool
+     */
+    public function hasValidImages(): bool
+    {
+        foreach ($this->getItems() as $item) {
+            if ($item instanceof \Pimcore\Model\DataObject\Data\Hotspotimage) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

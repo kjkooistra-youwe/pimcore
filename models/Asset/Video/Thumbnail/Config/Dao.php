@@ -30,10 +30,9 @@ class Dao extends Model\Dao\PimcoreLocationAwareConfigDao
         $config = \Pimcore::getContainer()->getParameter('pimcore.config');
 
         parent::configure([
-            'containerConfig' => $config['assets']['video']['thumbnails']['definitions'] ?? [],
+            'containerConfig' => $config['assets']['video']['thumbnails']['definitions'],
             'settingsStoreScope' => 'pimcore_video_thumbnails',
-            'storageDirectory' => PIMCORE_CONFIGURATION_DIRECTORY . '/video-thumbnails',
-            'legacyConfigFile' => 'video-thumbnails.php',
+            'storageDirectory' => $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_VIDEO_THUMBNAILS'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/video-thumbnails',
             'writeTargetEnvVariableName' => 'PIMCORE_WRITE_TARGET_VIDEO_THUMBNAILS',
         ]);
     }

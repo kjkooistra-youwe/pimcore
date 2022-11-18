@@ -19,6 +19,7 @@ use Pimcore\Extension\Document\Areabrick\AreabrickInterface;
 use Pimcore\Extension\Document\Areabrick\AreabrickManagerInterface;
 use Pimcore\Extension\Document\Areabrick\EditableDialogBoxInterface;
 use Pimcore\Extension\Document\Areabrick\Exception\ConfigurationException;
+use Pimcore\Extension\Document\Areabrick\PreviewAwareInterface;
 use Pimcore\Extension\Document\Areabrick\TemplateAreabrickInterface;
 use Pimcore\Http\Request\Resolver\EditmodeResolver;
 use Pimcore\Http\RequestHelper;
@@ -82,7 +83,7 @@ class EditableHandler implements LoggerAwareInterface
     protected $responseStack;
 
     /**
-     * @var array
+     * @var array<string, string>
      */
     protected $brickTemplateCache = [];
 
@@ -108,8 +109,6 @@ class EditableHandler implements LoggerAwareInterface
 
     public const ATTRIBUTE_AREABRICK_INFO = '_pimcore_areabrick_info';
 
-    private EditmodeEditableDefinitionCollector $definitionCollector;
-
     /**
      * @param AreabrickManagerInterface $brickManager
      * @param EngineInterface $templating
@@ -120,7 +119,8 @@ class EditableHandler implements LoggerAwareInterface
      * @param ResponseStack $responseStack
      * @param EditmodeResolver $editmodeResolver
      * @param HttpKernelRuntime $httpKernelRuntime
-     * @param EditmodeEditableDefinitionCollector $definitionCollector
+     * @param FragmentRendererInterface $fragmentRenderer
+     * @param RequestStack $requestStack
      */
     public function __construct(
         AreabrickManagerInterface $brickManager,
@@ -132,7 +132,6 @@ class EditableHandler implements LoggerAwareInterface
         ResponseStack $responseStack,
         EditmodeResolver $editmodeResolver,
         HttpKernelRuntime $httpKernelRuntime,
-        EditmodeEditableDefinitionCollector $definitionCollector,
         FragmentRendererInterface $fragmentRenderer,
         RequestStack $requestStack
     ) {
@@ -145,37 +144,20 @@ class EditableHandler implements LoggerAwareInterface
         $this->responseStack = $responseStack;
         $this->editmodeResolver = $editmodeResolver;
         $this->httpKernelRuntime = $httpKernelRuntime;
-        $this->definitionCollector = $definitionCollector;
         $this->fragmentRenderer = $fragmentRenderer;
         $this->requestStack = $requestStack;
     }
 
     /**
-     * {@inheritdoc}
-     */
-    public function isBrickEnabled(Editable $editable, $brick)
-    {
-        if ($brick instanceof AreabrickInterface) {
-            $brick = $brick->getId();
-        }
-
-        return $this->brickManager->isEnabled($brick);
-    }
-
-    /**
-     * {@inheritdoc}
+     * @param Editable\Areablock $editable
+     * @param array $options
+     *
+     * @return array
      */
     public function getAvailableAreablockAreas(Editable\Areablock $editable, array $options)
     {
         $areas = [];
         foreach ($this->brickManager->getBricks() as $brick) {
-            // don't show disabled bricks
-            if (!isset($options['dontCheckEnabled']) || !$options['dontCheckEnabled']) {
-                if (!$this->isBrickEnabled($editable, $brick)) {
-                    continue;
-                }
-            }
-
             if (!(empty($options['allowed']) || in_array($brick->getId(), $options['allowed']))) {
                 continue;
             }
@@ -187,7 +169,7 @@ class EditableHandler implements LoggerAwareInterface
 
             $hasDialogBoxConfiguration = $brick instanceof EditableDialogBoxInterface;
 
-            // autoresolve icon as <bundleName>/Resources/public/areas/<id>/icon.png
+            // autoresolve icon as <bundleName>/Resources/public/areas/<id>/icon.png or <bundleName>/public/areas/<id>/icon.png
             if (null === $icon) {
                 $bundle = null;
 
@@ -195,7 +177,8 @@ class EditableHandler implements LoggerAwareInterface
                     $bundle = $this->bundleLocator->getBundle($brick);
 
                     // check if file exists
-                    $iconPath = sprintf('%s/Resources/public/areas/%s/icon.png', $bundle->getPath(), $brick->getId());
+                    $publicDir = is_dir($bundle->getPath().'/Resources/public') ? $bundle->getPath().'/Resources/public' : $bundle->getPath().'/public';
+                    $iconPath = sprintf('%s/areas/%s/icon.png', $publicDir, $brick->getId());
                     if (file_exists($iconPath)) {
                         // build URL to icon
                         $icon = $this->webPathResolver->getPath($bundle, 'areas/' . $brick->getId(), 'icon.png');
@@ -204,6 +187,10 @@ class EditableHandler implements LoggerAwareInterface
                     $icon = '';
                 }
             }
+
+            $previewHtml = $brick instanceof PreviewAwareInterface
+                ? $brick->getPreviewHtml()
+                : null;
 
             if ($this->editmodeResolver->isEditmode()) {
                 $name = $this->translator->trans($name);
@@ -215,6 +202,7 @@ class EditableHandler implements LoggerAwareInterface
                 'description' => $desc,
                 'type' => $brick->getId(),
                 'icon' => $icon,
+                'previewHtml' => $previewHtml,
                 'limit' => $limit,
                 'needsReload' => $brick->needsReload(),
                 'hasDialogBoxConfiguration' => $hasDialogBoxConfiguration,
@@ -249,10 +237,10 @@ class EditableHandler implements LoggerAwareInterface
         $params['instance'] = $brick;
 
         // check if view template exists and throw error before open tag is rendered
-        $viewTemplate = $this->resolveBrickTemplate($brick, 'view');
+        $viewTemplate = $this->resolveBrickTemplate($brick);
         if (!$this->templating->exists($viewTemplate)) {
             $e = new ConfigurationException(sprintf(
-                'The view template "%s" for areabrick %s does not exist',
+                'The view template "%s" for areabrick "%s" does not exist',
                 $viewTemplate,
                 $brick->getId()
             ));
@@ -294,9 +282,11 @@ class EditableHandler implements LoggerAwareInterface
         return $html;
     }
 
+    /**
+     * @param Response|null $result
+     */
     protected function handleBrickActionResult($result)
     {
-
         // if the action result is a response object, push it onto the
         // response stack. this response will be used by the ResponseStackListener
         // and sent back to the client
@@ -306,94 +296,85 @@ class EditableHandler implements LoggerAwareInterface
     }
 
     /**
-     * Try to get the brick template from get*Template method. If method returns null and brick implements
-     * TemplateAreabrickInterface fall back to auto-resolving the template reference. See interface for examples.
+     * Try to get the brick template from getTemplate() method. If method returns null and brick implements
+     * TemplateAreabrickInterface, fall back to auto-resolving the template reference. See interface for examples.
      *
      * @param AreabrickInterface $brick
-     * @param string $type
      *
-     * @return mixed|null|string
+     * @return null|string
      */
-    protected function resolveBrickTemplate(AreabrickInterface $brick, $type)
+    protected function resolveBrickTemplate(AreabrickInterface $brick)
     {
-        $cacheKey = sprintf('%s.%s', $brick->getId(), $type);
+        $cacheKey = sprintf('%s.view', $brick->getId());
         if (isset($this->brickTemplateCache[$cacheKey])) {
             return $this->brickTemplateCache[$cacheKey];
         }
 
-        $template = null;
-        if ($type === 'view') {
-            $template = $brick->getTemplate();
+        if ($template = $brick->getTemplate()) {
+            return $this->brickTemplateCache[$cacheKey] = $template;
         }
 
-        if (null === $template) {
-            if ($brick instanceof TemplateAreabrickInterface) {
-                $template = $this->buildBrickTemplateReference($brick, $type);
-            } else {
-                $e = new ConfigurationException(sprintf(
-                    'Brick %s is configured to have a %s template but does not return a template path and does not implement %s',
-                    $brick->getId(),
-                    $type,
-                    TemplateAreabrickInterface::class
-                ));
-
-                $this->logger->error($e->getMessage());
-
-                throw $e;
-            }
+        if ($brick instanceof TemplateAreabrickInterface) {
+            return $this->brickTemplateCache[$cacheKey] = $this->buildBrickTemplateReference($brick);
         }
 
-        $this->brickTemplateCache[$cacheKey] = $template;
+        $e = new ConfigurationException(sprintf(
+            'Brick "%s" is configured to have a view template, but does not return a template path and does not implement %s',
+            $brick->getId(),
+            TemplateAreabrickInterface::class
+        ));
 
-        return $template;
+        $this->logger->error($e->getMessage());
+
+        throw $e;
     }
 
     /**
      * Return either bundle or global (= app/Resources) template reference
      *
      * @param TemplateAreabrickInterface $brick
-     * @param string $type
      *
      * @return string
      */
-    protected function buildBrickTemplateReference(TemplateAreabrickInterface $brick, $type)
+    protected function buildBrickTemplateReference(TemplateAreabrickInterface $brick)
     {
-        if ($brick->getTemplateLocation() === TemplateAreabrickInterface::TEMPLATE_LOCATION_BUNDLE) {
-            $bundle = $this->bundleLocator->getBundle($brick);
-            $bundleName = $bundle->getName();
-            if (str_ends_with($bundleName, 'Bundle')) {
-                $bundleName = substr($bundleName, 0, -6);
-            }
-
-            foreach (['areas', 'Areas'] as $folderName) {
-                $templateReference = sprintf(
-                    '@%s/%s/%s/%s.%s',
-                    $bundleName,
-                    $folderName,
-                    $brick->getId(),
-                    $type,
-                    $brick->getTemplateSuffix()
-                );
-
-                if ($this->templating->exists($templateReference)) {
-                    return $templateReference;
-                }
-            }
-
-            // return the last reference, even we know that it doesn't exist -> let care the templating engine
-            return $templateReference;
-        } else {
+        if ($brick->getTemplateLocation() === TemplateAreabrickInterface::TEMPLATE_LOCATION_GLOBAL) {
             return sprintf(
-                'areas/%s/%s.%s',
+                'areas/%s/view.%s',
                 $brick->getId(),
-                $type,
                 $brick->getTemplateSuffix()
             );
         }
+
+        $bundleName = $this->bundleLocator->getBundle($brick)->getName();
+        if (str_ends_with($bundleName, 'Bundle')) {
+            $bundleName = substr($bundleName, 0, -6);
+        }
+
+        foreach (['areas', 'Areas'] as $folderName) {
+            $templateReference = sprintf(
+                '@%s/%s/%s/view.%s',
+                $bundleName,
+                $folderName,
+                $brick->getId(),
+                $brick->getTemplateSuffix()
+            );
+
+            if ($this->templating->exists($templateReference)) {
+                return $templateReference;
+            }
+        }
+
+        // return the last reference, even we know that it doesn't exist -> let care the templating engine
+        return $templateReference;
     }
 
     /**
-     * {@inheritdoc}
+     * @param string $controller
+     * @param array $attributes
+     * @param array $query
+     *
+     * @return string|Response
      */
     public function renderAction($controller, array $attributes = [], array $query = [])
     {

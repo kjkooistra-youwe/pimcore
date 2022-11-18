@@ -35,14 +35,14 @@ trait RelationFilterConditionParser
     public function getRelationFilterCondition($value, $operator, $name)
     {
         $result = '`' . $name . '` IS NULL';
-        if ($value === null) {
+        if ($value === null || $value === 'null') {
             return $result;
         }
-        if ($operator == '=') {
+        if ($operator === '=') {
             return '`' . $name . '` = ' . "'" . $value . "'";
         }
-        $values = explode(',', (string)$value ?? '');
-        if (is_array($values) && !empty($values)) {
+        $values = explode(',', (string)$value);
+        if (is_array($values)) {
             $fieldConditions = array_map(function ($value) use ($name) {
                 return '`' . $name . "` LIKE '%," . $value . ",%' ";
             }, array_filter($values));

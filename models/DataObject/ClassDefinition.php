@@ -16,10 +16,13 @@
 namespace Pimcore\Model\DataObject;
 
 use Pimcore\Cache;
+use Pimcore\Cache\RuntimeCache;
+use Pimcore\DataObject\ClassBuilder\FieldDefinitionDocBlockBuilderInterface;
+use Pimcore\DataObject\ClassBuilder\PHPClassDumperInterface;
 use Pimcore\Db;
 use Pimcore\Event\DataObjectClassDefinitionEvents;
 use Pimcore\Event\Model\DataObject\ClassDefinitionEvent;
-use Pimcore\File;
+use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
@@ -32,6 +35,7 @@ final class ClassDefinition extends Model\AbstractModel
 {
     use DataObject\ClassDefinition\Helper\VarExport;
     use DataObject\Traits\LocateFileTrait;
+    use RecursionBlockingEventDispatchHelperTrait;
 
     /**
      * @internal
@@ -46,6 +50,13 @@ final class ClassDefinition extends Model\AbstractModel
      * @var string|null
      */
     public $name;
+
+    /**
+     * @internal
+     *
+     * @var string
+     */
+    public string $title = '';
 
     /**
      * @internal
@@ -173,21 +184,14 @@ final class ClassDefinition extends Model\AbstractModel
     /**
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     public $icon;
 
     /**
      * @internal
      *
-     * @var string
-     */
-    public $previewUrl;
-
-    /**
-     * @internal
-     *
-     * @var string
+     * @var string|null
      */
     public $group;
 
@@ -218,13 +222,6 @@ final class ClassDefinition extends Model\AbstractModel
      * @var array
      */
     public $compositeIndices = [];
-
-    /**
-     * @internal
-     *
-     * @var bool
-     */
-    public $generateTypeDeclarations = true;
 
     /**
      * @internal
@@ -263,6 +260,11 @@ final class ClassDefinition extends Model\AbstractModel
     public $enableGridLocking = false;
 
     /**
+     * @var ClassDefinition\Data[]
+     */
+    private array $deletedDataComponents = [];
+
+    /**
      * @param string $id
      * @param bool $force
      *
@@ -278,7 +280,7 @@ final class ClassDefinition extends Model\AbstractModel
             if ($force) {
                 throw new \Exception('Forced load');
             }
-            $class = \Pimcore\Cache\Runtime::get($cacheKey);
+            $class = RuntimeCache::get($cacheKey);
             if (!$class) {
                 throw new \Exception('Class in registry is null');
             }
@@ -286,6 +288,10 @@ final class ClassDefinition extends Model\AbstractModel
             try {
                 $class = new self();
                 $name = $class->getDao()->getNameById($id);
+                if (!$name) {
+                    throw new \Exception('Class definition with name ' . $name . ' or ID ' . $id . ' does not exist');
+                }
+
                 $definitionFile = $class->getDefinitionFile($name);
                 $class = @include $definitionFile;
 
@@ -295,7 +301,7 @@ final class ClassDefinition extends Model\AbstractModel
 
                 $class->setId($id);
 
-                \Pimcore\Cache\Runtime::set($cacheKey, $class);
+                RuntimeCache::set($cacheKey, $class);
             } catch (\Exception $e) {
                 Logger::info($e->getMessage());
 
@@ -386,10 +392,7 @@ final class ClassDefinition extends Model\AbstractModel
         }
     }
 
-    /**
-     * @return bool
-     */
-    private function exists()
+    private function exists(): bool
     {
         $name = $this->getDao()->getNameById($this->getId());
 
@@ -422,7 +425,8 @@ final class ClassDefinition extends Model\AbstractModel
         if (!$this->getId()) {
             $db = Db::get();
             $maxId = $db->fetchOne('SELECT MAX(CAST(id AS SIGNED)) FROM classes;');
-            $this->setId($maxId ? $maxId + 1 : 1);
+            $maxId = $maxId ? $maxId + 1 : 1;
+            $this->setId((string) $maxId);
         }
 
         if (!preg_match('/[a-zA-Z][a-zA-Z0-9_]+/', $this->getName())) {
@@ -444,9 +448,9 @@ final class ClassDefinition extends Model\AbstractModel
         $isUpdate = $this->exists();
 
         if (!$isUpdate) {
-            \Pimcore::getEventDispatcher()->dispatch(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::PRE_ADD);
+            $this->dispatchEvent(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::PRE_ADD);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::PRE_UPDATE);
+            $this->dispatchEvent(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::PRE_UPDATE);
         }
 
         $this->setModificationDate(time());
@@ -454,6 +458,14 @@ final class ClassDefinition extends Model\AbstractModel
         $this->getDao()->save($isUpdate);
 
         $this->generateClassFiles($saveDefinitionFile);
+
+        foreach ($fieldDefinitions as $fd) {
+            // call the method "classSaved" if exists, this is used to create additional data tables or whatever which depends on the field definition, for example for localizedfields
+            //TODO Pimcore 11 remove method_exists call
+            if (!$fd instanceof ClassDefinition\Data\DataContainerAwareInterface && method_exists($fd, 'classSaved')) {
+                $fd->classSaved($this);
+            }
+        }
 
         // empty object cache
         try {
@@ -468,10 +480,12 @@ final class ClassDefinition extends Model\AbstractModel
         }
 
         if ($isUpdate) {
-            \Pimcore::getEventDispatcher()->dispatch(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::POST_UPDATE);
+            $this->dispatchEvent(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::POST_UPDATE);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::POST_ADD);
+            $this->dispatchEvent(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::POST_ADD);
         }
+
+        $this->deleteDeletedDataComponentsInCustomLayout();
     }
 
     /**
@@ -483,172 +497,7 @@ final class ClassDefinition extends Model\AbstractModel
      */
     public function generateClassFiles($generateDefinitionFile = true)
     {
-        $infoDocBlock = $this->getInfoDocBlock();
-
-        // create class for object
-        $extendClass = 'Concrete';
-        if ($this->getParentClass()) {
-            $extendClass = $this->getParentClass();
-            $extendClass = '\\'.ltrim($extendClass, '\\');
-        }
-
-        $cd = '<?php';
-        $cd .= "\n\n";
-        $cd .= $infoDocBlock;
-        $cd .= "\n\n";
-        $cd .= 'namespace Pimcore\\Model\\DataObject;';
-        $cd .= "\n\n";
-        $cd .= 'use Pimcore\Model\DataObject\Exception\InheritanceParentNotFoundException;';
-        $cd .= "\n";
-        $cd .= 'use Pimcore\Model\DataObject\PreGetValueHookInterface;';
-        $cd .= "\n\n";
-        $cd .= "/**\n";
-        $cd .= '* @method static \\Pimcore\\Model\\DataObject\\'.ucfirst($this->getName()).'\Listing getList()'."\n";
-        if (is_array($this->getFieldDefinitions()) && count($this->getFieldDefinitions())) {
-            foreach ($this->getFieldDefinitions() as $key => $def) {
-                if ($def instanceof DataObject\ClassDefinition\Data\Localizedfields) {
-                    $cd .= '* @method static \\Pimcore\\Model\\DataObject\\'.ucfirst(
-                            $this->getName()
-                        ).'\Listing|\\Pimcore\\Model\\DataObject\\'.ucfirst(
-                            $this->getName()
-                        ).'|null getBy'.ucfirst(
-                            $def->getName()
-                        ).'($field, $value, $locale = null, $limit = 0, $offset = 0, $objectTypes = null)'."\n";
-
-                    foreach ($def->getFieldDefinitions() as $localizedFieldDefinition) {
-                        $cd .= '* @method static \\Pimcore\\Model\\DataObject\\'.ucfirst(
-                                $this->getName()
-                            ).'\Listing|\\Pimcore\\Model\\DataObject\\'.ucfirst(
-                                $this->getName()
-                            ).'|null getBy'.ucfirst(
-                                $localizedFieldDefinition->getName()
-                            ).'($value, $locale = null, $limit = 0, $offset = 0, $objectTypes = null)'."\n";
-                    }
-                } elseif ($def->isFilterable()) {
-                    $cd .= '* @method static \\Pimcore\\Model\\DataObject\\'.ucfirst(
-                            $this->getName()
-                        ).'\Listing|\\Pimcore\\Model\\DataObject\\'.ucfirst(
-                            $this->getName()
-                        ).'|null getBy'.ucfirst($def->getName()).'($value, $limit = 0, $offset = 0, $objectTypes = null)'."\n";
-                }
-            }
-        }
-        $cd .= "*/\n\n";
-
-        $implementsParts = [];
-
-        $implements = DataObject\ClassDefinition\Service::buildImplementsInterfacesCode($implementsParts, $this->getImplementsInterfaces());
-
-        $cd .= 'class '.ucfirst($this->getName()).' extends '.$extendClass. $implements . "\n";
-        $cd .= '{' . "\n";
-
-        $useParts = [];
-
-        $cd .= DataObject\ClassDefinition\Service::buildUseTraitsCode($useParts, $this->getUseTraits());
-
-        $cd .= 'protected $o_classId = "' . $this->getId(). "\";\n";
-        $cd .= 'protected $o_className = "'.$this->getName().'"'.";\n";
-
-        if (is_array($this->getFieldDefinitions()) && count($this->getFieldDefinitions())) {
-            foreach ($this->getFieldDefinitions() as $key => $def) {
-                if (!$def instanceof DataObject\ClassDefinition\Data\ReverseObjectRelation && !$def instanceof DataObject\ClassDefinition\Data\CalculatedValue
-                ) {
-                    $cd .= 'protected $'.$key.";\n";
-                }
-            }
-        }
-
-        $cd .= "\n\n";
-
-        $cd .= '/**'."\n";
-        $cd .= '* @param array $values'."\n";
-        $cd .= '* @return \\Pimcore\\Model\\DataObject\\'.ucfirst($this->getName())."\n";
-        $cd .= '*/'."\n";
-        $cd .= 'public static function create($values = array()) {';
-        $cd .= "\n";
-        $cd .= "\t".'$object = new static();'."\n";
-        $cd .= "\t".'$object->setValues($values);'."\n";
-        $cd .= "\t".'return $object;'."\n";
-        $cd .= '}';
-
-        $cd .= "\n\n";
-
-        if (is_array($this->getFieldDefinitions()) && count($this->getFieldDefinitions())) {
-            foreach ($this->getFieldDefinitions() as $key => $def) {
-                if ($def instanceof DataObject\ClassDefinition\Data\ReverseObjectRelation) {
-                    continue;
-                }
-
-                // get setter and getter code
-                $cd .= $def->getGetterCode($this);
-                $cd .= $def->getSetterCode($this);
-
-                // call the method "classSaved" if exists, this is used to create additional data tables or whatever which depends on the field definition, for example for localizedfields
-                //TODO Pimcore 11 remove method_exists call
-                if (!$def instanceof DataObject\ClassDefinition\Data\DataContainerAwareInterface && method_exists($def, 'classSaved')) {
-                    $def->classSaved($this);
-                }
-            }
-        }
-
-        $cd .= "}\n";
-        $cd .= "\n";
-
-        if (File::put($this->getPhpClassFile(), $cd) === false) {
-            throw new \Exception(sprintf('Cannot write class file in %s please check the rights on this directory', $this->getPhpClassFile()));
-        }
-
-        // create class for object list
-        $extendListingClass = 'DataObject\\Listing\\Concrete';
-        if ($this->getListingParentClass()) {
-            $extendListingClass = $this->getListingParentClass();
-            $extendListingClass = '\\'.ltrim($extendListingClass, '\\');
-        }
-
-        // create list class
-        $cd = '<?php';
-
-        $cd .= "\n\n";
-        $cd .= 'namespace Pimcore\\Model\\DataObject\\'.ucfirst($this->getName()).';';
-        $cd .= "\n\n";
-        $cd .= 'use Pimcore\\Model\\DataObject;';
-        $cd .= "\n\n";
-        $cd .= "/**\n";
-        $cd .= ' * @method DataObject\\'.ucfirst($this->getName())."|false current()\n";
-        $cd .= ' * @method DataObject\\'.ucfirst($this->getName())."[] load()\n";
-        $cd .= ' * @method DataObject\\'.ucfirst($this->getName())."[] getData()\n";
-        $cd .= ' */';
-        $cd .= "\n\n";
-        $cd .= 'class Listing extends '.$extendListingClass . "\n";
-        $cd .= '{' . "\n";
-
-        $cd .= DataObject\ClassDefinition\Service::buildUseTraitsCode([], $this->getListingUseTraits());
-
-        $cd .= 'protected $classId = "'. $this->getId()."\";\n";
-        $cd .= 'protected $className = "'.$this->getName().'"'.";\n";
-
-        $cd .= "\n\n";
-
-        if (\is_array($this->getFieldDefinitions())) {
-            foreach ($this->getFieldDefinitions() as $key => $def) {
-                if ($def instanceof DataObject\ClassDefinition\Data\Localizedfields) {
-                    foreach ($def->getFieldDefinitions() as $localizedFieldDefinition) {
-                        $cd .= $localizedFieldDefinition->getFilterCode();
-                    }
-                } elseif ($def->isFilterable()) {
-                    $cd .= $def->getFilterCode();
-                }
-            }
-        }
-
-        $cd .= "\n\n";
-        $cd .= "}\n";
-
-        if (File::put($this->getPhpListingClassFile(), $cd) === false) {
-            throw new \Exception(
-                sprintf('Cannot write class file in %s please check the rights on this directory', $this->getPhpListingClassFile())
-            );
-        }
+        \Pimcore::getContainer()->get(PHPClassDumperInterface::class)->dumpPHPClasses($this);
 
         if ($generateDefinitionFile) {
             // save definition as a php file
@@ -669,10 +518,10 @@ final class ClassDefinition extends Model\AbstractModel
 
             $data = '<?php';
             $data .= "\n\n";
-            $data .= $infoDocBlock;
+            $data .= $this->getInfoDocBlock();
             $data .= "\n\n";
 
-            $data .= "\nreturn ".$exportedClass.";\n";
+            $data .= 'return '.$exportedClass.";\n";
 
             \Pimcore\File::putPhpFile($definitionFile, $data);
         }
@@ -683,53 +532,39 @@ final class ClassDefinition extends Model\AbstractModel
      *
      * @internal
      */
-    protected function getInfoDocBlock()
+    protected function getInfoDocBlock(): string
     {
         $cd = '/**' . "\n";
-        $cd .= '* Inheritance: '.($this->getAllowInherit() ? 'yes' : 'no')."\n";
-        $cd .= '* Variants: '.($this->getAllowVariants() ? 'yes' : 'no')."\n";
+        $cd .= ' * Inheritance: '.($this->getAllowInherit() ? 'yes' : 'no')."\n";
+        $cd .= ' * Variants: '.($this->getAllowVariants() ? 'yes' : 'no')."\n";
 
-        if ($this->getDescription()) {
-            $description = str_replace(['/**', '*/', '//'], '', $this->getDescription());
-            $description = str_replace("\n", "\n* ", $description);
-
-            $cd .= '* '.$description."\n";
+        if ($title = $this->getTitle()) {
+            $cd .= ' * Title: ' . $title."\n";
         }
 
-        $cd .= "\n\n";
-        $cd .= "Fields Summary:\n";
+        if ($description = $this->getDescription()) {
+            $description = str_replace(['/**', '*/', '//'], '', $description);
+            $description = str_replace("\n", "\n * ", $description);
 
-        $cd = $this->getInfoDocBlockForFields($this, $cd, 1);
+            $cd .= ' * '.$description."\n";
+        }
 
-        $cd .= '*/';
+        $cd .= " *\n";
+        $cd .= " * Fields Summary:\n";
+
+        $fieldDefinitionDocBlockBuilder = \Pimcore::getContainer()->get(FieldDefinitionDocBlockBuilderInterface::class);
+        foreach ($this->getFieldDefinitions() as $fieldDefinition) {
+            $cd .= ' * ' . str_replace("\n", "\n * ", trim($fieldDefinitionDocBlockBuilder->buildFieldDefinitionDocBlock($fieldDefinition))) . "\n";
+        }
+
+        $cd .= ' */';
 
         return $cd;
     }
 
-    /**
-     * @internal
-     *
-     * @param ClassDefinition|ClassDefinition\Data $definition
-     * @param string $text
-     * @param int $level
-     *
-     * @return string
-     */
-    protected function getInfoDocBlockForFields($definition, $text, $level)
-    {
-        foreach ($definition->getFieldDefinitions() as $fd) {
-            $text .= str_pad('', $level, '-').' '.$fd->getName().' ['.$fd->getFieldtype()."]\n";
-            if (method_exists($fd, 'getFieldDefinitions')) {
-                $text = $this->getInfoDocBlockForFields($fd, $text, $level + 1);
-            }
-        }
-
-        return $text;
-    }
-
     public function delete()
     {
-        \Pimcore::getEventDispatcher()->dispatch(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::PRE_DELETE);
+        $this->dispatchEvent(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::PRE_DELETE);
 
         // delete all objects using this class
         $list = new Listing();
@@ -755,7 +590,10 @@ final class ClassDefinition extends Model\AbstractModel
         }
 
         $customLayouts = new ClassDefinition\CustomLayout\Listing();
-        $customLayouts->setCondition('classId = ?', $this->getId());
+        $id = $this->getId();
+        $customLayouts->setFilter(function (DataObject\ClassDefinition\CustomLayout $layout) use ($id) {
+            return $layout->getClassId() === $id;
+        });
         $customLayouts = $customLayouts->load();
 
         foreach ($customLayouts as $customLayout) {
@@ -784,10 +622,10 @@ final class ClassDefinition extends Model\AbstractModel
 
         $this->getDao()->delete();
 
-        \Pimcore::getEventDispatcher()->dispatch(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::POST_DELETE);
+        $this->dispatchEvent(new ClassDefinitionEvent($this), DataObjectClassDefinitionEvents::POST_DELETE);
     }
 
-    private function deletePhpClasses()
+    private function deletePhpClasses(): void
     {
         // delete the class files
         @unlink($this->getPhpClassFile());
@@ -799,15 +637,15 @@ final class ClassDefinition extends Model\AbstractModel
     /**
      * @internal
      *
+     * with PIMCORE_CLASS_DEFINITION_WRITABLE set, it globally allow/disallow creation and change in classes
+     * when the ENV is not set, it allows modification and creation of new in classes in /var/classes but disables modification of classes in config/pimcore/classes
+     * more details in 05_Deployment_Tools.md
+     *
      * @return bool
      */
     public function isWritable(): bool
     {
-        if ($_SERVER['PIMCORE_CLASS_DEFINITION_WRITABLE'] ?? false) {
-            return true;
-        }
-
-        return !str_starts_with($this->getDefinitionFile(), PIMCORE_CUSTOM_CONFIGURATION_DIRECTORY);
+        return $_SERVER['PIMCORE_CLASS_DEFINITION_WRITABLE'] ?? !str_starts_with($this->getDefinitionFile(), PIMCORE_CUSTOM_CONFIGURATION_DIRECTORY);
     }
 
     /**
@@ -822,12 +660,18 @@ final class ClassDefinition extends Model\AbstractModel
         return $this->locateDefinitionFile($name ?? $this->getName(), 'definition_%s.php');
     }
 
-    private function getPhpClassFile(): string
+    /**
+     * @internal
+     */
+    public function getPhpClassFile(): string
     {
         return $this->locateFile(ucfirst($this->getName()), 'DataObject/%s.php');
     }
 
-    private function getPhpListingClassFile(): string
+    /**
+     * @internal
+     */
+    public function getPhpListingClassFile(): string
     {
         return $this->locateFile(ucfirst($this->getName()), 'DataObject/%s/Listing.php');
     }
@@ -977,13 +821,7 @@ final class ClassDefinition extends Model\AbstractModel
      */
     protected function doEnrichFieldDefinition($fieldDefinition, $context = [])
     {
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($fieldDefinition instanceof FieldDefinitionEnrichmentInterface || method_exists($fieldDefinition, 'enrichFieldDefinition')) {
-            if (!$fieldDefinition instanceof FieldDefinitionEnrichmentInterface) {
-                trigger_deprecation('pimcore/pimcore', '10.1',
-                    sprintf('Usage of method_exists is deprecated since version 10.1 and will be removed in Pimcore 11.' .
-                    'Implement the %s interface instead.', FieldDefinitionEnrichmentInterface::class));
-            }
+        if ($fieldDefinition instanceof FieldDefinitionEnrichmentInterface) {
             $context['class'] = $this;
             $fieldDefinition = $fieldDefinition->enrichFieldDefinition($context);
         }
@@ -1051,18 +889,32 @@ final class ClassDefinition extends Model\AbstractModel
      */
     public function setLayoutDefinitions($layoutDefinitions)
     {
+        $oldFieldDefinitions = null;
+        if ($this->layoutDefinitions !== null) {
+            $this->setDeletedDataComponents([]);
+            $oldFieldDefinitions = $this->getFieldDefinitions();
+        }
+
         $this->layoutDefinitions = $layoutDefinitions;
 
         $this->fieldDefinitions = [];
         $this->extractDataDefinitions($this->layoutDefinitions);
 
+        if ($oldFieldDefinitions !== null) {
+            $newFieldDefinitions = $this->getFieldDefinitions();
+            $deletedComponents = [];
+            foreach ($oldFieldDefinitions as $fieldDefinition) {
+                if (!array_key_exists($fieldDefinition->getName(), $newFieldDefinitions)) {
+                    array_push($deletedComponents, $fieldDefinition);
+                }
+            }
+            $this->setDeletedDataComponents($deletedComponents);
+        }
+
         return $this;
     }
 
-    /**
-     * @param DataObject\ClassDefinition\Layout|DataObject\ClassDefinition\Data $def
-     */
-    private function extractDataDefinitions($def)
+    private function extractDataDefinitions(ClassDefinition\Data|ClassDefinition\Layout|null $def): void
     {
         if ($def instanceof DataObject\ClassDefinition\Layout) {
             if ($def->hasChildren()) {
@@ -1289,7 +1141,7 @@ final class ClassDefinition extends Model\AbstractModel
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getIcon()
     {
@@ -1297,7 +1149,7 @@ final class ClassDefinition extends Model\AbstractModel
     }
 
     /**
-     * @param string $icon
+     * @param string|null $icon
      *
      * @return $this
      */
@@ -1331,27 +1183,7 @@ final class ClassDefinition extends Model\AbstractModel
     }
 
     /**
-     * @param string $previewUrl
-     *
-     * @return $this
-     */
-    public function setPreviewUrl($previewUrl)
-    {
-        $this->previewUrl = $previewUrl;
-
-        return $this;
-    }
-
-    /**
-     * @return string
-     */
-    public function getPreviewUrl()
-    {
-        return $this->previewUrl;
-    }
-
-    /**
-     * @return string
+     * @return string|null
      */
     public function getGroup()
     {
@@ -1359,7 +1191,7 @@ final class ClassDefinition extends Model\AbstractModel
     }
 
     /**
-     * @param string $group
+     * @param string|null $group
      *
      * @return $this
      */
@@ -1388,6 +1220,26 @@ final class ClassDefinition extends Model\AbstractModel
     public function getDescription()
     {
         return $this->description;
+    }
+
+    /**
+     * @param string $title
+     *
+     * @return $this
+     */
+    public function setTitle(string $title): static
+    {
+        $this->title = $title;
+
+        return $this;
+    }
+
+    /**
+     * @return string
+     */
+    public function getTitle(): string
+    {
+        return $this->title;
     }
 
     /**
@@ -1547,7 +1399,7 @@ final class ClassDefinition extends Model\AbstractModel
     }
 
     /**
-     * @param array $compositeIndices
+     * @param array|null $compositeIndices
      *
      * @return $this
      */
@@ -1559,22 +1411,86 @@ final class ClassDefinition extends Model\AbstractModel
     }
 
     /**
-     * @return bool
+     * @return ClassDefinition\Data[]
      */
-    public function getGenerateTypeDeclarations()
+    public function getDeletedDataComponents()
     {
-        return (bool) $this->generateTypeDeclarations;
+        return $this->deletedDataComponents;
     }
 
     /**
-     * @param bool $generateTypeDeclarations
+     * @param ClassDefinition\Data[] $deletedDataComponents
      *
      * @return $this
      */
-    public function setGenerateTypeDeclarations($generateTypeDeclarations)
+    public function setDeletedDataComponents(array $deletedDataComponents): ClassDefinition
     {
-        $this->generateTypeDeclarations = (bool) $generateTypeDeclarations;
+        $this->deletedDataComponents = $deletedDataComponents;
 
         return $this;
+    }
+
+    private function deleteDeletedDataComponentsInCustomLayout(): void
+    {
+        if (empty($this->getDeletedDataComponents())) {
+            return;
+        }
+        $customLayouts = new ClassDefinition\CustomLayout\Listing();
+        $id = $this->getId();
+        $customLayouts->setFilter(function (DataObject\ClassDefinition\CustomLayout $layout) use ($id) {
+            return $layout->getClassId() === $id;
+        });
+        $customLayouts = $customLayouts->load();
+
+        foreach ($customLayouts as $customLayout) {
+            $layoutDefinition = $customLayout->getLayoutDefinitions();
+            $this->deleteDeletedDataComponentsInLayoutDefinition($layoutDefinition);
+            $customLayout->setLayoutDefinitions($layoutDefinition);
+            $customLayout->save();
+        }
+    }
+
+    private function deleteDeletedDataComponentsInLayoutDefinition(ClassDefinition\Layout $layoutDefinition): void
+    {
+        $componentsToDelete = $this->getDeletedDataComponents();
+        $componentDeleted = false;
+
+        $children = &$layoutDefinition->getChildrenByRef();
+        $count = count($children);
+        for ($i = 0; $i < $count; $i++) {
+            $component = $children[$i];
+            if (in_array($component, $componentsToDelete)) {
+                unset($children[$i]);
+                $componentDeleted = true;
+            }
+            if ($component instanceof ClassDefinition\Layout) {
+                $this->deleteDeletedDataComponentsInLayoutDefinition($component);
+            }
+        }
+        if ($componentDeleted) {
+            $children = array_values($children);
+        }
+    }
+
+    public static function getByIdIgnoreCase(string $id): ClassDefinition|null
+    {
+        try {
+            $class = new self();
+            $name = $class->getDao()->getNameByIdIgnoreCase($id);
+            $definitionFile = $class->getDefinitionFile($name);
+            $class = @include $definitionFile;
+
+            if (!$class instanceof self) {
+                throw new \Exception('Class definition with name ' . $name . ' or ID ' . $id . ' does not exist');
+            }
+
+            $class->setId($id);
+        } catch (\Exception $e) {
+            Logger::info($e->getMessage());
+
+            return null;
+        }
+
+        return $class;
     }
 }

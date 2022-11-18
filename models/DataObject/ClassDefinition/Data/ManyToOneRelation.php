@@ -51,6 +51,11 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
 
     /**
      * @internal
+     */
+    public bool $assetInlineDownloadAllowed = false;
+
+    /**
+     * @internal
      *
      * @var string
      */
@@ -58,10 +63,13 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $relationType = true;
+    public bool $allowToClearRelation = true;
+
+    /**
+     * @internal
+     */
+    public bool $relationType = true;
 
     /**
      * Type for the column to query
@@ -77,17 +85,13 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $objectsAllowed = false;
+    public bool $objectsAllowed = false;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $assetsAllowed = false;
+    public bool $assetsAllowed = false;
 
     /**
      * Allowed asset types
@@ -100,10 +104,8 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $documentsAllowed = false;
+    public bool $documentsAllowed = false;
 
     /**
      * Allowed document types
@@ -497,6 +499,21 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
     }
 
     /**
+     * @return $this
+     */
+    public function setAssetInlineDownloadAllowed(bool $assetInlineDownloadAllowed): static
+    {
+        $this->assetInlineDownloadAllowed = $assetInlineDownloadAllowed;
+
+        return $this;
+    }
+
+    public function getAssetInlineDownloadAllowed(): bool
+    {
+        return $this->assetInlineDownloadAllowed;
+    }
+
+    /**
      * @param string $assetUploadPath
      *
      * @return $this
@@ -514,6 +531,16 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
     public function getAssetUploadPath()
     {
         return $this->assetUploadPath;
+    }
+
+    public function isAllowedToClearRelation(): bool
+    {
+        return $this->allowToClearRelation;
+    }
+
+    public function setAllowToClearRelation(bool $allowToClearRelation): void
+    {
+        $this->allowToClearRelation = $allowToClearRelation;
     }
 
     /**
@@ -649,6 +676,18 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
         }
 
         throw new \InvalidArgumentException('Filtering '.__CLASS__.' does only support "=" operator');
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getPhpdocInputType(): ?string
+    {
+        if ($phpdocType = $this->getPhpdocType()) {
+            return $phpdocType . '|null';
+        }
+
+        return null;
     }
 
     /**

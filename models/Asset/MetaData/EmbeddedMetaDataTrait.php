@@ -99,12 +99,7 @@ trait EmbeddedMetaDataTrait
         return $embeddedMetaData;
     }
 
-    /**
-     * @param array $tempArray
-     *
-     * @return array
-     */
-    private function flattenArray(array $tempArray)
+    private function flattenArray(array $tempArray): array
     {
         array_walk($tempArray, function (&$value) {
             if (is_array($value)) {
@@ -142,6 +137,13 @@ trait EmbeddedMetaDataTrait
         return $data;
     }
 
+    /**
+     * @param string|null $filePath
+     *
+     * @return array
+     *
+     * @throws \Exception
+     */
     public function getXMPData(?string $filePath = null)
     {
         if (!$filePath) {
@@ -183,7 +185,7 @@ trait EmbeddedMetaDataTrait
                 $tagLength = strlen($tag);
                 $offset = 0;
                 while (($position = strpos($buffer, $tag, $offset)) === false && ($chunk = fread($file_pointer,
-                        $chunkSize)) !== false && !empty($chunk)) {
+                    $chunkSize)) !== false && !empty($chunk)) {
                     $offset = strlen($buffer) - $tagLength; // subtract the tag size just in case it's split between chunks.
                     $buffer .= $chunk;
                 }
@@ -245,7 +247,7 @@ trait EmbeddedMetaDataTrait
         $data = [];
 
         if (is_file($filePath)) {
-            $result = getimagesize($filePath, $info);
+            $result = @getimagesize($filePath, $info);
             if ($result) {
                 $mapping = [
                     '1#000' => 'EnvelopeRecordVersion',

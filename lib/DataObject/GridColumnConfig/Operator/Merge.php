@@ -20,15 +20,9 @@ namespace Pimcore\DataObject\GridColumnConfig\Operator;
  */
 final class Merge extends AbstractOperator
 {
-    /**
-     * @var bool
-     */
-    private $flatten;
+    private bool $flatten;
 
-    /**
-     * @var bool
-     */
-    private $unique;
+    private bool $unique;
 
     /**
      * {@inheritdoc}
@@ -50,10 +44,10 @@ final class Merge extends AbstractOperator
         $result->label = $this->label;
         $result->isArrayType = true;
 
-        $childs = $this->getChilds();
+        $children = $this->getChildren();
         $resultItems = [];
 
-        foreach ($childs as $c) {
+        foreach ($children as $c) {
             $childResult = $c->getLabeledValue($element);
             $childValues = $childResult->value ?? null;
 
@@ -83,7 +77,7 @@ final class Merge extends AbstractOperator
     }
 
     /**
-     * @return mixed
+     * @return bool
      */
     public function getFlatten()
     {
@@ -91,7 +85,7 @@ final class Merge extends AbstractOperator
     }
 
     /**
-     * @param mixed $flatten
+     * @param bool $flatten
      */
     public function setFlatten($flatten)
     {
@@ -99,7 +93,7 @@ final class Merge extends AbstractOperator
     }
 
     /**
-     * @return mixed
+     * @return bool
      */
     public function getUnique()
     {
@@ -107,7 +101,7 @@ final class Merge extends AbstractOperator
     }
 
     /**
-     * @param mixed $unique
+     * @param bool $unique
      */
     public function setUnique($unique)
     {

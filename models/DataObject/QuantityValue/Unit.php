@@ -18,6 +18,7 @@ namespace Pimcore\Model\DataObject\QuantityValue;
 use Pimcore\Cache;
 use Pimcore\Event\DataObjectQuantityValueEvents;
 use Pimcore\Event\Model\DataObject\QuantityValueUnitEvent;
+use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Model;
 
 /**
@@ -25,6 +26,8 @@ use Pimcore\Model;
  */
 class Unit extends Model\AbstractModel
 {
+    use RecursionBlockingEventDispatchHelperTrait;
+
     const CACHE_KEY = 'quantityvalue_units_table';
 
     /**
@@ -115,14 +118,14 @@ class Unit extends Model\AbstractModel
     {
         try {
             $table = null;
-            if (Cache\Runtime::isRegistered(self::CACHE_KEY)) {
-                $table = Cache\Runtime::get(self::CACHE_KEY);
+            if (Cache\RuntimeCache::isRegistered(self::CACHE_KEY)) {
+                $table = Cache\RuntimeCache::get(self::CACHE_KEY);
             }
 
             if (!is_array($table)) {
                 $table = Cache::load(self::CACHE_KEY);
                 if (is_array($table)) {
-                    Cache\Runtime::set(self::CACHE_KEY, $table);
+                    Cache\RuntimeCache::set(self::CACHE_KEY, $table);
                 }
             }
 
@@ -135,7 +138,7 @@ class Unit extends Model\AbstractModel
                 }
 
                 Cache::save($table, self::CACHE_KEY, [], null, 995, true);
-                Cache\Runtime::set(self::CACHE_KEY, $table);
+                Cache\RuntimeCache::set(self::CACHE_KEY, $table);
             }
         } catch (\Exception $e) {
             return null;
@@ -166,29 +169,29 @@ class Unit extends Model\AbstractModel
         $isUpdate = false;
         if ($this->getId()) {
             $isUpdate = true;
-            \Pimcore::getEventDispatcher()->dispatch(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_PRE_UPDATE);
+            $this->dispatchEvent(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_PRE_UPDATE);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_PRE_ADD);
+            $this->dispatchEvent(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_PRE_ADD);
         }
 
         $this->getDao()->save();
-        Cache\Runtime::set(self::CACHE_KEY, null);
+        Cache\RuntimeCache::set(self::CACHE_KEY, null);
         Cache::remove(self::CACHE_KEY);
 
         if ($isUpdate) {
-            \Pimcore::getEventDispatcher()->dispatch(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_POST_UPDATE);
+            $this->dispatchEvent(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_POST_UPDATE);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_POST_ADD);
+            $this->dispatchEvent(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_POST_ADD);
         }
     }
 
     public function delete()
     {
-        \Pimcore::getEventDispatcher()->dispatch(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_PRE_DELETE);
+        $this->dispatchEvent(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_PRE_DELETE);
         $this->getDao()->delete();
-        Cache\Runtime::set(self::CACHE_KEY, null);
+        Cache\RuntimeCache::set(self::CACHE_KEY, null);
         Cache::remove(self::CACHE_KEY);
-        \Pimcore::getEventDispatcher()->dispatch(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_POST_DELETE);
+        $this->dispatchEvent(new QuantityValueUnitEvent($this), DataObjectQuantityValueEvents::UNIT_POST_DELETE);
     }
 
     /**

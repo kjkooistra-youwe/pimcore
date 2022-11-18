@@ -24,9 +24,6 @@ class DomCrawler extends Crawler
 {
     public const FRAGMENT_WRAPPER_TAG = 'pimcore-fragment-wrapper';
 
-    /**
-     * @var bool
-     */
     private bool $wrappedHtmlFragment = false;
 
     /**
@@ -49,7 +46,7 @@ class DomCrawler extends Crawler
     /**
      * {@inheritDoc}
      */
-    public function html(string $default = null)
+    public function html(string $default = null): string
     {
         if ($this->wrappedHtmlFragment) {
             $html = $this->filter(self::FRAGMENT_WRAPPER_TAG)->html();

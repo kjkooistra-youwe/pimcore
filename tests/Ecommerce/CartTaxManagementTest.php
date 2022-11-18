@@ -17,11 +17,12 @@ declare(strict_types=1);
 
 namespace Pimcore\Tests\Ecommerce;
 
-use Codeception\Util\Stub;
+use Codeception\Stub;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CartManager\CartInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CartManager\CartPriceCalculator;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CartManager\CartPriceModificator\Shipping;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CartManager\SessionCart;
+use Pimcore\Bundle\EcommerceFrameworkBundle\EventListener\SessionBagListener;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Model\AbstractProduct;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Model\CheckoutableInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Model\Currency;
@@ -30,17 +31,16 @@ use Pimcore\Bundle\EcommerceFrameworkBundle\PriceSystem\Price;
 use Pimcore\Bundle\EcommerceFrameworkBundle\PriceSystem\TaxManagement\TaxEntry;
 use Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\PricingManager;
 use Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\PricingManagerLocator;
-use Pimcore\Bundle\EcommerceFrameworkBundle\Tools\SessionConfigurator;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Type\Decimal;
 use Pimcore\Model\DataObject\ClassDefinition;
 use Pimcore\Model\DataObject\Fieldcollection;
 use Pimcore\Model\DataObject\Fieldcollection\Data\TaxEntry as TaxEntryFieldcollection;
 use Pimcore\Model\DataObject\OnlineShopTaxClass;
-use Pimcore\Tests\Test\EcommerceTestCase;
+use Pimcore\Tests\Support\Test\EcommerceTestCase;
 
 class CartTaxManagementTest extends EcommerceTestCase
 {
-    private function buildTaxClass(array $taxes = [], $combinationType = TaxEntry::CALCULATION_MODE_COMBINE)
+    private function buildTaxClass(array $taxes = [], $combinationType = TaxEntry::CALCULATION_MODE_COMBINE): OnlineShopTaxClass
     {
         $taxClass = new OnlineShopTaxClass();
         $taxClass->setId(md5(serialize($taxes)));
@@ -67,7 +67,7 @@ class CartTaxManagementTest extends EcommerceTestCase
 
         $pricingManagers = Stub::make(PricingManagerLocator::class, [
             'getPricingManager' => function () {
-                return new PricingManager([], [], $this->buildSession());
+                return new PricingManager([], []);
             },
         ]);
 
@@ -105,12 +105,9 @@ class CartTaxManagementTest extends EcommerceTestCase
         return $product;
     }
 
-    /**
-     * @return SessionCart
-     */
-    private function setUpCart()
+    private function setUpCart(): SessionCart
     {
-        $sessionBag = $this->buildSession()->getBag(SessionConfigurator::ATTRIBUTE_BAG_CART);
+        $sessionBag = $this->buildSession()->getBag(SessionBagListener::ATTRIBUTE_BAG_CART);
 
         /** @var SessionCart|\PHPUnit_Framework_MockObject_Stub $cart */
         $cart = Stub::construct(SessionCart::class, [], [
@@ -127,12 +124,7 @@ class CartTaxManagementTest extends EcommerceTestCase
         return $cart;
     }
 
-    /**
-     * @param CartInterface $cart
-     *
-     * @return CartPriceCalculator
-     */
-    private function setUpCartCalculator(CartInterface $cart, $withModificators = false, $taxes = [])
+    private function setUpCartCalculator(CartInterface $cart, bool $withModificators = false, array $taxes = []): CartPriceCalculator
     {
         $calculator = new CartPriceCalculator($this->buildEnvironment(), $cart);
 

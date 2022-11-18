@@ -15,17 +15,20 @@
 
 namespace Pimcore\Model;
 
-use Pimcore\Cache\Runtime;
+use Pimcore\Cache\RuntimeCache;
+use Pimcore\Event\Model\SiteEvent;
+use Pimcore\Event\SiteEvents;
+use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Logger;
 use Pimcore\Model\Exception\NotFoundException;
 
 /**
  * @method \Pimcore\Model\Site\Dao getDao()
- * @method void delete()
- * @method void save()
  */
 final class Site extends AbstractModel
 {
+    use RecursionBlockingEventDispatchHelperTrait;
+
     /**
      * @var Site|null
      */
@@ -48,13 +51,10 @@ final class Site extends AbstractModel
      */
     protected $rootId;
 
-    /**
-     * @var Document\Page|null
-     */
     protected ?Document\Page $rootDocument = null;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $rootPath;
 
@@ -97,8 +97,8 @@ final class Site extends AbstractModel
     {
         $cacheKey = 'site_id_'. $id;
 
-        if (Runtime::isRegistered($cacheKey)) {
-            $site = Runtime::get($cacheKey);
+        if (RuntimeCache::isRegistered($cacheKey)) {
+            $site = RuntimeCache::get($cacheKey);
         } elseif (!$site = \Pimcore\Cache::load($cacheKey)) {
             try {
                 $site = new self();
@@ -114,7 +114,7 @@ final class Site extends AbstractModel
             $site = null;
         }
 
-        Runtime::set($cacheKey, $site);
+        RuntimeCache::set($cacheKey, $site);
 
         return $site;
     }
@@ -146,8 +146,8 @@ final class Site extends AbstractModel
         // cached because this is called in the route
         $cacheKey = 'site_domain_'. md5($domain);
 
-        if (Runtime::isRegistered($cacheKey)) {
-            $site = Runtime::get($cacheKey);
+        if (RuntimeCache::isRegistered($cacheKey)) {
+            $site = RuntimeCache::get($cacheKey);
         } elseif (!$site = \Pimcore\Cache::load($cacheKey)) {
             try {
                 $site = new self();
@@ -163,7 +163,7 @@ final class Site extends AbstractModel
             $site = null;
         }
 
-        Runtime::set($cacheKey, $site);
+        RuntimeCache::set($cacheKey, $site);
 
         return $site;
     }
@@ -327,7 +327,7 @@ final class Site extends AbstractModel
     }
 
     /**
-     * @param string $path
+     * @param string|null $path
      *
      * @return $this
      */
@@ -339,7 +339,7 @@ final class Site extends AbstractModel
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getRootPath()
     {
@@ -426,12 +426,11 @@ final class Site extends AbstractModel
      */
     public function clearDependentCache()
     {
-
         // this is mostly called in Site\Dao not here
         try {
             \Pimcore\Cache::clearTag('site');
         } catch (\Exception $e) {
-            Logger::crit($e);
+            Logger::crit((string) $e);
         }
     }
 
@@ -473,5 +472,27 @@ final class Site extends AbstractModel
     public function getCreationDate()
     {
         return $this->creationDate;
+    }
+
+    public function save(): void
+    {
+        $preSaveEvent = new SiteEvent($this);
+        $this->dispatchEvent($preSaveEvent, SiteEvents::PRE_SAVE);
+
+        $this->getDao()->save();
+
+        $postSaveEvent = new SiteEvent($this);
+        $this->dispatchEvent($postSaveEvent, SiteEvents::POST_SAVE);
+    }
+
+    public function delete(): void
+    {
+        $preDeleteEvent = new SiteEvent($this);
+        $this->dispatchEvent($preDeleteEvent, SiteEvents::PRE_DELETE);
+
+        $this->getDao()->delete();
+
+        $postDeleteEvent = new SiteEvent($this);
+        $this->dispatchEvent($postDeleteEvent, SiteEvents::POST_DELETE);
     }
 }

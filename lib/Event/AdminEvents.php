@@ -344,7 +344,7 @@ final class AdminEvents
      *
      * @var string
      */
-    const ASSET_TREE_GET_CHILDREN_BY_ID_PRE_SEND_DATA = 'pimcore.admin.asset.treeGetChildsById.preSendData';
+    const ASSET_TREE_GET_CHILDREN_BY_ID_PRE_SEND_DATA = 'pimcore.admin.asset.treeGetChildrenById.preSendData';
 
     /**
      * Fired before the request params are parsed.
@@ -369,7 +369,7 @@ final class AdminEvents
      *
      * @var string
      */
-    const DOCUMENT_TREE_GET_CHILDREN_BY_ID_PRE_SEND_DATA = 'pimcore.admin.document.treeGetChildsById.preSendData';
+    const DOCUMENT_TREE_GET_CHILDREN_BY_ID_PRE_SEND_DATA = 'pimcore.admin.document.treeGetChildrenById.preSendData';
 
     /**
      * Fired before the request params are parsed.
@@ -386,6 +386,20 @@ final class AdminEvents
     const OBJECT_GET_PRE_SEND_DATA = 'pimcore.admin.dataobject.get.preSendData';
 
     /**
+     * Subject: \Pimcore\Bundle\AdminBundle\Controller\Admin\DataObject\DataObjectHelperController
+     * Arguments:
+     *  - data | array | the response data which this can be modified
+     *  - request | Request | the Request object passed to the action
+     *  - config | Config | the Config object passed to the action
+     *  - context | string | 'get' or 'delete'
+     *
+     * @Event("Symfony\Component\EventDispatcher\GenericEvent")
+     *
+     * @var string
+     */
+    const OBJECT_GRID_GET_COLUMN_CONFIG_PRE_SEND_DATA = 'pimcore.admin.dataobject.gridGetColumnConfig.preSendData';
+
+    /**
      * Subject: \Pimcore\Bundle\AdminBundle\Controller\Admin\DataObjectController
      * Arguments:
      *  - objects | array | the list of object tree nodes
@@ -394,7 +408,7 @@ final class AdminEvents
      *
      * @var string
      */
-    const OBJECT_TREE_GET_CHILDREN_BY_ID_PRE_SEND_DATA = 'pimcore.admin.dataobject.treeGetChildsById.preSendData';
+    const OBJECT_TREE_GET_CHILDREN_BY_ID_PRE_SEND_DATA = 'pimcore.admin.dataobject.treeGetChildrenById.preSendData';
 
     /**
      * Subject: \Pimcore\Bundle\AdminBundle\Controller\Admin\ClassController
@@ -530,6 +544,7 @@ final class AdminEvents
      *
      * Arguments:
      *  - result | The result array
+     *  - configName | Name of the current perspective
      *
      * @Event("Symfony\Component\EventDispatcher\GenericEvent")
      *

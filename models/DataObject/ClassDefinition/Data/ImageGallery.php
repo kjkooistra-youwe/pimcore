@@ -245,7 +245,7 @@ class ImageGallery extends Data implements ResourcePersistenceAwareInterface, Qu
      *
      * @param array $data
      * @param null|DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return DataObject\Data\ImageGallery
      */
@@ -278,7 +278,9 @@ class ImageGallery extends Data implements ResourcePersistenceAwareInterface, Qu
             ];
 
             $itemResult = $fd->getDataFromResource($itemData, $object, $params);
-            $resultItems[] = $itemResult;
+            if ($itemResult instanceof DataObject\Data\Hotspotimage) {
+                $resultItems[] = $itemResult;
+            }
         }
 
         $imageGallery = new DataObject\Data\ImageGallery($resultItems);
@@ -292,14 +294,9 @@ class ImageGallery extends Data implements ResourcePersistenceAwareInterface, Qu
         return $imageGallery;
     }
 
-    /**
-     * @param mixed $params
-     *
-     * @return DataObject\Data\ImageGallery
-     */
-    private function createEmptyImageGallery($params = [])
+    private function createEmptyImageGallery(array $params): DataObject\Data\ImageGallery
     {
-        $imageGallery = new DataObject\Data\ImageGallery(null);
+        $imageGallery = new DataObject\Data\ImageGallery();
 
         if (isset($params['owner'])) {
             $imageGallery->_setOwner($params['owner']);
@@ -372,7 +369,7 @@ class ImageGallery extends Data implements ResourcePersistenceAwareInterface, Qu
     }
 
     /**
-     * @param DataObject\Data\ImageGallery $data
+     * @param array|null $data
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
@@ -495,7 +492,10 @@ class ImageGallery extends Data implements ResourcePersistenceAwareInterface, Qu
      */
     public function checkValidity($data, $omitMandatoryCheck = false, $params = [])
     {
-        if ($this->getMandatory() && !$omitMandatoryCheck && ($data === null || empty($data->getItems()) || $data->getItems()[0]->getImage() === null)) {
+        if (
+            $this->getMandatory() && !$omitMandatoryCheck &&
+            ($data === null || empty($data->getItems()) || $data->hasValidImages() === false)
+        ) {
             throw new Model\Element\ValidationException('[ ' . $this->getName() . ' ] At least 1 image should be uploaded!');
         }
 

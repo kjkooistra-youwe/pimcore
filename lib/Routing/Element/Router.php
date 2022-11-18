@@ -67,7 +67,7 @@ class Router implements RouterInterface, RequestMatcherInterface, VersatileGener
      *
      * @return RequestContext
      */
-    public function getContext()// : RequestContext
+    public function getContext(): RequestContext
     {
         return $this->context;
     }
@@ -77,19 +77,21 @@ class Router implements RouterInterface, RequestMatcherInterface, VersatileGener
      *
      * @return bool
      */
-    public function supports($name)// : bool
+    public function supports($name): bool
     {
         return $name === 'pimcore_element';
     }
 
     /**
      * {@inheritdoc}
+     *
+     * @return string
      */
-    public function getRouteDebugMessage($name, array $parameters = [])// : string
+    public function getRouteDebugMessage($name, array $parameters = []): string
     {
         $element = $parameters['element'] ?? null;
         if ($element instanceof ElementInterface) {
-            return sprintf('Element (Type: %s, ID: %d)', $parameters['element']->getType(), $parameters['element']->getId());
+            return sprintf('Element (Type: %s, ID: %d)', $element->getType(), $element->getId());
         }
 
         return 'No element';
@@ -97,10 +99,13 @@ class Router implements RouterInterface, RequestMatcherInterface, VersatileGener
 
     /**
      * {@inheritdoc}
+     *
+     * @return string
      */
-    public function generate(string $name, array $parameters = [], int $referenceType = self::ABSOLUTE_PATH)// : string
+    public function generate(string $name, array $parameters = [], int $referenceType = self::ABSOLUTE_PATH): string
     {
         $element = $parameters['element'] ?? null;
+        unset($parameters['element']);
         if ($element instanceof Document || $element instanceof Asset) {
             $schemeAuthority = '';
             $host = $this->context->getHost();
@@ -183,16 +188,20 @@ class Router implements RouterInterface, RequestMatcherInterface, VersatileGener
 
     /**
      * {@inheritdoc}
+     *
+     * @return array
      */
-    public function matchRequest(Request $request)
+    public function matchRequest(Request $request): array
     {
         throw new ResourceNotFoundException(sprintf('No routes found for "%s".', $request->getPathInfo()));
     }
 
     /**
      * {@inheritdoc}
+     *
+     * @return array
      */
-    public function match($pathinfo)
+    public function match($pathinfo): array
     {
         throw new ResourceNotFoundException(sprintf('No routes found for "%s".', $pathinfo));
     }
@@ -202,7 +211,7 @@ class Router implements RouterInterface, RequestMatcherInterface, VersatileGener
      *
      * @return RouteCollection
      */
-    public function getRouteCollection()// : RouteCollection
+    public function getRouteCollection(): RouteCollection
     {
         return new RouteCollection();
     }

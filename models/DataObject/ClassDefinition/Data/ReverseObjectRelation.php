@@ -15,6 +15,7 @@
 
 namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 
+use Pimcore\Db;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
@@ -55,10 +56,8 @@ class ReverseObjectRelation extends ManyToManyObjectRelation
      * ReverseObjectRelation must be lazy loading!
      *
      * @internal
-     *
-     * @var bool
      */
-    public $lazyLoading = true;
+    public bool $lazyLoading = true;
 
     /**
      * @param array $classes
@@ -84,13 +83,16 @@ class ReverseObjectRelation extends ManyToManyObjectRelation
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getOwnerClassName()
     {
         //fallback for legacy data
-        if (empty($this->ownerClassName)) {
+        if (empty($this->ownerClassName) && $this->ownerClassId) {
             try {
+                if (empty($this->ownerClassId)) {
+                    return null;
+                }
                 $class = DataObject\ClassDefinition::getById($this->ownerClassId);
                 $this->ownerClassName = $class->getName();
             } catch (\Exception $e) {
@@ -102,13 +104,18 @@ class ReverseObjectRelation extends ManyToManyObjectRelation
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getOwnerClassId()
     {
         if (empty($this->ownerClassId)) {
             try {
                 $class = DataObject\ClassDefinition::getByName($this->ownerClassName);
+                if (!$class instanceof DataObject\ClassDefinition) {
+                    Logger::error('Reverse relation '.$this->getName().' has no owner class assigned');
+
+                    return null;
+                }
                 $this->ownerClassId = $class->getId();
             } catch (\Exception $e) {
                 Logger::error($e->getMessage());
@@ -147,8 +154,8 @@ class ReverseObjectRelation extends ManyToManyObjectRelation
         $ownerClass = DataObject\ClassDefinition::getByName($this->getOwnerClassName());
         if ($ownerClass instanceof DataObject\ClassDefinition && $object instanceof DataObject\Concrete && $ownerClass->getId() == $object->getClassId()) {
             $fd = $ownerClass->getFieldDefinition($this->getOwnerFieldName());
-            if ($fd instanceof DataObject\ClassDefinition\Data\ManyToManyObjectRelation) {
-                return $fd->allowObjectRelation($object);
+            if ($fd instanceof DataObject\ClassDefinition\Data\Relations\AbstractRelations) {
+                return true;
             }
         }
 
@@ -176,11 +183,33 @@ class ReverseObjectRelation extends ManyToManyObjectRelation
     }
 
     /**
-     * {@inheritdoc}
+     * @param DataObject\Concrete $object
+     * @param array $params
+     *
+     * @return array
      */
-    public function getForCsvExport($object, $params = [])
+    public function load($object, $params = [])
     {
-        return '';
+        if ($this->getOwnerClassId() === null) {
+            return [];
+        }
+
+        $db = Db::get();
+        $relations = $db->fetchAllAssociative('SELECT * FROM object_relations_'.$this->getOwnerClassId()." WHERE dest_id = ? AND fieldname = ? AND ownertype = 'object'", [$object->getId(), $this->getOwnerFieldName()]);
+
+        $relations = array_map(static function ($relation) {
+            $relation['dest_id'] = $relation['src_id'];
+            unset($relation['src_id']);
+
+            return $relation;
+        }, $relations);
+
+        $data = $this->loadData($relations, $object, $params);
+        if ($object instanceof Model\Element\DirtyIndicatorInterface) {
+            $object->markFieldDirty($this->getName(), false);
+        }
+
+        return $data['data'];
     }
 
     /**
@@ -208,7 +237,20 @@ class ReverseObjectRelation extends ManyToManyObjectRelation
     {
         return true;
     }
-}
 
-//TODO remove in Pimcore 11
-class_alias(ReverseObjectRelation::class, 'Pimcore\Model\DataObject\ClassDefinition\Data\ReverseManyToManyObjectRelation');
+    /**
+     * {@inheritdoc}
+     */
+    public function preGetData($container, $params = [])
+    {
+        return $this->load($container);
+    }
+
+    /**
+     * @return false
+     */
+    public function supportsInheritance()
+    {
+        return false;
+    }
+}

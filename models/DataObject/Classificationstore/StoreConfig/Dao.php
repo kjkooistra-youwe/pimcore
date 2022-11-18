@@ -39,7 +39,7 @@ class Dao extends Model\Dao\AbstractDao
             $this->model->setId($id);
         }
 
-        $data = $this->db->fetchRow('SELECT * FROM ' . self::TABLE_NAME_STORES . ' WHERE id = ?', $this->model->getId());
+        $data = $this->db->fetchAssociative('SELECT * FROM ' . self::TABLE_NAME_STORES . ' WHERE id = ?', [$this->model->getId()]);
 
         if (!empty($data['id'])) {
             $this->assignVariablesToModel($data);
@@ -61,7 +61,7 @@ class Dao extends Model\Dao\AbstractDao
 
         $name = $this->model->getName();
 
-        $data = $this->db->fetchRow('SELECT * FROM ' . self::TABLE_NAME_STORES . ' WHERE name = ?', $name);
+        $data = $this->db->fetchAssociative('SELECT * FROM ' . self::TABLE_NAME_STORES . ' WHERE name = ?', [$name]);
 
         if (!empty($data['id'])) {
             $this->assignVariablesToModel($data);
@@ -117,6 +117,6 @@ class Dao extends Model\Dao\AbstractDao
     public function create()
     {
         $this->db->insert(self::TABLE_NAME_STORES, []);
-        $this->model->setId($this->db->lastInsertId());
+        $this->model->setId((int) $this->db->lastInsertId());
     }
 }

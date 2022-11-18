@@ -24,9 +24,8 @@ use Pimcore\Model\Element;
 use Pimcore\Normalizer\NormalizerInterface;
 use Pimcore\Tool;
 
-class Localizedfields extends Data implements CustomResourcePersistingInterface, TypeDeclarationSupportInterface, NormalizerInterface, DataContainerAwareInterface, IdRewriterInterface, PreGetDataInterface
+class Localizedfields extends Data implements CustomResourcePersistingInterface, TypeDeclarationSupportInterface, NormalizerInterface, DataContainerAwareInterface, IdRewriterInterface, PreGetDataInterface, VarExporterInterface
 {
-    use Element\ChildsCompatibilityTrait;
     use Layout\Traits\LabelTrait;
     use DataObject\Traits\ClassSavedTrait;
 
@@ -44,7 +43,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      *
      * @var array
      */
-    public $childs = [];
+    public $children = [];
 
     /**
      * @internal
@@ -97,17 +96,13 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $border = false;
+    public bool $border = false;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $provideSplitView;
+    public bool $provideSplitView = false;
 
     /**
      * @internal
@@ -193,17 +188,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         return $result;
     }
 
-    /**
-     * @param DataObject\Localizedfield $data
-     * @param DataObject\Concrete $object
-     * @param array $fieldData
-     * @param array $metaData
-     * @param int $level
-     * @param array $params
-     *
-     * @return array
-     */
-    private function doGetDataForEditMode($data, $object, &$fieldData, &$metaData, $level = 1, $params = [])
+    private function doGetDataForEditMode(DataObject\Localizedfield $data, DataObject\Concrete $object, array &$fieldData, array &$metaData, int $level = 1, array $params = []): array
     {
         $class = $object->getClass();
         $inheritanceAllowed = $class->getAllowInherit();
@@ -256,52 +241,52 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         }
 
         if ($inheritanceAllowed) {
-            // same type, iterate over all language and all fields and check if there is something missing
-            $validLanguages = Tool::getValidLanguages();
-            $foundEmptyValue = false;
+            // check if there is a parent with the same type
+            $parent = DataObject\Service::hasInheritableParentObject($object);
+            if ($parent) {
+                // same type, iterate over all language and all fields and check if there is something missing
+                $validLanguages = Tool::getValidLanguages();
+                $foundEmptyValue = false;
 
-            foreach ($validLanguages as $language) {
-                $fieldDefinitions = $this->getFieldDefinitions();
-                foreach ($fieldDefinitions as $fd) {
-                    $key = $fd->getName();
-                    $parent = DataObject\Service::hasInheritableParentObject($object, $key);
+                foreach ($validLanguages as $language) {
+                    $fieldDefinitions = $this->getFieldDefinitions();
+                    foreach ($fieldDefinitions as $fd) {
+                        $key = $fd->getName();
 
-                    if ($parent !== null && $fd->isEmpty($fieldData[$language][$key] ?? null)) {
-                        $foundEmptyValue = true;
-                        $inherited = true;
-                        $metaData[$language][$key] = ['inherited' => true, 'objectid' => $parent->getId()];
+                        if ($fd->isEmpty($fieldData[$language][$key] ?? null)) {
+                            $foundEmptyValue = true;
+                            $inherited = true;
+                            $metaData[$language][$key] = ['inherited' => true, 'objectid' => $parent->getId()];
+                        }
                     }
                 }
-            }
 
-            if ($foundEmptyValue) {
-                $parentData = null;
-                // still some values are passing, ask the parent
-                if (isset($params['context']['containerType']) && $params['context']['containerType'] === 'objectbrick') {
-                    $parent = DataObject\Service::hasInheritableParentObject($object, $params['fieldname']);
-                    $brickContainerGetter = 'get' . ucfirst($params['fieldname']);
-                    $brickContainer = $parent->$brickContainerGetter();
-                    $brickGetter = 'get' . ucfirst($params['context']['containerKey']);
-                    $brickData = $brickContainer->$brickGetter();
-                    if ($brickData) {
-                        $parentData = $brickData->getLocalizedFields();
+                if ($foundEmptyValue) {
+                    $parentData = null;
+                    // still some values are passing, ask the parent
+                    if (isset($params['context']['containerType']) && $params['context']['containerType'] === 'objectbrick') {
+                        $brickContainerGetter = 'get' . ucfirst($params['fieldname']);
+                        $brickContainer = $parent->$brickContainerGetter();
+                        $brickGetter = 'get' . ucfirst($params['context']['containerKey']);
+                        $brickData = $brickContainer->$brickGetter();
+                        if ($brickData) {
+                            $parentData = $brickData->getLocalizedFields();
+                        }
+                    } else {
+                        if (method_exists($parent, 'getLocalizedFields')) {
+                            $parentData = $parent->getLocalizedFields();
+                        }
                     }
-                } else {
-                    $parent = DataObject\Service::hasInheritableParentObject($object, 'localizedfields');
-                    if (method_exists($parent, 'getLocalizedFields')) {
-                        $parentData = $parent->getLocalizedFields();
+                    if ($parentData) {
+                        $parentResult = $this->doGetDataForEditMode(
+                            $parentData,
+                            $parent,
+                            $fieldData,
+                            $metaData,
+                            $level + 1,
+                            $params
+                        );
                     }
-                }
-                if ($parentData) {
-                    $parent = DataObject\Service::hasInheritableParentObject($object);
-                    $parentResult = $this->doGetDataForEditMode(
-                        $parentData,
-                        $parent,
-                        $fieldData,
-                        $metaData,
-                        $level + 1,
-                        $params
-                    );
                 }
             }
         }
@@ -393,7 +378,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
     public function getVersionPreview($data, $object = null, $params = [])
     {
         // this is handled directly in the template
-        // /bundles/AdminBundle/Resources/views/Admin/DataObject/DataObject/previewVersion.html.twig
+        // /bundles/AdminBundle/templates/admin/data_object/data_object/preview_version.html.twig
         return 'LOCALIZED FIELDS';
     }
 
@@ -437,7 +422,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      */
     public function getChildren()
     {
-        return $this->childs;
+        return $this->children;
     }
 
     /**
@@ -447,7 +432,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      */
     public function setChildren($children)
     {
-        $this->childs = $children;
+        $this->children = $children;
         $this->fieldDefinitionsCache = null;
 
         return $this;
@@ -458,7 +443,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      */
     public function hasChildren()
     {
-        return is_array($this->childs) && count($this->childs) > 0;
+        return is_array($this->children) && count($this->children) > 0;
     }
 
     /**
@@ -466,7 +451,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      */
     public function addChild($child)
     {
-        $this->childs[] = $child;
+        $this->children[] = $child;
         $this->fieldDefinitionsCache = null;
     }
 
@@ -717,15 +702,9 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         return $enrichedFieldDefinitions;
     }
 
-    private function doEnrichFieldDefinition($fieldDefinition, $context = [])
+    private function doEnrichFieldDefinition(Data $fieldDefinition, array $context = []): Data
     {
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($fieldDefinition instanceof FieldDefinitionEnrichmentInterface || method_exists($fieldDefinition, 'enrichFieldDefinition')) {
-            if (!$fieldDefinition instanceof FieldDefinitionEnrichmentInterface) {
-                trigger_deprecation('pimcore/pimcore', '10.1',
-                    sprintf('Usage of method_exists is deprecated since version 10.1 and will be removed in Pimcore 11.' .
-                    'Implement the %s interface instead.', FieldDefinitionEnrichmentInterface::class));
-            }
+        if ($fieldDefinition instanceof FieldDefinitionEnrichmentInterface) {
             $context['class'] = $this;
             $fieldDefinition = $fieldDefinition->enrichFieldDefinition($context);
         }
@@ -733,13 +712,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         return $fieldDefinition;
     }
 
-    /**
-     * @param mixed $def
-     * @param array $fields
-     *
-     * @return array
-     */
-    private function doGetFieldDefinitions($def = null, $fields = [])
+    private function doGetFieldDefinitions(mixed $def = null, array $fields = [])
     {
         if ($def === null) {
             $def = $this->getChildren();
@@ -872,7 +845,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
     /**
      * @param string $name
      *
-     * @return $this|Data
+     * @return $this
      *
      * @throws \Exception
      */
@@ -1012,17 +985,10 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         }
     }
 
-    /**
-     * @param DataObject\Localizedfield|mixed $localizedObject
-     * @param array $languages
-     *
-     * @return array
-     */
-    private function getDataForValidity($localizedObject, array $languages)
+    private function getDataForValidity(DataObject\Localizedfield $localizedObject, array $languages): array
     {
         if (!$localizedObject->getObject()
-            || $localizedObject->getObject()->getType() != DataObject::OBJECT_TYPE_VARIANT
-            || !$localizedObject instanceof DataObject\Localizedfield) {
+            || $localizedObject->getObject()->getType() != DataObject::OBJECT_TYPE_VARIANT) {
             return $localizedObject->getInternalData(true);
         }
 
@@ -1093,7 +1059,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return mixed
+     * @return DataObject\Localizedfield
      */
     public function getDiffDataFromEditmode($data, $object = null, $params = [])
     {
@@ -1151,16 +1117,24 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
     /**
      * @return array
      */
-    public function __sleep()
+    public function getBlockedVarsForExport(): array
     {
-        $vars = get_object_vars($this);
-        $blockedVars = [
+        return [
             'fieldDefinitionsCache',
             'referencedFields',
             'blockedVarsForExport',
             'permissionView',
             'permissionEdit',
         ];
+    }
+
+    /**
+     * @return array
+     */
+    public function __sleep()
+    {
+        $vars = get_object_vars($this);
+        $blockedVars = $this->getBlockedVarsForExport();
 
         foreach ($blockedVars as $blockedVar) {
             unset($vars[$blockedVar]);
@@ -1180,14 +1154,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
 
         foreach ($validLanguages as $language) {
             foreach ($this->getFieldDefinitions() as $fd) {
-                //TODO Pimcore 11: remove method_exists BC layer
-                if ($fd instanceof IdRewriterInterface || method_exists($fd, 'rewriteIds')) {
-                    if (!$fd instanceof IdRewriterInterface) {
-                        trigger_deprecation('pimcore/pimcore', '10.1',
-                            sprintf('Usage of method_exists is deprecated since version 10.1 and will be removed in Pimcore 11.' .
-                            'Implement the %s interface instead.', IdRewriterInterface::class));
-                    }
-
+                if ($fd instanceof IdRewriterInterface) {
                     $d = $fd->rewriteIds($data, $idMapping, ['language' => $language]);
                     $data->setLocalizedValue($fd->getName(), $d, $language);
                 }
@@ -1294,7 +1261,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      */
     public function setProvideSplitView($provideSplitView): void
     {
-        $this->provideSplitView = $provideSplitView;
+        $this->provideSplitView = (bool) $provideSplitView;
     }
 
     /**
@@ -1434,5 +1401,13 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         }
 
         return null;
+    }
+
+    public static function __set_state($data)
+    {
+        $obj = new static();
+        $obj->setValues($data);
+
+        return $obj;
     }
 }

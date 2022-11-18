@@ -63,10 +63,8 @@ class Datetime extends Data implements ResourcePersistenceAwareInterface, QueryR
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $useCurrentDate;
+    public bool $useCurrentDate = false;
 
     /**
      * @see ResourcePersistenceAwareInterface::getDataForResource
@@ -96,11 +94,11 @@ class Datetime extends Data implements ResourcePersistenceAwareInterface, QueryR
     /**
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
-     * @param int $data
+     * @param string|null $data
      * @param null|Model\DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return \Carbon\Carbon|null
+     * @return Carbon|null
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
@@ -152,14 +150,9 @@ class Datetime extends Data implements ResourcePersistenceAwareInterface, QueryR
         return null;
     }
 
-    /**
-     * @param int $timestamp
-     *
-     * @return \Carbon\Carbon
-     */
-    private function getDateFromTimestamp($timestamp)
+    private function getDateFromTimestamp(float|int|string $timestamp): Carbon
     {
-        $date = new \Carbon\Carbon();
+        $date = new Carbon();
         $date->setTimestamp($timestamp);
 
         return $date;
@@ -172,7 +165,7 @@ class Datetime extends Data implements ResourcePersistenceAwareInterface, QueryR
      * @param null|Model\DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return \Carbon\Carbon|null
+     * @return Carbon|null
      */
     public function getDataFromEditmode($data, $object = null, $params = [])
     {
@@ -314,7 +307,7 @@ class Datetime extends Data implements ResourcePersistenceAwareInterface, QueryR
      * @param Model\DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return mixed
+     * @return Carbon|null
      */
     public function getDiffDataFromEditmode($data, $object = null, $params = [])
     {

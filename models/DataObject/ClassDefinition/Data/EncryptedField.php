@@ -29,7 +29,7 @@ use Pimcore\Normalizer\NormalizerInterface;
  *
  * How to generate a key: vendor/bin/generate-defuse-key
  */
-class EncryptedField extends Data implements ResourcePersistenceAwareInterface, TypeDeclarationSupportInterface, EqualComparisonInterface, VarExporterInterface, NormalizerInterface
+class EncryptedField extends Data implements ResourcePersistenceAwareInterface, TypeDeclarationSupportInterface, EqualComparisonInterface, VarExporterInterface, NormalizerInterface, LayoutDefinitionEnrichmentInterface
 {
     use Extension\ColumnType;
 
@@ -85,7 +85,7 @@ class EncryptedField extends Data implements ResourcePersistenceAwareInterface, 
      *
      * @param mixed $data
      * @param null|Model\DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return mixed
      */
@@ -109,16 +109,10 @@ class EncryptedField extends Data implements ResourcePersistenceAwareInterface, 
     }
 
     /**
-     * @param mixed $data
-     * @param Model\DataObject\Concrete $object
-     * @param array $params
-     *
-     * @return string
-     *
      * @throws \Defuse\Crypto\Exception\BadFormatException
      * @throws \Defuse\Crypto\Exception\EnvironmentIsBrokenException
      */
-    private function encrypt($data, $object, $params = [])
+    private function encrypt(mixed $data, Model\DataObject\Concrete $object, array $params): string
     {
         if (!is_null($data)) {
             $key = \Pimcore::getContainer()->getParameter('pimcore.encryption.secret');
@@ -142,15 +136,9 @@ class EncryptedField extends Data implements ResourcePersistenceAwareInterface, 
     }
 
     /**
-     * @param string|null $data
-     * @param Model\DataObject\Concrete $object
-     * @param array $params
-     *
-     * @return string|null
-     *
      * @throws \Exception
      */
-    private function decrypt($data, $object, $params = [])
+    private function decrypt(?string $data, Model\DataObject\Concrete $object, array $params): ?string
     {
         if ($data) {
             try {
@@ -180,7 +168,7 @@ class EncryptedField extends Data implements ResourcePersistenceAwareInterface, 
 
                 return $data;
             } catch (\Exception $e) {
-                Logger::error($e);
+                Logger::error((string) $e);
                 if (self::isStrictMode()) {
                     throw new \Exception('encrypted field ' . $this->getName() . ' cannot be decoded');
                 }
@@ -195,7 +183,7 @@ class EncryptedField extends Data implements ResourcePersistenceAwareInterface, 
      *
      * @param string $data
      * @param null|Model\DataObject\Concrete $object
-     * @param mixed $params
+     * @param array $params
      *
      * @return Model\DataObject\Data\EncryptedField|null
      */
@@ -475,11 +463,11 @@ class EncryptedField extends Data implements ResourcePersistenceAwareInterface, 
     /**
      * @inheritdoc
      */
-    public function enrichLayoutDefinition(/*?Concrete */ $object, /**  array */ $context = []) // : self
+    public function enrichLayoutDefinition(/* ?Concrete */ $object, /* array */ $context = []) // : static
     {
         $delegate = $this->getDelegate();
 
-        if (method_exists($delegate, 'enrichLayoutDefinition')) {
+        if ($delegate instanceof LayoutDefinitionEnrichmentInterface) {
             $delegate->enrichLayoutDefinition($object, $context);
         }
 

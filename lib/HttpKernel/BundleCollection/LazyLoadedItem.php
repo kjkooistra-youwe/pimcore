@@ -93,7 +93,7 @@ class LazyLoadedItem extends AbstractItem
         }
 
         // do not initialize bundle - check class instead
-        return static::implementsInterface($this->className, PimcoreBundleInterface::class);
+        return self::implementsInterface($this->className, PimcoreBundleInterface::class);
     }
 
     /**
@@ -101,25 +101,19 @@ class LazyLoadedItem extends AbstractItem
      */
     public function registerDependencies(BundleCollection $collection)
     {
-        if (static::implementsInterface($this->className, DependentBundleInterface::class)) {
+        if (self::implementsInterface($this->className, DependentBundleInterface::class)) {
             /** @var DependentBundleInterface $className */
             $className = $this->className;
             $className::registerDependentBundles($collection);
         }
     }
 
-    /**
-     * @param string $className
-     * @param string $interfaceName
-     *
-     * @return bool
-     */
     private static function implementsInterface(string $className, string $interfaceName): bool
     {
-        if (!isset(static::$classImplementsCache[$className])) {
-            static::$classImplementsCache[$className] = class_implements($className);
+        if (!isset(self::$classImplementsCache[$className])) {
+            self::$classImplementsCache[$className] = class_implements($className);
         }
 
-        return in_array($interfaceName, static::$classImplementsCache[$className]);
+        return in_array($interfaceName, self::$classImplementsCache[$className]);
     }
 }

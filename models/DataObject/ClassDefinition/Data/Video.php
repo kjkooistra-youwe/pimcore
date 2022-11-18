@@ -22,10 +22,27 @@ use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Normalizer\NormalizerInterface;
 use Pimcore\Tool\Serialize;
 
-class Video extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface, TypeDeclarationSupportInterface, EqualComparisonInterface, VarExporterInterface, NormalizerInterface, IdRewriterInterface
+class Video extends Data implements
+    ResourcePersistenceAwareInterface,
+    QueryResourcePersistenceAwareInterface,
+    TypeDeclarationSupportInterface,
+    EqualComparisonInterface,
+    VarExporterInterface,
+    NormalizerInterface,
+    IdRewriterInterface,
+    FieldDefinitionEnrichmentInterface,
+    LayoutDefinitionEnrichmentInterface
 {
     use Extension\ColumnType;
     use Extension\QueryColumnType;
+
+    public const TYPE_ASSET = 'asset';
+
+    public const TYPE_YOUTUBE = 'youtube';
+
+    public const TYPE_VIMEO = 'vimeo';
+
+    public const TYPE_DAILYMOTION = 'dailymotion';
 
     /**
      * Static type of this element
@@ -53,6 +70,11 @@ class Video extends Data implements ResourcePersistenceAwareInterface, QueryReso
     public $height = 0;
 
     /**
+     * @internal
+     */
+    public string $uploadPath = '';
+
+    /**
      * Type for the column to query
      *
      * @internal
@@ -69,6 +91,25 @@ class Video extends Data implements ResourcePersistenceAwareInterface, QueryReso
      * @var string
      */
     public $columnType = 'text';
+
+    /**
+     * @internal
+     *
+     * @var array|null
+     */
+    public $allowedTypes;
+
+    /**
+     * @internal
+     *
+     * @var array
+     */
+    public $supportedTypes = [
+        self::TYPE_ASSET,
+        self::TYPE_YOUTUBE,
+        self::TYPE_VIMEO,
+        self::TYPE_DAILYMOTION,
+    ];
 
     /**
      * @return string|int
@@ -117,6 +158,49 @@ class Video extends Data implements ResourcePersistenceAwareInterface, QueryReso
     }
 
     /**
+     * @return $this
+     */
+    public function setUploadPath(string $uploadPath): static
+    {
+        $this->uploadPath = $uploadPath;
+
+        return $this;
+    }
+
+    public function getUploadPath(): string
+    {
+        return $this->uploadPath;
+    }
+
+    /**
+     * @param array|null $allowedTypes
+     *
+     * @return $this
+     */
+    public function setAllowedTypes($allowedTypes): static
+    {
+        $this->allowedTypes = $allowedTypes;
+
+        return $this;
+    }
+
+    /**
+     * @return array|null
+     */
+    public function getAllowedTypes(): ?array
+    {
+        return $this->allowedTypes;
+    }
+
+    /**
+     * @return array
+     */
+    public function getSupportedTypes(): array
+    {
+        return $this->supportedTypes;
+    }
+
+    /**
      * @see ResourcePersistenceAwareInterface::getDataForResource
      *
      * @param DataObject\Data\Video|null $data
@@ -140,9 +224,7 @@ class Video extends Data implements ResourcePersistenceAwareInterface, QueryReso
                 $data->setPoster($data->getPoster()->getId());
             }
 
-            $data = object2array($data->getObjectVars());
-
-            return Serialize::serialize($data);
+            return Serialize::serialize($data->getObjectVars());
         }
 
         return null;
@@ -227,10 +309,11 @@ class Video extends Data implements ResourcePersistenceAwareInterface, QueryReso
             if ($data->getPoster() instanceof Asset) {
                 $data->setPoster($data->getPoster()->getRealFullPath());
             }
-            $data = object2array($data->getObjectVars());
+
+            return $data->getObjectVars();
         }
 
-        return $data;
+        return null;
     }
 
     /**
@@ -296,10 +379,8 @@ class Video extends Data implements ResourcePersistenceAwareInterface, QueryReso
     public function getDataForGrid($data, $object = null, $params = [])
     {
         $id = null;
-        if ($data) {
-            if ($data->getData() instanceof Asset) {
-                $id = $data->getData()->getId();
-            }
+        if ($data && $data->getData() instanceof Asset) {
+            $id = $data->getData()->getId();
         }
         $result = $this->getDataForEditmode($data, $object, $params);
         if ($id) {
@@ -378,6 +459,26 @@ class Video extends Data implements ResourcePersistenceAwareInterface, QueryReso
         }
 
         return $tags;
+    }
+
+    /**
+     * { @inheritdoc }
+     */
+    public function enrichFieldDefinition(/** array */ $context = []) /** : static */
+    {
+        if (empty($this->getAllowedTypes()) && (isset($context['object']) || isset($context['containerType']))) {
+            $this->setAllowedTypes($this->getSupportedTypes());
+        }
+
+        return $this;
+    }
+
+    /**
+     * { @inheritdoc }
+     */
+    public function enrichLayoutDefinition($object, $context = [])
+    {
+        return $this->enrichFieldDefinition($context);
     }
 
     /**

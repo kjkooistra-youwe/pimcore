@@ -24,14 +24,12 @@ use Pimcore\Model\Element\DirtyIndicatorInterface;
 /**
  * @method \Pimcore\Model\DataObject\Objectbrick\Dao getDao()
  */
-class Objectbrick extends Model\AbstractModel implements DirtyIndicatorInterface
+class Objectbrick extends Model\AbstractModel implements DirtyIndicatorInterface, ObjectAwareFieldInterface
 {
     use Model\Element\Traits\DirtyIndicatorTrait;
 
     /**
      * @internal
-     *
-     * @var array
      */
     protected array $items = [];
 
@@ -51,8 +49,6 @@ class Objectbrick extends Model\AbstractModel implements DirtyIndicatorInterface
 
     /**
      * @internal
-     *
-     * @var int|null
      */
     protected ?int $objectId = null;
 
@@ -185,7 +181,7 @@ class Objectbrick extends Model\AbstractModel implements DirtyIndicatorInterface
         $getters = $this->getBrickGetters();
 
         foreach ($getters as $getter) {
-            $brick = $this->$getter();
+            $brick = $this->$getter(true);
 
             if ($brick instanceof Objectbrick\Data\AbstractData) {
                 if ($brick->getDoDelete()) {

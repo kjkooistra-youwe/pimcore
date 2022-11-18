@@ -15,7 +15,6 @@
 
 namespace Pimcore\DataObject\GridColumnConfig\Operator;
 
-use Pimcore\Translation\Translator;
 use Symfony\Contracts\Translation\LocaleAwareInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
@@ -42,7 +41,7 @@ final class TranslateValue extends AbstractOperator
     /**
      * {@inheritdoc}
      */
-    public function __construct(Translator $translator, \stdClass $config, array $context = [])
+    public function __construct(TranslatorInterface $translator, \stdClass $config, array $context = [])
     {
         parent::__construct($config, $context);
 
@@ -58,9 +57,9 @@ final class TranslateValue extends AbstractOperator
      */
     public function getLabeledValue($element)
     {
-        $childs = $this->getChilds();
-        if (isset($childs[0])) {
-            $value = $childs[0]->getLabeledValue($element);
+        $children = $this->getChildren();
+        if (isset($children[0])) {
+            $value = $children[0]->getLabeledValue($element);
             if ((string)$value->value != '') {
                 $currentLocale = $this->translator->getLocale();
                 if (null != $this->locale) {

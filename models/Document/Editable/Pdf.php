@@ -62,7 +62,7 @@ class Pdf extends Model\Document\Editable implements EditmodeDataInterface
     /**
      * {@inheritdoc}
      */
-    public function getDataEditmode() /** : mixed */
+    public function getDataEditmode(): array
     {
         $pages = 0;
 
@@ -185,12 +185,7 @@ HTML;
         }
     }
 
-    /**
-     * @param string $message
-     *
-     * @return string
-     */
-    private function getErrorCode($message = '')
+    private function getErrorCode(string $message = ''): string
     {
         // only display error message in debug mode
         if (!\Pimcore::inDebugMode()) {
@@ -220,7 +215,7 @@ HTML;
     }
 
     /**
-     * @return Asset
+     * @return Asset|null
      */
     public function getElement()
     {
@@ -230,7 +225,7 @@ HTML;
     }
 
     /**
-     * @param int $id
+     * @param int|null $id
      */
     public function setId($id)
     {
@@ -238,10 +233,10 @@ HTML;
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getId()
     {
-        return (int)  $this->id;
+        return $this->id;
     }
 }

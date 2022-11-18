@@ -54,10 +54,7 @@ class PimcoreBundleLocator
         $this->handleComposer = $handleComposer;
     }
 
-    /**
-     * @param array $paths
-     */
-    private function setPaths(array $paths)
+    private function setPaths(array $paths): void
     {
         $fs = new Filesystem();
 
@@ -90,25 +87,13 @@ class PimcoreBundleLocator
         return $result;
     }
 
-    /**
-     * @param array $paths
-     *
-     * @return array
-     */
-    private function findBundlesInPaths(array $paths)
+    private function findBundlesInPaths(array $paths): array
     {
-        $filteredPaths = [];
-        foreach ($paths as $path) {
-            if (file_exists($path) && is_dir($path)) {
-                $filteredPaths[] = $path;
-            }
-        }
-
         $result = [];
 
         $finder = new Finder();
         $finder
-            ->in(array_unique($filteredPaths))
+            ->in(array_unique(array_filter($paths, 'is_dir')))
             ->name('*Bundle.php');
 
         /** @var SplFileInfo $file */
@@ -130,18 +115,16 @@ class PimcoreBundleLocator
      *    as list of available bundle names
      *  * If the config entry above is not available, it will scan the package directory with the same logic as for
      *    the other paths
-     *
-     * @return array
      */
-    private function findComposerBundles()
+    private function findComposerBundles(): array
     {
         $pimcoreBundles = $this->composerPackageInfo->getInstalledPackages('pimcore-bundle');
         $composerPaths = [];
 
         $result = [];
         foreach ($pimcoreBundles as $packageInfo) {
-            // if bundle explicitely defines bundles, use the config
-            if (isset($packageInfo['extra']) && isset($packageInfo['extra']['pimcore'])) {
+            // if bundle explicitly defines bundles, use the config
+            if (isset($packageInfo['extra']['pimcore'])) {
                 $cfg = $packageInfo['extra']['pimcore'];
                 if (isset($cfg['bundles']) && is_array($cfg['bundles'])) {
                     foreach ($cfg['bundles'] as $bundle) {
@@ -162,11 +145,7 @@ class PimcoreBundleLocator
         return $result;
     }
 
-    /**
-     * @param string $bundle
-     * @param array $result
-     */
-    private function processBundleClass($bundle, array &$result)
+    private function processBundleClass(string $bundle, array &$result): void
     {
         if (empty($bundle) || !is_string($bundle)) {
             return;

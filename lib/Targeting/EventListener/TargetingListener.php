@@ -87,7 +87,10 @@ class TargetingListener implements EventSubscriberInterface
         $this->codeGenerator = $codeGenerator;
     }
 
-    public static function getSubscribedEvents()
+    /**
+     * @return array
+     */
+    public static function getSubscribedEvents()//: array
     {
         return [
             // needs to run before ElementListener to make sure there's a
@@ -194,7 +197,7 @@ class TargetingListener implements EventSubscriberInterface
         }
     }
 
-    private function injectTargetingCode(Response $response, VisitorInfo $visitorInfo)
+    private function injectTargetingCode(Response $response, VisitorInfo $visitorInfo): void
     {
         if (!$this->isHtmlResponse($response)) {
             return;
@@ -208,7 +211,7 @@ class TargetingListener implements EventSubscriberInterface
         $this->injectBeforeHeadEnd($response, $code);
     }
 
-    private function handleResponseActions(VisitorInfo $visitorInfo, Response $response)
+    private function handleResponseActions(VisitorInfo $visitorInfo, Response $response): void
     {
         $actions = $this->getResponseActions($visitorInfo);
         if (empty($actions)) {
@@ -248,7 +251,7 @@ class TargetingListener implements EventSubscriberInterface
                 continue;
             }
 
-            if (!is_array($actions[$type])) {
+            if (!isset($actions[$type])) {
                 $actions[$type] = [$action];
             } else {
                 $actions[$type][] = $action;

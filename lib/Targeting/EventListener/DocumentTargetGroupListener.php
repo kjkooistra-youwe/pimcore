@@ -61,7 +61,10 @@ class DocumentTargetGroupListener implements EventSubscriberInterface
         $this->eventDispatcher = $eventDispatcher;
     }
 
-    public static function getSubscribedEvents()
+    /**
+     * @return string[]
+     */
+    public static function getSubscribedEvents()// : array
     {
         return [
             TargetingEvents::PRE_RESOLVE => 'onVisitorInfoResolve',
@@ -78,7 +81,7 @@ class DocumentTargetGroupListener implements EventSubscriberInterface
         }
     }
 
-    private function assignDocumentTargetGroups(Document $document, VisitorInfo $visitorInfo)
+    private function assignDocumentTargetGroups(Document $document, VisitorInfo $visitorInfo): void
     {
         if (!$document instanceof Document\Page || null !== Staticroute::getCurrentRoute()) {
             return;

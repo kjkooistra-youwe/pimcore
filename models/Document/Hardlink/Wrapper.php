@@ -29,9 +29,6 @@ trait Wrapper
      */
     protected $hardLinkSource;
 
-    /**
-     * @var Document|null
-     */
     protected ?Document $sourceDocument = null;
 
     /**
@@ -39,7 +36,7 @@ trait Wrapper
      *
      * @throws \Exception
      */
-    public function save()
+    public function save(array $parameters = []): static
     {
         throw $this->getHardlinkError();
     }
@@ -63,7 +60,7 @@ trait Wrapper
     }
 
     /**
-     * @return mixed
+     * @return array|null
      */
     public function getProperties()
     {

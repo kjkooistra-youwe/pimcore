@@ -39,7 +39,7 @@ class Admin
      */
     public static function getLanguageFile($language)
     {
-        $baseResource = \Pimcore::getContainer()->getParameter('pimcore.admin.translations.path');
+        $baseResource = \Pimcore::getContainer()->getParameter('pimcore_admin.translations.path');
         $languageFile = \Pimcore::getKernel()->locateResource($baseResource . '/' . $language . '.json');
 
         return $languageFile;
@@ -54,7 +54,7 @@ class Admin
      */
     public static function getLanguages()
     {
-        $baseResource = \Pimcore::getContainer()->getParameter('pimcore.admin.translations.path');
+        $baseResource = \Pimcore::getContainer()->getParameter('pimcore_admin.translations.path');
         $languageDir = \Pimcore::getKernel()->locateResource($baseResource);
         $adminLang = \Pimcore::getContainer()->getParameter('pimcore_admin.admin_languages');
         $appDefaultPath = \Pimcore::getContainer()->getParameter('translator.default_path');
@@ -94,7 +94,7 @@ class Admin
      *
      * @param string $scriptContent
      *
-     * @return mixed
+     * @return array
      */
     public static function getMinimizedScriptPath($scriptContent)
     {
@@ -118,7 +118,6 @@ class Admin
      */
     public static function determineCsvDialect($file)
     {
-
         // minimum 10 lines, to be sure take more
         $sample = '';
         for ($i = 0; $i < 10; $i++) {
@@ -154,6 +153,9 @@ class Admin
         return PIMCORE_CONFIGURATION_DIRECTORY . '/maintenance.php';
     }
 
+    /**
+     * @return string
+     */
     public static function getMaintenanceModeScheduleLoginFile()
     {
         return PIMCORE_CONFIGURATION_DIRECTORY . '/maintenance-schedule-login.php';

@@ -34,6 +34,8 @@ use Exception;
 use Iterator;
 
 /**
+ * @deprecated Will be removed in Pimcore 11.
+ *
  * Provides a property based interface to an array.
  * The data are read-only unless $allowModifications is set to true
  * on construction.
@@ -222,8 +224,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     /**
      * {@inheritdoc}
      */
-    #[\ReturnTypeWillChange]
-    public function count()
+    public function count(): int
     {
         return count($this->data);
     }
@@ -231,8 +232,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     /**
      * {@inheritdoc}
      */
-    #[\ReturnTypeWillChange]
-    public function current()
+    public function current(): mixed
     {
         $this->skipNextIteration = false;
 
@@ -242,8 +242,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     /**
      * {@inheritdoc}
      */
-    #[\ReturnTypeWillChange]
-    public function key()
+    public function key(): string|int|null
     {
         return key($this->data);
     }
@@ -251,8 +250,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     /**
      * {@inheritdoc}
      */
-    #[\ReturnTypeWillChange]
-    public function next()
+    public function next(): void
     {
         if ($this->skipNextIteration) {
             $this->skipNextIteration = false;
@@ -266,8 +264,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     /**
      * {@inheritdoc}
      */
-    #[\ReturnTypeWillChange]
-    public function rewind()
+    public function rewind(): void
     {
         $this->skipNextIteration = false;
         reset($this->data);
@@ -276,8 +273,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     /**
      * {@inheritdoc}
      */
-    #[\ReturnTypeWillChange]
-    public function valid()
+    public function valid(): bool
     {
         return $this->key() !== null;
     }
@@ -285,8 +281,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     /**
      * {@inheritdoc}
      */
-    #[\ReturnTypeWillChange]
-    public function offsetExists($offset)
+    public function offsetExists($offset): bool
     {
         return $this->__isset($offset);
     }
@@ -294,8 +289,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     /**
      * {@inheritdoc}
      */
-    #[\ReturnTypeWillChange]
-    public function offsetGet($offset)
+    public function offsetGet($offset): mixed
     {
         return $this->__get($offset);
     }
@@ -303,8 +297,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     /**
      * {@inheritdoc}
      */
-    #[\ReturnTypeWillChange]
-    public function offsetSet($offset, $value)
+    public function offsetSet($offset, $value): void
     {
         $this->__set($offset, $value);
     }
@@ -312,8 +305,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     /**
      * {@inheritdoc}
      */
-    #[\ReturnTypeWillChange]
-    public function offsetUnset($offset)
+    public function offsetUnset($offset): void
     {
         $this->__unset($offset);
     }
@@ -330,7 +322,7 @@ final class Config implements Countable, Iterator, ArrayAccess
      *
      * @param  Config $merge
      *
-     * @return self
+     * @return $this
      */
     public function merge(Config $merge)
     {
@@ -394,7 +386,7 @@ final class Config implements Countable, Iterator, ArrayAccess
     }
 
     /**
-     * {@inheritdoc}
+     * @return string|false
      */
     public function __toString()
     {

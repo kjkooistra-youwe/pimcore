@@ -15,8 +15,10 @@
 
 namespace Pimcore\Http;
 
+use Symfony\Component\HttpFoundation\Exception\SessionNotFoundException;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\Routing\RequestContext;
 
 class RequestHelper
@@ -78,22 +80,6 @@ class RequestHelper
     }
 
     /**
-     * @deprecated will be removed in Pimcore 11, use getMainRequest() instead
-     *
-     * @return bool
-     */
-    public function hasMasterRequest(): bool
-    {
-        trigger_deprecation(
-            'pimcore/pimcore',
-            '10.2',
-            sprintf('%s is deprecated, please use RequestHelper::hasMainRequest() instead.', __METHOD__)
-        );
-
-        return $this->hasMainRequest();
-    }
-
-    /**
      * @return bool
      */
     public function hasMainRequest(): bool
@@ -102,32 +88,16 @@ class RequestHelper
     }
 
     /**
-     * @deprecated will be removed in Pimcore 11 - use getMainRequest() instead
-     *
-     * @return Request
-     */
-    public function getMasterRequest(): Request
-    {
-        trigger_deprecation(
-            'pimcore/pimcore',
-            '10.2',
-            sprintf('%s is deprecated, please use RequestHelper::getMainRequest() instead.', __METHOD__)
-        );
-
-        return $this->getMainRequest();
-    }
-
-    /**
      * @return Request
      */
     public function getMainRequest(): Request
     {
-        $masterRequest = $this->requestStack->getMainRequest();
-        if (null === $masterRequest) {
+        $mainRequest = $this->requestStack->getMainRequest();
+        if (null === $mainRequest) {
             throw new \LogicException('There is no main request available.');
         }
 
-        return $masterRequest;
+        return $mainRequest;
     }
 
     /**
@@ -140,8 +110,8 @@ class RequestHelper
         $request = $this->getRequest($request);
         $attribute = self::ATTRIBUTE_FRONTEND_REQUEST;
 
-        if ($request->attributes->has($attribute) && $request->attributes->get($attribute)) {
-            return true;
+        if ($request->attributes->has($attribute)) {
+            return (bool)$request->attributes->get($attribute);
         }
 
         $frontendRequest = $this->detectFrontendRequest($request);
@@ -153,10 +123,6 @@ class RequestHelper
 
     /**
      * TODO use pimcore context here?
-     *
-     * @param Request $request
-     *
-     * @return bool
      */
     private function detectFrontendRequest(Request $request): bool
     {
@@ -229,12 +195,8 @@ class RequestHelper
 
     /**
      * Anonymize IP: replace the last octet with 255
-     *
-     * @param string $ip
-     *
-     * @return string
      */
-    private function anonymizeIp(string $ip)
+    private function anonymizeIp(string $ip): string
     {
         $aip = substr($ip, 0, strrpos($ip, '.') + 1);
         $aip .= '255';
@@ -267,5 +229,15 @@ class RequestHelper
         );
 
         return $request;
+    }
+
+    /**
+     * Gets the current session from RequestStack
+     *
+     * @throws SessionNotFoundException
+     */
+    public function getSession(): SessionInterface
+    {
+        return $this->requestStack->getSession();
     }
 }

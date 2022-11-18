@@ -29,11 +29,9 @@ class BundleCollection
     /**
      * Adds a collection item
      *
-     * @param ItemInterface $item
-     *
-     * @return self
+     * @return $this
      */
-    public function add(ItemInterface $item): self
+    public function add(ItemInterface $item): static
     {
         $identifier = $item->getBundleIdentifier();
 
@@ -137,19 +135,15 @@ class BundleCollection
     /**
      * Adds a bundle
      *
-     * @param BundleInterface|string $bundle
-     * @param int $priority
-     * @param array $environments
-     *
      * @throws \InvalidArgumentException
      *
-     * @return self
+     * @return $this
      */
-    public function addBundle($bundle, int $priority = 0, array $environments = []): self
+    public function addBundle(BundleInterface|string $bundle, int $priority = 0, array $environments = []): static
     {
         if ($bundle instanceof BundleInterface) {
             $item = new Item($bundle, $priority, $environments);
-        } elseif (is_string($bundle) || !empty($bundle)) {
+        } elseif (is_string($bundle)) {
             $item = new LazyLoadedItem($bundle, $priority, $environments);
         } else {
             throw new \InvalidArgumentException('Bundle must be either an instance of BundleInterface or a string containing the bundle class name');
@@ -162,12 +156,10 @@ class BundleCollection
      * Adds a collection of bundles with the same priority and environments
      *
      * @param BundleInterface[]|string[] $bundles
-     * @param int $priority
-     * @param array $environments
      *
-     * @return BundleCollection
+     * @return $this
      */
-    public function addBundles(array $bundles, int $priority = 0, array $environments = []): self
+    public function addBundles(array $bundles, int $priority = 0, array $environments = []): static
     {
         foreach ($bundles as $bundle) {
             $this->addBundle($bundle, $priority, $environments);

@@ -15,9 +15,11 @@
 
 namespace Pimcore\Model\Search\Backend;
 
+use Doctrine\DBAL\Exception\DeadlockException;
 use ForceUTF8\Encoding;
 use Pimcore\Event\Model\SearchBackendEvent;
 use Pimcore\Event\SearchBackendEvents;
+use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Loader\ImplementationLoader\Exception\UnsupportedException;
 use Pimcore\Logger;
 use Pimcore\Model\Asset;
@@ -33,13 +35,16 @@ use Pimcore\Model\Search\Backend\Data\Dao;
  */
 class Data extends \Pimcore\Model\AbstractModel
 {
+    use RecursionBlockingEventDispatchHelperTrait;
+
     // if a word occures more often than this number it will get stripped to keep the search_backend_data table from getting too big
     const MAX_WORD_OCCURENCES = 3;
 
-    /**
-     * @var Data\Id|null
-     */
     protected ?Data\Id $id = null;
+
+    protected ?string $key = null;
+
+    protected ?int $index = null;
 
     /**
      * @var string
@@ -98,7 +103,7 @@ class Data extends \Pimcore\Model\AbstractModel
     /**
      * User-ID of the user last modified the element
      *
-     * @var int
+     * @var int|null
      */
     protected $userModification;
 
@@ -138,6 +143,30 @@ class Data extends \Pimcore\Model\AbstractModel
     public function setId(?Data\Id $id)
     {
         $this->id = $id;
+
+        return $this;
+    }
+
+    public function getKey(): ?string
+    {
+        return $this->key;
+    }
+
+    public function setKey(?string $key): static
+    {
+        $this->key = $key;
+
+        return $this;
+    }
+
+    public function getIndex(): ?int
+    {
+        return $this->index;
+    }
+
+    public function setIndex(?int $index): static
+    {
+        $this->index = $index;
 
         return $this;
     }
@@ -243,7 +272,7 @@ class Data extends \Pimcore\Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getUserModification()
     {
@@ -360,6 +389,7 @@ class Data extends \Pimcore\Model\AbstractModel
         $this->data = null;
 
         $this->id = new Data\Id($element);
+        $this->key = $element->getKey();
         $this->fullPath = $element->getRealFullPath();
         $this->creationDate = $element->getCreationDate();
         $this->modificationDate = $element->getModificationDate();
@@ -369,8 +399,12 @@ class Data extends \Pimcore\Model\AbstractModel
         $this->type = $element->getType();
         if ($element instanceof DataObject\Concrete) {
             $this->subtype = $element->getClassName();
+            $this->index = $element->getIndex();
         } else {
             $this->subtype = $this->type;
+            if ($element instanceof Document) {
+                $this->index = $element->getIndex();
+            }
         }
 
         $this->properties = '';
@@ -386,7 +420,7 @@ class Data extends \Pimcore\Model\AbstractModel
             }
         }
 
-        $this->data = $element->getKey();
+        $this->data = '';
 
         if ($element instanceof Document) {
             if ($element instanceof Document\Folder) {
@@ -445,7 +479,7 @@ class Data extends \Pimcore\Model\AbstractModel
                             $this->data .= ' ' . $contentText;
                         }
                     } catch (\Exception $e) {
-                        Logger::error($e);
+                        Logger::error((string) $e);
                     }
                 }
             } elseif ($element instanceof Asset\Text) {
@@ -457,7 +491,7 @@ class Data extends \Pimcore\Model\AbstractModel
                         $this->data .= ' ' . $contentText;
                     }
                 } catch (\Exception $e) {
-                    Logger::error($e);
+                    Logger::error((string) $e);
                 }
             } elseif ($element instanceof Asset\Image) {
                 try {
@@ -470,7 +504,7 @@ class Data extends \Pimcore\Model\AbstractModel
                         }
                     }
                 } catch (\Exception $e) {
-                    Logger::error($e);
+                    Logger::error((string) $e);
                 }
             }
 
@@ -498,7 +532,7 @@ class Data extends \Pimcore\Model\AbstractModel
 
         $pathWords = str_replace([ '-', '_', '/', '.', '(', ')'], ' ', $this->getFullPath());
         $this->data .= ' ' . $pathWords;
-        $this->data = 'ID: ' . $element->getId() . "  \nPath: " . $this->getFullPath() . "  \n"  . $this->cleanupData($this->data);
+        $this->data = 'ID: ' . $element->getId() . "  \nPath: " . $this->getKey() . "  \n"  . $this->cleanupData($this->data);
 
         return $this;
     }
@@ -568,31 +602,41 @@ class Data extends \Pimcore\Model\AbstractModel
     public function save()
     {
         if ($this->id instanceof Data\Id) {
-            \Pimcore::getEventDispatcher()->dispatch(new SearchBackendEvent($this), SearchBackendEvents::PRE_SAVE);
+            $this->dispatchEvent(new SearchBackendEvent($this), SearchBackendEvents::PRE_SAVE);
 
             $maxRetries = 5;
             for ($retries = 0; $retries < $maxRetries; $retries++) {
+                $this->beginTransaction();
+
                 try {
                     $this->getDao()->save();
-                    // successfully completed, so we cancel the loop here -> no restart required
-                    break;
+
+                    $this->commit();
+
+                    break; // transaction was successfully completed, so we cancel the loop here -> no restart required
                 } catch (\Exception $e) {
-                    // we try to start saving $maxRetries times again (deadlocks, ...)
-                    if ($retries < ($maxRetries - 1)) {
+                    try {
+                        $this->rollBack();
+                    } catch (\Exception $er) {
+                        // PDO adapter throws exceptions if rollback fails
+                        Logger::error((string) $er);
+                    }
+
+                    // we try to start the transaction $maxRetries times again (deadlocks, ...)
+                    if ($e instanceof DeadlockException && $retries < ($maxRetries - 1)) {
                         $run = $retries + 1;
-                        $waitTime = rand(1, 5) * 100000;
+                        $waitTime = rand(1, 5) * 100000; // microseconds
                         Logger::warn('Unable to finish transaction (' . $run . ". run) because of the following reason '" . $e->getMessage() . "'. --> Retrying in " . $waitTime . ' microseconds ... (' . ($run + 1) . ' of ' . $maxRetries . ')');
 
-                        // wait specified time until we restart
-                        usleep($waitTime);
+                        usleep($waitTime); // wait specified time until we restart the transaction
                     } else {
-                        // if we fail after $maxRetries retries, we throw out the exception
+                        // if the transaction still fail after $maxRetries retries, we throw out the exception
                         throw $e;
                     }
                 }
             }
 
-            \Pimcore::getEventDispatcher()->dispatch(new SearchBackendEvent($this), SearchBackendEvents::POST_SAVE);
+            $this->dispatchEvent(new SearchBackendEvent($this), SearchBackendEvents::POST_SAVE);
         } else {
             throw new \Exception('Search\\Backend\\Data cannot be saved - no id set!');
         }

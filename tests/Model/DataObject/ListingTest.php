@@ -18,14 +18,15 @@ namespace Pimcore\Tests\Model\DataObject;
 use Pimcore\Db;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\Unittest;
-use Pimcore\Tests\Helper\DataType\TestDataHelper;
-use Pimcore\Tests\Test\ModelTestCase;
-use Pimcore\Tests\Util\TestHelper;
+use Pimcore\Tests\Support\Helper\DataType\TestDataHelper;
+use Pimcore\Tests\Support\Test\ModelTestCase;
+use Pimcore\Tests\Support\Util\TestHelper;
 
 /**
  * Class ListingTest
  *
  * @package Pimcore\Tests\Model\DataObject
+ *
  * @group model.dataobject.listing
  */
 class ListingTest extends ModelTestCase
@@ -62,10 +63,12 @@ class ListingTest extends ModelTestCase
         $seeds = [10, 11, 42, 53, 65, 78, 85];
 
         foreach ($seeds as $seed) {
-            $object = TestHelper::createEmptyObject('listing-test-' . $seed . '_', true, true);
+            $object = TestHelper::createEmptyObject('listing-test-' . $seed . '_', false, true);
 
-            $object->setInput('content' . $seed);
+            $object->setInput('content'.$seed);
             $object->setNumber(99 + $seed);
+            $object->setFirstname('first?name '.$seed);
+            $object->setLastname('last:name '.$seed);
 
             $object->save();
         }
@@ -105,6 +108,57 @@ class ListingTest extends ModelTestCase
         $listing->setCondition('input = :param1 AND number = :param2', ['param2' => 109, 'param1' => 'content10']);
 
         $this->assertEquals(1, $listing->getTotalCount(), 'Simple ParamCondition Result Published Objects');
+    }
+
+    public function testAddConditionParam()
+    {
+        $listing = new Unittest\Listing();
+        $listing->addConditionParam('input = ?', 'content10');
+
+        $this->assertEquals(1, $listing->getTotalCount(), 'AddConditionParam Result Published Objects');
+
+        $listing = new Unittest\Listing();
+        $listing->addConditionParam('input = ?', 'content10');
+        $listing->addConditionParam('number = ?', 109);
+
+        $this->assertEquals(1, $listing->getTotalCount(), 'AddConditionParam Result Published Objects');
+
+        $listing = new Unittest\Listing();
+        $listing->addConditionParam('input = ?', 'content10');
+        $listing->addConditionParam('number = ?', 184, 'OR');
+
+        $this->assertEquals(2, $listing->getTotalCount(), 'AddConditionParam Result Published Objects');
+
+        // Test if question marks / colons are not misinterpreted as prepared statement placeholders
+        $listing = new Unittest\Listing();
+        $listing->addConditionParam('firstname = \'first?name 11\'');
+
+        $this->assertEquals(1, $listing->getTotalCount(), 'AddConditionParam Result Published Objects');
+
+        $listing = new Unittest\Listing();
+        $listing->addConditionParam('lastname = \'last:name 11\'');
+
+        $this->assertEquals(1, $listing->getTotalCount(), 'AddConditionParam Result Published Objects');
+
+        $listing = new Unittest\Listing();
+        $listing->addConditionParam('firstname = "first?name 11"');
+
+        $this->assertEquals(1, $listing->getTotalCount(), 'AddConditionParam Result Published Objects');
+
+        $listing = new Unittest\Listing();
+        $listing->addConditionParam('lastname = "last:name 11"');
+
+        $this->assertEquals(1, $listing->getTotalCount(), 'AddConditionParam Result Published Objects');
+
+        $listing = new Unittest\Listing();
+        $listing->addConditionParam('firstname = "first?name 11" AND lastname="last:name 11"');
+
+        $this->assertEquals(1, $listing->getTotalCount(), 'AddConditionParam Result Published Objects');
+
+        $listing = new Unittest\Listing();
+        $listing->addConditionParam('firstname = \'first?name 11\' AND lastname = ?', 'last:name 11');
+
+        $this->assertEquals(1, $listing->getTotalCount(), 'AddConditionParam Result Published Objects');
     }
 
     public function testArrayCondition()

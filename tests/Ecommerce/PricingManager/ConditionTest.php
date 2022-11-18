@@ -15,10 +15,11 @@
 
 namespace Pimcore\Tests\Ecommerce\PricingManager;
 
-use Codeception\Util\Stub;
+use Codeception\Stub;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CartManager\CartInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CartManager\CartPriceCalculator;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CartManager\SessionCart;
+use Pimcore\Bundle\EcommerceFrameworkBundle\EventListener\SessionBagListener;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Model\AbstractCategory;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Model\AbstractProduct;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Model\Currency;
@@ -29,9 +30,8 @@ use Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\Condition\CatalogProd
 use Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\Condition\DateRange;
 use Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\Environment;
 use Pimcore\Bundle\EcommerceFrameworkBundle\PricingManager\EnvironmentInterface;
-use Pimcore\Bundle\EcommerceFrameworkBundle\Tools\SessionConfigurator;
 use Pimcore\Bundle\EcommerceFrameworkBundle\Type\Decimal;
-use Pimcore\Tests\Test\EcommerceTestCase;
+use Pimcore\Tests\Support\Test\EcommerceTestCase;
 
 class ConditionTest extends EcommerceTestCase
 {
@@ -106,12 +106,7 @@ class ConditionTest extends EcommerceTestCase
         $this->assertFalse($cartAmount->check($environment), 'check not empty product and empty cart');
     }
 
-    /**
-     * @param string $path
-     *
-     * @return AbstractCategory
-     */
-    private function mockCategory($path)
+    private function mockCategory(string $path): AbstractCategory
     {
         $category = $this->getMockBuilder(AbstractCategory::class)->getMock();
         $category->method('getFullPath')->willReturn($path);
@@ -188,13 +183,7 @@ class ConditionTest extends EcommerceTestCase
         $this->assertTrue($catalogCategory->check($environment), 'check filled environment with parent category');
     }
 
-    /**
-     * @param int $id
-     * @param int|null $parentId
-     *
-     * @return AbstractProduct
-     */
-    private function mockProduct($id, $parentId = null)
+    private function mockProduct(int $id, int $parentId = null): AbstractProduct
     {
         $product = $this->getMockBuilder(AbstractProduct::class)->getMock();
         $product->method('getId')->willReturn($id);
@@ -209,12 +198,9 @@ class ConditionTest extends EcommerceTestCase
         return $product;
     }
 
-    /**
-     * @return CartInterface
-     */
-    private function mockCart()
+    private function mockCart(): CartInterface
     {
-        $sessionBag = $this->buildSession()->getBag(SessionConfigurator::ATTRIBUTE_BAG_CART);
+        $sessionBag = $this->buildSession()->getBag(SessionBagListener::ATTRIBUTE_BAG_CART);
 
         /** @var SessionCart|\PHPUnit_Framework_MockObject_Stub $cart */
         $cart = Stub::construct(SessionCart::class, [], [

@@ -20,10 +20,7 @@ namespace Pimcore\DataObject\GridColumnConfig\Operator;
  */
 final class ElementCounter extends AbstractOperator
 {
-    /**
-     * @var bool
-     */
-    private $countEmpty;
+    private bool $countEmpty;
 
     /**
      * {@inheritdoc}
@@ -43,10 +40,10 @@ final class ElementCounter extends AbstractOperator
         $result = new \stdClass();
         $result->label = $this->label;
 
-        $childs = $this->getChilds();
+        $children = $this->getChildren();
         $count = 0;
 
-        foreach ($childs as $c) {
+        foreach ($children as $c) {
             $childResult = $c->getLabeledValue($element);
             $childValues = $childResult->value ?? null;
 

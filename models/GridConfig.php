@@ -15,7 +15,6 @@
 
 namespace Pimcore\Model;
 
-use Pimcore\Db;
 use Pimcore\Model\Exception\NotFoundException;
 
 /**
@@ -56,7 +55,7 @@ class GridConfig extends AbstractModel
     protected $config;
 
     /**
-     * @var string
+     * @var string|null
      */
     protected $description;
 
@@ -70,15 +69,11 @@ class GridConfig extends AbstractModel
      */
     protected $modificationDate;
 
-    /**
-     * @var bool
-     */
-    protected $shareGlobally;
+    protected bool $shareGlobally = false;
 
-    /**
-     * @var bool
-     */
-    protected $setAsFavourite;
+    protected bool $setAsFavourite = false;
+
+    protected bool $saveFilters = false;
 
     /**
      * @var string
@@ -126,11 +121,6 @@ class GridConfig extends AbstractModel
     public function delete()
     {
         $this->getDao()->delete();
-
-        // also delete the favourite
-        $db = Db::get();
-        $db->query('DELETE from gridconfig_favourites where gridConfigId = ' . $db->quote($this->getId()));
-        $db->query('DELETE from gridconfig_shares where gridConfigId = ' . $db->quote($this->getId()));
     }
 
     /**
@@ -230,7 +220,7 @@ class GridConfig extends AbstractModel
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getDescription()
     {
@@ -238,7 +228,7 @@ class GridConfig extends AbstractModel
     }
 
     /**
-     * @param string $description
+     * @param string|null $description
      */
     public function setDescription($description)
     {
@@ -290,7 +280,7 @@ class GridConfig extends AbstractModel
      */
     public function setShareGlobally($shareGlobally)
     {
-        $this->shareGlobally = $shareGlobally;
+        $this->shareGlobally = (bool) $shareGlobally;
     }
 
     /**
@@ -306,10 +296,22 @@ class GridConfig extends AbstractModel
      */
     public function setSetAsFavourite($setAsFavourite)
     {
-        $this->setAsFavourite = $setAsFavourite;
+        $this->setAsFavourite = (bool) $setAsFavourite;
+    }
+
+    public function isSaveFilters(): bool
+    {
+        return $this->saveFilters;
+    }
+
+    public function setSaveFilters(bool $saveFilters): void
+    {
+        $this->saveFilters = $saveFilters;
     }
 
     /**
+     * enum('asset','object')
+     *
      * @return string
      */
     public function getType()
@@ -318,6 +320,8 @@ class GridConfig extends AbstractModel
     }
 
     /**
+     * enum('asset','object')
+     *
      * @param string $type
      */
     public function setType(string $type)

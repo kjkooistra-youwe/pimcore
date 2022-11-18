@@ -23,6 +23,7 @@ use Pimcore\Model;
  * @method \Pimcore\Model\User\Listing\AbstractListing\Dao getDao()
  * @method Model\User[] load()
  * @method Model\User|false current()
+ * @method int getTotalCount()
  */
 abstract class AbstractListing extends Model\Listing\AbstractListing
 {
@@ -42,7 +43,7 @@ abstract class AbstractListing extends Model\Listing\AbstractListing
     /**
      * @param array $items
      *
-     * @return static
+     * @return $this
      */
     public function setItems($items)
     {

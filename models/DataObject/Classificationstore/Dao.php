@@ -15,6 +15,7 @@
 
 namespace Pimcore\Model\DataObject\Classificationstore;
 
+use Pimcore\Db\Helper;
 use Pimcore\Element\MarshallerService;
 use Pimcore\Logger;
 use Pimcore\Model;
@@ -64,7 +65,11 @@ class Dao extends Model\Dao\AbstractDao
         $dataTable = $this->getDataTableName();
         $fieldname = $this->model->getFieldname();
 
-        $this->db->delete($dataTable, ['o_id' => $objectId, 'fieldname' => $fieldname]);
+        $dataExists = $this->db->fetchOne('SELECT `o_id` FROM `'.$dataTable."` WHERE
+         `o_id` = '".$objectId."' AND `fieldname` = '".$fieldname."' LIMIT 1");
+        if ($dataExists) {
+            $this->db->delete($dataTable, ['o_id' => $objectId, 'fieldname' => $fieldname]);
+        }
 
         $items = $this->model->getItems();
         $activeGroups = $this->model->getActiveGroups();
@@ -114,14 +119,18 @@ class Dao extends Model\Dao\AbstractDao
                     $data['value'] = $encodedData['value'] ?? null;
                     $data['value2'] = $encodedData['value2'] ?? null;
 
-                    $this->db->insertOrUpdate($dataTable, $data);
+                    Helper::insertOrUpdate($this->db, $dataTable, $data);
                 }
             }
         }
 
         $groupsTable = $this->getGroupsTableName();
 
-        $this->db->delete($groupsTable, ['o_id' => $objectId, 'fieldname' => $fieldname]);
+        $dataExists = $this->db->fetchOne('SELECT `o_id` FROM `'.$groupsTable."` WHERE
+         `o_id` = '".$objectId."' AND `fieldname` = '".$fieldname."' LIMIT 1");
+        if ($dataExists) {
+            $this->db->delete($groupsTable, ['o_id' => $objectId, 'fieldname' => $fieldname]);
+        }
 
         if (is_array($activeGroups)) {
             foreach ($activeGroups as $activeGroupId => $enabled) {
@@ -131,7 +140,7 @@ class Dao extends Model\Dao\AbstractDao
                         'groupId' => $activeGroupId,
                         'fieldname' => $fieldname,
                     ];
-                    $this->db->insertOrUpdate($groupsTable, $data);
+                    Helper::insertOrUpdate($this->db, $groupsTable, $data);
                 }
             }
         }
@@ -163,7 +172,7 @@ class Dao extends Model\Dao\AbstractDao
 
         $query = 'SELECT * FROM ' . $groupsTableName . ' WHERE o_id = ' . $this->db->quote($objectId) . ' AND fieldname = ' . $this->db->quote($fieldname);
 
-        $data = $this->db->fetchAll($query);
+        $data = $this->db->fetchAllAssociative($query);
         $list = [];
 
         foreach ($data as $item) {
@@ -172,7 +181,7 @@ class Dao extends Model\Dao\AbstractDao
 
         $query = 'SELECT * FROM ' . $dataTableName . ' WHERE o_id = ' . $this->db->quote($objectId) . ' AND fieldname = ' . $this->db->quote($fieldname);
 
-        $data = $this->db->fetchAll($query);
+        $data = $this->db->fetchAllAssociative($query);
 
         $groupCollectionMapping = [];
 
@@ -232,7 +241,7 @@ class Dao extends Model\Dao\AbstractDao
         $groupsTable = $this->getGroupsTableName();
         $dataTable = $this->getDataTableName();
 
-        $this->db->query('CREATE TABLE IF NOT EXISTS `' . $groupsTable . '` (
+        $this->db->executeQuery('CREATE TABLE IF NOT EXISTS `' . $groupsTable . '` (
             `o_id` INT(11) UNSIGNED NOT NULL,
             `groupId` BIGINT(20) NOT NULL,
             `fieldname` VARCHAR(70) NOT NULL,
@@ -240,7 +249,7 @@ class Dao extends Model\Dao\AbstractDao
             CONSTRAINT `'.self::getForeignKeyName($groupsTable, 'o_id').'` FOREIGN KEY (`o_id`) REFERENCES objects (`o_id`) ON DELETE CASCADE
         ) DEFAULT CHARSET=utf8mb4;');
 
-        $this->db->query('CREATE TABLE IF NOT EXISTS `' . $dataTable . '` (
+        $this->db->executeQuery('CREATE TABLE IF NOT EXISTS `' . $dataTable . '` (
             `o_id` INT(11) UNSIGNED NOT NULL,
             `collectionId` BIGINT(20) NULL,
             `groupId` BIGINT(20) NOT NULL,

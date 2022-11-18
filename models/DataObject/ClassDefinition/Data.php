@@ -15,6 +15,7 @@
 
 namespace Pimcore\Model\DataObject\ClassDefinition;
 
+use Pimcore\Db\Helper;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\Exception\InheritanceParentNotFoundException;
@@ -24,39 +25,30 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     use DataObject\ClassDefinition\Helper\VarExport;
 
     /**
-     * @var string
+     * @var string|null
      */
     public $name;
 
     /**
-     * @var string
+     * @var string|null
      */
     public $title;
 
     /**
-     * @var string
+     * @var string|null
      */
     public $tooltip;
 
-    /**
-     * @var bool
-     */
-    public $mandatory;
+    public bool $mandatory = false;
+
+    public bool $noteditable = false;
 
     /**
-     * @var bool
-     */
-    public $noteditable;
-
-    /**
-     * @var int
+     * @var int|null
      */
     public $index;
 
-    /**
-     * @var bool
-     */
-    public $locked;
+    public bool $locked = false;
 
     /**
      * @var string
@@ -78,25 +70,13 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
      */
     public $fieldtype;
 
-    /**
-     * @var bool
-     */
-    public $relationType = false;
+    public bool $relationType = false;
 
-    /**
-     * @var bool
-     */
-    public $invisible = false;
+    public bool $invisible = false;
 
-    /**
-     * @var bool
-     */
-    public $visibleGridView = true;
+    public bool $visibleGridView = true;
 
-    /**
-     * @var bool
-     */
-    public $visibleSearch = true;
+    public bool $visibleSearch = true;
 
     /**
      * @var array
@@ -114,16 +94,17 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
         '<=',
     ];
 
+    //TODO remove childs in Pimcore 12
     /**
      * @var array
      */
-    protected $forbiddenNames = [
+    protected const FORBIDDEN_NAMES = [
         'id', 'key', 'path', 'type', 'index', 'classname', 'creationdate', 'userowner', 'value', 'class', 'list',
-        'fullpath', 'childs', 'values', 'cachetag', 'cachetags', 'parent', 'published', 'valuefromparent',
+        'fullpath', 'childs', 'children', 'values', 'cachetag', 'cachetags', 'parent', 'published', 'valuefromparent',
         'userpermissions', 'dependencies', 'modificationdate', 'usermodification', 'byid', 'bypath', 'data',
         'versions', 'properties', 'permissions', 'permissionsforuser', 'childamount', 'apipluginbroker', 'resource',
         'parentClass', 'definition', 'locked', 'language', 'omitmandatorycheck', 'idpath', 'object', 'fieldname',
-        'property', 'parentid', 'children', 'scheduledtasks',
+        'property', 'parentid', 'scheduledtasks', 'latestVersion',
     ];
 
     /**
@@ -205,7 +186,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getName()
     {
@@ -217,7 +198,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
      */
     public function getTitle()
     {
-        return $this->title;
+        return $this->title ?? '';
     }
 
     /**
@@ -353,7 +334,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getIndex()
     {
@@ -361,7 +342,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @param int $index
+     * @param int|null $index
      *
      * @return $this
      */
@@ -403,7 +384,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @param int|bool|null $locked
+     * @param bool $locked
      *
      * @return $this
      */
@@ -416,7 +397,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
 
     /**
      *
-     * @return string
+     * @return string|null
      */
     public function getTooltip()
     {
@@ -557,8 +538,12 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
      */
     public function getFilterConditionExt($value, $operator, $params = [])
     {
+        if (is_array($value) && empty($value)) {
+            return '';
+        }
+
         $db = \Pimcore\Db::get();
-        $name = $params['name'] ? $params['name'] : $this->name;
+        $name = $params['name'] ?: $this->name;
         $key = $db->quoteIdentifier($name);
         if (!empty($params['brickPrefix'])) {
             $key = $params['brickPrefix'].$key;
@@ -579,7 +564,21 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
         }
 
         if (in_array($operator, DataObject\ClassDefinition\Data::$validFilterOperators)) {
-            return $key . ' ' . $operator . ' ' . $value . ' ';
+            $trailer = '';
+            //the db interprets 0 as NULL -> if empty (0) is selected in the filter, we must also filter for NULL
+            if ($value === '\'0\'' || is_array($value) && in_array(0, $value)) {
+                $trailer = ' OR ' . $key . ' IS NULL';
+            }
+
+            if (str_contains($name, 'cskey') && is_array($value) && !empty($value)) {
+                $values = array_map(function ($val) use ($db) {
+                    return $db->quote(Helper::escapeLike($val));
+                }, $value);
+
+                return $key . ' ' . $operator . ' ' . implode(' OR ' . $key . ' ' . $operator . ' ', $values) . $trailer;
+            }
+
+            return $key . ' ' . $operator . ' ' . $value . ' ' . $trailer;
         }
 
         return '';
@@ -613,7 +612,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     {
         $key = $this->getName();
 
-        if ($class->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
             $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
         } else {
             $typeDeclaration = '';
@@ -628,8 +627,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
 
         $code .= $this->getPreGetValueHookCode($key);
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($this instanceof DataObject\ClassDefinition\Data\PreGetDataInterface ||method_exists($this, 'preGetData')) {
+        if ($this instanceof DataObject\ClassDefinition\Data\PreGetDataInterface) {
             $code .= "\t" . '$data = $this->getClass()->getFieldDefinition("' . $key . '")->preGetData($this);' . "\n\n";
         } else {
             $code .= "\t" . '$data = $this->' . $key . ";\n\n";
@@ -675,7 +673,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
 
         $key = $this->getName();
 
-        if ($class->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getParameterTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getParameterTypeDeclaration()) {
             $typeDeclaration = $this->getParameterTypeDeclaration() . ' ';
         } else {
             $typeDeclaration = '';
@@ -684,9 +682,9 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
         $code = '/**' . "\n";
         $code .= '* Set ' . str_replace(['/**', '*/', '//'], '', $this->getName()) . ' - ' . str_replace(['/**', '*/', '//'], '', $this->getTitle()) . "\n";
         $code .= '* @param ' . $this->getPhpdocInputType() . ' $' . $key . "\n";
-        $code .= '* @return \\Pimcore\\Model\\DataObject\\' . ucfirst($classname) . "\n";
+        $code .= '* @return $this' . "\n";
         $code .= '*/' . "\n";
-        $code .= 'public function set' . ucfirst($key) . '(' . $typeDeclaration . '$' . $key . ')' . "\n";
+        $code .= 'public function set' . ucfirst($key) . '(' . $typeDeclaration . '$' . $key . '): static' . "\n";
         $code .= '{' . "\n";
 
         if (
@@ -733,8 +731,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
             }
         }
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($this instanceof DataObject\ClassDefinition\Data\PreSetDataInterface || method_exists($this, 'preSetData')) {
+        if ($this instanceof DataObject\ClassDefinition\Data\PreSetDataInterface) {
             $code .= "\t" . '$this->' . $key . ' = ' . '$fd->preSetData($this, $' . $key . ');' . "\n";
         } else {
             $code .= "\t" . '$this->' . $key . ' = ' . '$' . $key . ";\n\n";
@@ -757,7 +754,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     {
         $key = $this->getName();
 
-        if ($brickClass->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
             $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
         } else {
             $typeDeclaration = '';
@@ -771,8 +768,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
         $code .= 'public function get' . ucfirst($key) . '()' . $typeDeclaration . "\n";
         $code .= '{' . "\n";
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($this instanceof DataObject\ClassDefinition\Data\PreGetDataInterface ||method_exists($this, 'preGetData')) {
+        if ($this instanceof DataObject\ClassDefinition\Data\PreGetDataInterface) {
             $code .= "\t" . '$data = $this->getDefinition()->getFieldDefinition("' . $key . '")->preGetData($this);' . "\n";
         } else {
             $code .= "\t" . '$data = $this->' . $key . ";\n";
@@ -809,7 +805,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     {
         $key = $this->getName();
 
-        if ($brickClass->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getParameterTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getParameterTypeDeclaration()) {
             $typeDeclaration = $this->getParameterTypeDeclaration() . ' ';
         } else {
             $typeDeclaration = '';
@@ -818,9 +814,9 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
         $code = '/**' . "\n";
         $code .= '* Set ' . str_replace(['/**', '*/', '//'], '', $this->getName()) . ' - ' . str_replace(['/**', '*/', '//'], '', $this->getTitle()) . "\n";
         $code .= '* @param ' . $this->getPhpdocInputType() . ' $' . $key . "\n";
-        $code .= '* @return \\Pimcore\\Model\\DataObject\\Objectbrick\\Data\\' . ucfirst($brickClass->getKey()) . "\n";
+        $code .= '* @return $this' . "\n";
         $code .= '*/' . "\n";
-        $code .= 'public function set' . ucfirst($key) . ' (' . $typeDeclaration . '$' . $key . ')' . "\n";
+        $code .= 'public function set' . ucfirst($key) . ' (' . $typeDeclaration . '$' . $key . '): static' . "\n";
         $code .= '{' . "\n";
 
         if (
@@ -869,8 +865,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
             }
         }
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($this instanceof DataObject\ClassDefinition\Data\PreSetDataInterface || method_exists($this, 'preSetData')) {
+        if ($this instanceof DataObject\ClassDefinition\Data\PreSetDataInterface) {
             $code .= "\t" . '$this->' . $key . ' = ' . '$fd->preSetData($this, $' . $key . ');' . "\n";
         } else {
             $code .= "\t" . '$this->' . $key . ' = ' . '$' . $key . ";\n\n";
@@ -893,7 +888,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     {
         $key = $this->getName();
 
-        if ($fieldcollectionDefinition->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
             $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
         } else {
             $typeDeclaration = '';
@@ -906,8 +901,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
         $code .= 'public function get' . ucfirst($key) . '()' . $typeDeclaration . "\n";
         $code .= '{' . "\n";
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($this instanceof DataObject\ClassDefinition\Data\PreGetDataInterface || method_exists($this, 'preGetData')) {
+        if ($this instanceof DataObject\ClassDefinition\Data\PreGetDataInterface) {
             $code .= "\t" . '$container = $this;' . "\n";
             $code .= "\t" . '/** @var \\' . static::class . ' $fd */' . "\n";
             $code .= "\t" . '$fd = $this->getDefinition()->getFieldDefinition("' . $key . '");' . "\n";
@@ -937,7 +931,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     {
         $key = $this->getName();
 
-        if ($fieldcollectionDefinition->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getParameterTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getParameterTypeDeclaration()) {
             $typeDeclaration = $this->getParameterTypeDeclaration() . ' ';
         } else {
             $typeDeclaration = '';
@@ -946,9 +940,9 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
         $code = '/**' . "\n";
         $code .= '* Set ' . str_replace(['/**', '*/', '//'], '', $this->getName()) . ' - ' . str_replace(['/**', '*/', '//'], '', $this->getTitle()) . "\n";
         $code .= '* @param ' . $this->getPhpdocInputType() . ' $' . $key . "\n";
-        $code .= '* @return \\Pimcore\\Model\\DataObject\\Fieldcollection\\Data\\' . ucfirst($fieldcollectionDefinition->getKey()) . "\n";
+        $code .= '* @return $this' . "\n";
         $code .= '*/' . "\n";
-        $code .= 'public function set' . ucfirst($key) . '(' . $typeDeclaration . '$' . $key . ')' . "\n";
+        $code .= 'public function set' . ucfirst($key) . '(' . $typeDeclaration . '$' . $key . '): static' . "\n";
         $code .= '{' . "\n";
 
         if (
@@ -988,8 +982,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
             }
         }
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($this instanceof DataObject\ClassDefinition\Data\PreSetDataInterface || method_exists($this, 'preSetData')) {
+        if ($this instanceof DataObject\ClassDefinition\Data\PreSetDataInterface) {
             $code .= "\t" . '$this->' . $key . ' = ' . '$fd->preSetData($this, $' . $key . ');' . "\n";
         } else {
             $code .= "\t" . '$this->' . $key . ' = ' . '$' . $key . ";\n\n";
@@ -1012,7 +1005,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     {
         $key = $this->getName();
 
-        if ($class->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
             $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
         } else {
             $typeDeclaration = '';
@@ -1022,7 +1015,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
         $code .= '* Get ' . str_replace(['/**', '*/', '//'], '', $this->getName()) . ' - ' . str_replace(['/**', '*/', '//'], '', $this->getTitle()) . "\n";
         $code .= '* @return ' . $this->getPhpdocReturnType() . "\n";
         $code .= '*/' . "\n";
-        $code .= 'public function get' . ucfirst($key) . '($language = null)' . $typeDeclaration . "\n";
+        $code .= 'public function get' . ucfirst($key) . '(?string $language = null)' . $typeDeclaration . "\n";
         $code .= '{' . "\n";
 
         $code .= "\t" . '$data = $this->getLocalizedfields()->getLocalizedValue("' . $key . '", $language);' . "\n";
@@ -1064,7 +1057,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
             $containerGetter = 'getClass';
         }
 
-        if ($class->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getParameterTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getParameterTypeDeclaration()) {
             $typeDeclaration = $this->getParameterTypeDeclaration() . ' ';
         } else {
             $typeDeclaration = '';
@@ -1073,9 +1066,9 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
         $code = '/**' . "\n";
         $code .= '* Set ' . str_replace(['/**', '*/', '//'], '', $this->getName()) . ' - ' . str_replace(['/**', '*/', '//'], '', $this->getTitle()) . "\n";
         $code .= '* @param ' . $this->getPhpdocInputType() . ' $' . $key . "\n";
-        $code .= '* @return \\Pimcore\\Model\\DataObject\\' . ucfirst($classname) . "\n";
+        $code .= '* @return $this' . "\n";
         $code .= '*/' . "\n";
-        $code .= 'public function set' . ucfirst($key) . ' (' . $typeDeclaration . '$' . $key . ', $language = null)' . "\n";
+        $code .= 'public function set' . ucfirst($key) . ' (' . $typeDeclaration . '$' . $key . ', ?string $language = null): static' . "\n";
         $code .= '{' . "\n";
 
         if ($this->supportsDirtyDetection()) {
@@ -1152,10 +1145,10 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
 
         $code .= '* @param '.$dataParamDoc."\n";
         $code .= '* @param '.$operatorParamDoc."\n";
-        $code .= '* @return static'."\n";
+        $code .= '* @return $this'."\n";
         $code .= '*/' . "\n";
 
-        $code .= 'public function filterBy' . ucfirst($key) .' ($data, $operator = \'=\')' . "\n";
+        $code .= 'public function filterBy' . ucfirst($key) .' ($data, $operator = \'=\'): static' . "\n";
         $code .= '{' . "\n";
         $code .= "\t" . '$this->getClass()->getFieldDefinition("' . $key . '")->addListingFilter($this, $data, $operator);' . "\n";
         $code .= "\treturn " . '$this' . ";\n";
@@ -1165,23 +1158,23 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
     }
 
     /**
-     * @param int|string|null $number
+     * @param mixed $number
      *
      * @return int|null
      */
     public function getAsIntegerCast($number)
     {
-        return strlen($number) === 0 ? '' : (int)$number;
+        return strlen((string) $number) === 0 ? null : (int)$number;
     }
 
     /**
      * @param mixed $number
      *
-     * @return float
+     * @return float|null
      */
     public function getAsFloatCast($number)
     {
-        return strlen($number) === 0 ? '' : (float)$number;
+        return strlen((string) $number) === 0 ? null : (float)$number;
     }
 
     /**
@@ -1250,7 +1243,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
      *
      *
      * @param mixed $data
-     * @param null|DataObject\AbstractObject $object
+     * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
      * @return null|array
@@ -1336,7 +1329,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
                                     $items = $container->getItems();
                                 }
 
-                                if ($items && count($items) > $originalIndex) {
+                                if ($items && (count($items) > $originalIndex || count($items) > --$originalIndex)) {
                                     $item = $items[$originalIndex];
 
                                     if ($context['containerType'] === 'block') {
@@ -1449,7 +1442,7 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
      * @param array|null $existingData
      * @param array $additionalData
      *
-     * @return mixed
+     * @return array|null
      */
     public function appendData($existingData, $additionalData)
     {
@@ -1517,8 +1510,11 @@ abstract class Data implements DataObject\ClassDefinition\Data\TypeDeclarationSu
         return $listing->addFilterByField($this->getName(), $operator, $data);
     }
 
+    /**
+     * @return bool
+     */
     public function isForbiddenName()
     {
-        return in_array($this->getName(), $this->forbiddenNames);
+        return in_array($this->getName(), self::FORBIDDEN_NAMES);
     }
 }

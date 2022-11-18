@@ -24,8 +24,6 @@ use Pimcore\Model;
  */
 class Dao extends Model\Dao\AbstractDao
 {
-    use Model\Element\ChildsCompatibilityTrait;
-
     const TABLE_NAME_GROUPS = 'classificationstore_groups';
 
     /**
@@ -41,7 +39,7 @@ class Dao extends Model\Dao\AbstractDao
             $this->model->setId($id);
         }
 
-        $data = $this->db->fetchRow('SELECT * FROM ' . self::TABLE_NAME_GROUPS . ' WHERE id = ?', $this->model->getId());
+        $data = $this->db->fetchAssociative('SELECT * FROM ' . self::TABLE_NAME_GROUPS . ' WHERE id = ?', [$this->model->getId()]);
 
         if (!empty($data['id'])) {
             $this->assignVariablesToModel($data);
@@ -64,7 +62,7 @@ class Dao extends Model\Dao\AbstractDao
         $name = $this->model->getName();
         $storeId = $this->model->getStoreId();
 
-        $data = $this->db->fetchRow('SELECT * FROM ' . self::TABLE_NAME_GROUPS . ' WHERE name = ? and storeId = ?', [$name, $storeId]);
+        $data = $this->db->fetchAssociative('SELECT * FROM ' . self::TABLE_NAME_GROUPS . ' WHERE name = ? and storeId = ?', [$name, $storeId]);
 
         if (!empty($data['id'])) {
             $this->assignVariablesToModel($data);
@@ -74,18 +72,15 @@ class Dao extends Model\Dao\AbstractDao
     }
 
     /**
-     * @return int
+     * @return bool
      */
     public function hasChildren()
     {
-        $amount = 0;
-
-        try {
-            $amount = (int) $this->db->fetchOne('SELECT COUNT(*) as amount FROM ' . self::TABLE_NAME_GROUPS . ' where parentId= ' . $this->model->getId());
-        } catch (\Exception $e) {
+        if (!$this->model->getId()) {
+            return false;
         }
 
-        return $amount;
+        return (bool) $this->db->fetchOne('SELECT COUNT(*) as amount FROM ' . self::TABLE_NAME_GROUPS . ' WHERE parentId = ?', [$this->model->getId()]);
     }
 
     /**
@@ -143,6 +138,6 @@ class Dao extends Model\Dao\AbstractDao
 
         $this->db->insert(self::TABLE_NAME_GROUPS, []);
 
-        $this->model->setId($this->db->lastInsertId());
+        $this->model->setId((int) $this->db->lastInsertId());
     }
 }

@@ -12,7 +12,7 @@ Pimcore provides 2 possible ways of working with custom entities namely Doctrine
 
 ## Option 1: Use Doctrine ORM
 Pimcore comes already with the Doctrine bundle, so you can easily create your own entities.
-Please check <https://symfony.com/doc/5.2/doctrine.html> for more details.
+Please check <https://symfony.com/doc/current/doctrine.html> for more details.
 
 ## Option 2: Working with Pimcore Data Access Objects (Dao)
 
@@ -162,13 +162,15 @@ class Dao extends AbstractDao {
      */
     public function getById($id = null) {
 
-        if ($id != null)
+        if ($id != null)  {
             $this->model->setId($id);
+        }
 
-        $data = $this->db->fetchRow('SELECT * FROM '.$this->tableName.' WHERE id = ?', $this->model->getId());
+        $data = $this->db->fetchAssociative('SELECT * FROM '.$this->tableName.' WHERE id = ?', [$this->model->getId()]);
 
-        if(!$data["id"])
+        if(!$data["id"]) {
             throw new NotFoundException("Object with the ID " . $this->model->getId() . " doesn't exists");
+        }
 
         $this->assignVariablesToModel($data);
     }
@@ -267,9 +269,9 @@ class Listing extends Model\Listing\AbstractListing implements PaginateListingIn
     /**
      * get total count.
      *
-     * @return mixed
+     * @return int
      */
-    public function count()
+    public function count(): int
     {
         return $this->getTotalCount();
     }
@@ -303,9 +305,9 @@ class Listing extends Model\Listing\AbstractListing implements PaginateListingIn
     /**
      * Set Locale.
      *
-     * @param mixed $locale
+     * @param string $locale
      */
-    public function setLocale($locale)
+    public function setLocale($locale): void
     {
         $this->locale = $locale;
     }
@@ -315,7 +317,7 @@ class Listing extends Model\Listing\AbstractListing implements PaginateListingIn
      *
      * @return string
      */
-    public function getLocale()
+    public function getLocale(): string
     {
         return $this->locale;
     }
@@ -327,7 +329,7 @@ class Listing extends Model\Listing\AbstractListing implements PaginateListingIn
     /**
      * Rewind.
      */
-    public function rewind()
+    public function rewind(): void
     {
         $this->getData();
         reset($this->data);
@@ -338,12 +340,11 @@ class Listing extends Model\Listing\AbstractListing implements PaginateListingIn
      *
      * @return mixed
      */
-    public function current()
+    public function current(): mixed
     {
         $this->getData();
-        $var = current($this->data);
 
-        return $var;
+        return current($this->data);
     }
 
     /**
@@ -351,25 +352,22 @@ class Listing extends Model\Listing\AbstractListing implements PaginateListingIn
      *
      * @return mixed
      */
-    public function key()
+    public function key(): mixed
     {
         $this->getData();
-        $var = key($this->data);
 
-        return $var;
+        return key($this->data);
     }
 
     /**
      * next.
      *
-     * @return mixed
+     * @return void
      */
-    public function next()
+    public function next(): void
     {
         $this->getData();
-        $var = next($this->data);
-
-        return $var;
+        next($this->data);
     }
 
     /**
@@ -377,12 +375,11 @@ class Listing extends Model\Listing\AbstractListing implements PaginateListingIn
      *
      * @return bool
      */
-    public function valid()
+    public function valid(): bool
     {
         $this->getData();
-        $var = $this->current() !== false;
 
-        return $var;
+        return $this->current() !== false;
     }
 }
 ```
@@ -424,8 +421,6 @@ class Dao extends Listing\Dao\AbstractDao
     }
 
     /**
-     * @param string|string[]|null $columns
-     *
      * @return DoctrineQueryBuilder
      */
     public function getQueryBuilder()
@@ -470,15 +465,11 @@ class Dao extends Listing\Dao\AbstractDao
      */
     public function loadIdList()
     {
-        try {
-            $query = $this->getQueryBuilder();
-            $objectIds = $this->db->fetchCol((string) $query, $this->model->getConditionVariables(), $this->model->getConditionVariableTypes());
-            $this->totalCount = (int) $this->db->fetchOne('SELECT FOUND_ROWS()');
+        $query = $this->getQueryBuilder();
+        $objectIds = $this->db->fetchFirstColumn((string) $query, $this->model->getConditionVariables(), $this->model->getConditionVariableTypes());
+        $this->totalCount = (int) $this->db->fetchOne('SELECT FOUND_ROWS()');
 
-            return array_map('intval', $objectIds);
-        } catch (\Exception $e) {
-            throw $e;
-        }
+        return array_map('intval', $objectIds);
     }
 
     /**
@@ -509,7 +500,7 @@ class Dao extends Listing\Dao\AbstractDao
     public function getTotalCount()
     {
         $queryBuilder = $this->getQueryBuilder();
-        $this->prepareQueryBuilderForTotalCount($queryBuilder);
+        $this->prepareQueryBuilderForTotalCount($queryBuilder, $this->getTableName() . '.id');
 
         $totalCount = $this->db->fetchOne((string) $queryBuilder, $this->model->getConditionVariables(), $this->model->getConditionVariableTypes());
 

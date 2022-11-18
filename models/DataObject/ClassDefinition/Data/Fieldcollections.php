@@ -43,52 +43,40 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $lazyLoading;
+    public bool $lazyLoading = false;
 
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $maxItems;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $disallowAddRemove = false;
+    public bool $disallowAddRemove = false;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $disallowReorder = false;
+    public bool $disallowReorder = false;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $collapsed;
+    public bool $collapsed = false;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $collapsible;
+    public bool $collapsible = false;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $border = false;
+    public bool $border = false;
 
     /**
      * @return bool
@@ -99,13 +87,13 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
     }
 
     /**
-     * @param  int|bool|null $lazyLoading
+     * @param bool $lazyLoading
      *
      * @return $this
      */
     public function setLazyLoading($lazyLoading)
     {
-        $this->lazyLoading = $lazyLoading;
+        $this->lazyLoading = (bool) $lazyLoading;
 
         return $this;
     }
@@ -134,15 +122,18 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
                     foreach ($collectionDef->getFieldDefinitions() as $fd) {
                         if (!$fd instanceof CalculatedValue) {
                             $value = $item->{'get' . $fd->getName()}();
+                            if (isset($params['context']['containerKey']) === false) {
+                                $params['context']['containerKey'] = $idx;
+                            }
                             $collectionData[$fd->getName()] = $fd->getDataForEditmode($value, $object, $params);
                         }
                     }
 
-                    $calculatedChilds = [];
-                    self::collectCalculatedValueItems($collectionDef->getFieldDefinitions(), $calculatedChilds);
+                    $calculatedChildren = [];
+                    self::collectCalculatedValueItems($collectionDef->getFieldDefinitions(), $calculatedChildren);
 
-                    if ($calculatedChilds) {
-                        foreach ($calculatedChilds as $fd) {
+                    if ($calculatedChildren) {
+                        foreach ($calculatedChildren as $fd) {
                             $data = new DataObject\Data\CalculatedValue($fd->getName());
                             $data->setContextualData('fieldcollection', $this->getName(), $idx, null, null, null, $fd);
                             $data = $fd->getDataForEditmode($data, $object, $params);
@@ -318,7 +309,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
      */
     public function load($object, $params = [])
     {
-        $container = new DataObject\Fieldcollection(null, $this->getName());
+        $container = new DataObject\Fieldcollection([], $this->getName());
         $container->load($object);
 
         if ($container->isEmpty()) {
@@ -333,7 +324,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
      */
     public function delete($object, $params = [])
     {
-        $container = new DataObject\Fieldcollection(null, $this->getName());
+        $container = new DataObject\Fieldcollection([], $this->getName());
         $container->delete($object);
     }
 
@@ -531,17 +522,22 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
         // getter, no inheritance here, that's the only difference
         $key = $this->getName();
 
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
+            $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
+        } else {
+            $typeDeclaration = '';
+        }
+
         $code = '/**' . "\n";
         $code .= '* @return ' . $this->getPhpdocReturnType() . "\n";
         $code .= '*/' . "\n";
-        $code .= 'public function get' . ucfirst($key) . '()' . "\n";
+        $code .= 'public function get' . ucfirst($key) . '()' . $typeDeclaration . "\n";
         $code .= '{' . "\n";
 
         $code .= $this->getPreGetValueHookCode($key);
 
-        // TODO Pimcore 11: remove method_exists BC layer
         // TODO else part should not be needed at all as preGetData is always there
-        // if ($this instanceof PreGetDataInterface || method_exists($this, 'preGetData')) {
+        // if ($this instanceof PreGetDataInterface) {
         $code .= "\t" . '$data = $this->getClass()->getFieldDefinition("' . $key . '")->preGetData($this);' . "\n";
 //        } else {
 //            $code .= "\t" . '$data = $this->' . $key . ";\n";
@@ -554,7 +550,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
     }
 
     /**
-     * @param int|string|null $maxItems
+     * @param int|null $maxItems
      *
      * @return $this
      */
@@ -566,7 +562,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getMaxItems()
     {
@@ -588,7 +584,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return array|string
+     * @return array
      */
     public function getDiffVersionPreview($data, $object = null, $params = [])
     {
@@ -638,8 +634,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
 
                 if ($collectionDef = DataObject\Fieldcollection\Definition::getByKey($item->getType())) {
                     foreach ($collectionDef->getFieldDefinitions() as $fd) {
-                        //TODO Pimcore 11: remove method_exists BC layer
-                        if ($fd instanceof IdRewriterInterface || method_exists($fd, 'rewriteIds')) {
+                        if ($fd instanceof IdRewriterInterface) {
                             $d = $fd->rewriteIds($item, $idMapping, $params);
                             $setter = 'set' . ucfirst($fd->getName());
                             $item->$setter($d);
@@ -698,7 +693,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
      */
     public function setDisallowAddRemove($disallowAddRemove)
     {
-        $this->disallowAddRemove = $disallowAddRemove;
+        $this->disallowAddRemove = (bool) $disallowAddRemove;
     }
 
     /**
@@ -714,7 +709,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
      */
     public function setDisallowReorder($disallowReorder)
     {
-        $this->disallowReorder = $disallowReorder;
+        $this->disallowReorder = (bool) $disallowReorder;
     }
 
     /**
@@ -754,7 +749,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
      */
     public function setCollapsed($collapsed)
     {
-        $this->collapsed = $collapsed;
+        $this->collapsed = (bool) $collapsed;
     }
 
     /**
@@ -770,7 +765,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
      */
     public function setCollapsible($collapsible)
     {
-        $this->collapsible = $collapsible;
+        $this->collapsible = (bool) $collapsible;
     }
 
     /**

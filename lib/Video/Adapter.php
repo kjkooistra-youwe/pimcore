@@ -216,14 +216,12 @@ abstract class Adapter
     }
 
     /**
-     * @return float
-     *
-     * @throws \Exception
+     * @return float|null
      */
     abstract public function getDuration();
 
     /**
-     * @return array
+     * @return array|null
      */
     abstract public function getDimensions();
 }

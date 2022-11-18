@@ -15,8 +15,10 @@
 
 namespace Pimcore\Model;
 
+use Pimcore\Config;
 use Pimcore\Event\Model\RedirectEvent;
 use Pimcore\Event\RedirectEvents;
+use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Logger;
 use Pimcore\Model\Exception\NotFoundException;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,6 +28,8 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final class Redirect extends AbstractModel
 {
+    use RecursionBlockingEventDispatchHelperTrait;
+
     const TYPE_ENTIRE_URI = 'entire_uri';
 
     const TYPE_PATH_QUERY = 'path_query';
@@ -97,7 +101,7 @@ final class Redirect extends AbstractModel
     protected $active = true;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $expiry;
 
@@ -113,28 +117,15 @@ final class Redirect extends AbstractModel
 
     /**
      * ID of the owner user
-     *
-     * @var int|null
      */
     protected ?int $userOwner = null;
 
     /**
      * ID of the user who make the latest changes
      *
-     * @var int
+     * @var int|null
      */
     protected $userModification;
-
-    /**
-     * StatusCodes
-     */
-    protected static $statusCodes = [
-        '300' => 'Multiple Choices',
-        '301' => 'Moved Permanently',
-        '302' => 'Found',
-        '303' => 'See Other',
-        '307' => 'Temporary Redirect',
-    ];
 
     /**
      * @param int $id
@@ -222,6 +213,8 @@ final class Redirect extends AbstractModel
     }
 
     /**
+     * enum('entire_uri','path_query','path','auto_create')
+     *
      * @return string
      */
     public function getType()
@@ -230,6 +223,8 @@ final class Redirect extends AbstractModel
     }
 
     /**
+     * enum('entire_uri','path_query','path','auto_create')
+     *
      * @param string $type
      */
     public function setType($type)
@@ -319,22 +314,21 @@ final class Redirect extends AbstractModel
             $statusCode = '301';
         }
 
-        return 'HTTP/1.1 ' . $statusCode . ' ' . self::$statusCodes[$statusCode];
+        return 'HTTP/1.1 ' . $statusCode . ' ' . $this->getStatusCodes()[$statusCode];
     }
 
     public function clearDependentCache()
     {
-
         // this is mostly called in Redirect\Dao not here
         try {
             \Pimcore\Cache::clearTag('redirect');
         } catch (\Exception $e) {
-            Logger::crit($e);
+            Logger::crit((string) $e);
         }
     }
 
     /**
-     * @param int|string $expiry
+     * @param int|string|null $expiry
      *
      * @return $this
      */
@@ -349,7 +343,7 @@ final class Redirect extends AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getExpiry()
     {
@@ -357,7 +351,7 @@ final class Redirect extends AbstractModel
     }
 
     /**
-     * @return bool
+     * @return bool|null
      */
     public function getRegex()
     {
@@ -370,17 +364,13 @@ final class Redirect extends AbstractModel
     }
 
     /**
-     * @param bool $regex
+     * @param bool|null $regex
      *
      * @return $this
      */
     public function setRegex($regex)
     {
-        if ($regex) {
-            $this->regex = (bool) $regex;
-        } else {
-            $this->regex = null;
-        }
+        $this->regex = $regex ? (bool) $regex : null;
 
         return $this;
     }
@@ -530,7 +520,7 @@ final class Redirect extends AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getUserModification()
     {
@@ -547,17 +537,17 @@ final class Redirect extends AbstractModel
 
     public function save()
     {
-        \Pimcore::getEventDispatcher()->dispatch(new RedirectEvent($this), RedirectEvents::PRE_SAVE);
+        $this->dispatchEvent(new RedirectEvent($this), RedirectEvents::PRE_SAVE);
         $this->getDao()->save();
-        \Pimcore::getEventDispatcher()->dispatch(new RedirectEvent($this), RedirectEvents::POST_SAVE);
+        $this->dispatchEvent(new RedirectEvent($this), RedirectEvents::POST_SAVE);
         $this->clearDependentCache();
     }
 
     public function delete()
     {
-        \Pimcore::getEventDispatcher()->dispatch(new RedirectEvent($this), RedirectEvents::PRE_DELETE);
+        $this->dispatchEvent(new RedirectEvent($this), RedirectEvents::PRE_DELETE);
         $this->getDao()->delete();
-        \Pimcore::getEventDispatcher()->dispatch(new RedirectEvent($this), RedirectEvents::POST_DELETE);
+        $this->dispatchEvent(new RedirectEvent($this), RedirectEvents::POST_DELETE);
         $this->clearDependentCache();
     }
 
@@ -566,6 +556,6 @@ final class Redirect extends AbstractModel
      */
     public static function getStatusCodes(): array
     {
-        return self::$statusCodes;
+        return Config::getSystemConfiguration('redirects')['status_codes'];
     }
 }

@@ -15,6 +15,7 @@
 
 namespace Pimcore\Model\DataObject\Data;
 
+use Pimcore\Cache\RuntimeCache;
 use Pimcore\Db;
 use Pimcore\Logger;
 use Pimcore\Model\DataObject\ClassDefinition;
@@ -61,11 +62,6 @@ class UrlSlug implements OwnerAwareFieldInterface
     protected $fieldname;
 
     /**
-     * @var int
-     */
-    protected $index;
-
-    /**
      * @var string
      */
     protected $ownertype;
@@ -84,11 +80,6 @@ class UrlSlug implements OwnerAwareFieldInterface
      * @var null|string
      */
     protected $previousSlug;
-
-    /**
-     * @var array
-     */
-    protected static $cache = [];
 
     /**
      * UrlSlug constructor.
@@ -163,7 +154,7 @@ class UrlSlug implements OwnerAwareFieldInterface
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getSiteId(): ?int
     {
@@ -183,7 +174,7 @@ class UrlSlug implements OwnerAwareFieldInterface
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getFieldname(): ?string
     {
@@ -198,26 +189,6 @@ class UrlSlug implements OwnerAwareFieldInterface
     public function setFieldname(?string $fieldname)
     {
         $this->fieldname = $fieldname;
-
-        return $this;
-    }
-
-    /**
-     * @return int
-     */
-    public function getIndex(): ?int
-    {
-        return $this->index;
-    }
-
-    /**
-     * @param int|null $index
-     *
-     * @return $this
-     */
-    public function setIndex(?int $index)
-    {
-        $this->index = $index;
 
         return $this;
     }
@@ -243,7 +214,7 @@ class UrlSlug implements OwnerAwareFieldInterface
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getOwnername(): ?string
     {
@@ -263,7 +234,7 @@ class UrlSlug implements OwnerAwareFieldInterface
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getPosition(): ?string
     {
@@ -313,7 +284,6 @@ class UrlSlug implements OwnerAwareFieldInterface
         $slug->setObjectId($rawItem['objectId']);
         $slug->setClassId($rawItem['classId']);
         $slug->setFieldname($rawItem['fieldname']);
-        $slug->setIndex($rawItem['index']);
         $slug->setOwnertype($rawItem['ownertype']);
         $slug->setOwnername($rawItem['ownername']);
         $slug->setPosition($rawItem['position']);
@@ -332,32 +302,41 @@ class UrlSlug implements OwnerAwareFieldInterface
      */
     public static function resolveSlug($path, $siteId = 0)
     {
-        $cacheKey = $path . '~~' . $siteId;
-        if (isset(self::$cache[$cacheKey])) {
-            return self::$cache[$cacheKey];
+        $cacheKey = self::getCacheKey($path, $siteId);
+        if (RuntimeCache::isRegistered($cacheKey)) {
+            $slug = RuntimeCache::get($cacheKey);
+
+            if ($slug instanceof UrlSlug) {
+                return $slug;
+            }
         }
 
         $slug = null;
         $db = Db::get();
 
         try {
+            $filterSiteId = 'siteId = 0';
+            if ($siteId) {
+                $filterSiteId = sprintf('(siteId = %d OR siteId = 0)', $siteId);
+            }
+
             $query = sprintf(
-                'SELECT * FROM %s WHERE slug = %s AND (siteId = %d OR siteId = 0) ORDER BY siteId DESC LIMIT 1',
+                'SELECT * FROM %s WHERE slug = %s AND %s ORDER BY siteId DESC LIMIT 1',
                 self::TABLE_NAME,
                 $db->quote($path),
-                $siteId
+                $filterSiteId
             );
 
-            $rawItem = $db->fetchRow($query);
+            $rawItem = $db->fetchAssociative($query);
 
             if ($rawItem) {
                 $slug = self::createFromDataRow($rawItem);
             }
         } catch (\Exception $e) {
-            Logger::error($e);
+            Logger::error((string) $e);
         }
 
-        self::$cache[$cacheKey] = $slug;
+        RuntimeCache::set($cacheKey, $slug);
 
         return $slug;
     }
@@ -419,7 +398,7 @@ class UrlSlug implements OwnerAwareFieldInterface
                             $fc = $object->$getter();
                             if ($fc instanceof Fieldcollection) {
                                 $index = explode('/', $objectFieldnameParts);
-                                $index = $index[1];
+                                $index = (int) $index[1];
                                 $item = $fc->get($index);
                                 if ($item instanceof AbstractData) {
                                     if ($colDef = Fieldcollection\Definition::getByKey($item->getType())) {
@@ -454,7 +433,8 @@ class UrlSlug implements OwnerAwareFieldInterface
                 if (method_exists($object, $getter)) {
                     $fcValue = $object->$getter();
                     if ($fcValue instanceof Fieldcollection) {
-                        $item = $fcValue->get($this->getPosition());
+                        // https://github.com/pimcore/pimcore/issues/13435#issuecomment-1287052907
+                        $item = $fcValue->get(0);
                         $fcType = $item->getType();
                         if ($fcDef = Fieldcollection\Definition::getByKey($fcType)) {
                             $fd = $fcDef->getFieldDefinition($this->getFieldname());
@@ -481,10 +461,8 @@ class UrlSlug implements OwnerAwareFieldInterface
     {
         $db = Db::get();
         $db->delete(self::TABLE_NAME, ['slug' => $this->getSlug(), 'siteId' => $this->getSiteId()]);
-        $cacheKey = $this->getSlug() . '~~' . $this->getSiteId();
-        if (isset(self::$cache[$cacheKey])) {
-            unset(self::$cache[$cacheKey]);
-        }
+
+        RuntimeCache::set(self::getCacheKey($this->getSlug(), $this->getSiteId()), null);
     }
 
     /**
@@ -507,5 +485,18 @@ class UrlSlug implements OwnerAwareFieldInterface
     {
         $db = Db::get();
         $db->delete(self::TABLE_NAME, ['classId' => $classId]);
+    }
+
+    /**
+     * @internal
+     *
+     * @param string $path
+     * @param int $siteId
+     *
+     * @return string
+     */
+    protected static function getCacheKey($path, $siteId): string
+    {
+        return "UrlSlug~~{$path}~~{$siteId}";
     }
 }

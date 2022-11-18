@@ -54,30 +54,26 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $cols;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $colsFixed;
+    public bool $colsFixed = false;
 
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $rows;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $rowsFixed;
+    public bool $rowsFixed = false;
 
     /**
      * Default data
@@ -90,10 +86,8 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $columnConfigActivated = false;
+    public bool $columnConfigActivated = false;
 
     /**
      * @internal
@@ -167,7 +161,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getCols()
     {
@@ -175,7 +169,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     }
 
     /**
-     * @param int $cols
+     * @param int|null $cols
      *
      * @return $this
      */
@@ -187,7 +181,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getRows()
     {
@@ -195,7 +189,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     }
 
     /**
-     * @param int $rows
+     * @param int|null $rows
      *
      * @return $this
      */
@@ -354,7 +348,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     {
         $unserializedData = Serialize::unserialize((string) $data);
 
-        if ($data === null || $unserializedData === null) {
+        if ($data === null || empty($unserializedData)) {
             return [];
         }
 
@@ -372,7 +366,9 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
             $index = 0;
 
             foreach ($row as $col) {
-                $indexedRow[$columnConfig[$index]['key']] = $col;
+                if (isset($columnConfig[$index])) {
+                    $indexedRow[$columnConfig[$index]['key']] = $col;
+                }
                 $index++;
             }
 
@@ -654,7 +650,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
      */
     public function getPhpdocInputType(): ?string
     {
-        return '?array';
+        return 'array|null';
     }
 
     /**
@@ -672,7 +668,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     {
         $key = $this->getName();
 
-        if ($class->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
             $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
         } else {
             $typeDeclaration = '';
@@ -687,8 +683,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
 
         $code .= $this->getPreGetValueHookCode($key);
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($this instanceof  PreGetDataInterface || method_exists($this, 'preGetData')) {
+        if ($this instanceof  PreGetDataInterface) {
             $code .= "\t" . '$data = $this->getClass()->getFieldDefinition("' . $key . '")->preGetData($this);' . "\n\n";
         } else {
             $code .= "\t" . '$data = $this->' . $key . ";\n\n";
@@ -722,7 +717,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     {
         $key = $this->getName();
 
-        if ($brickClass->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
             $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
         } else {
             $typeDeclaration = '';
@@ -736,8 +731,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
         $code .= 'public function get' . ucfirst($key) . '()' . $typeDeclaration . "\n";
         $code .= '{' . "\n";
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($this instanceof PreGetDataInterface || method_exists($this, 'preGetData')) {
+        if ($this instanceof PreGetDataInterface) {
             $code .= "\t" . '$data = $this->getDefinition()->getFieldDefinition("' . $key . '")->preGetData($this);' . "\n";
         } else {
             $code .= "\t" . '$data = $this->' . $key . ";\n";
@@ -770,7 +764,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     {
         $key = $this->getName();
 
-        if ($fieldcollectionDefinition->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
             $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
         } else {
             $typeDeclaration = '';
@@ -784,8 +778,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
         $code .= 'public function get' . ucfirst($key) . '()' . $typeDeclaration . "\n";
         $code .= '{' . "\n";
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($this instanceof PreGetDataInterface || method_exists($this, 'preGetData')) {
+        if ($this instanceof PreGetDataInterface) {
             $code .= "\t" . '$container = $this;' . "\n";
             $code .= "\t" . '/** @var \\' . static::class . ' $fd */' . "\n";
             $code .= "\t" . '$fd = $this->getDefinition()->getFieldDefinition("' . $key . '");' . "\n";
@@ -811,7 +804,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     {
         $key = $this->getName();
 
-        if ($class->getGenerateTypeDeclarations() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
+        if ($this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface && $this->getReturnTypeDeclaration()) {
             $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
         } else {
             $typeDeclaration = '';
@@ -821,7 +814,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
         $code .= '* Get ' . str_replace(['/**', '*/', '//'], '', $this->getName()) . ' - ' . str_replace(['/**', '*/', '//'], '', $this->getTitle()) . "\n";
         $code .= '* @return ' . $this->getPhpdocReturnType() . "\n";
         $code .= '*/' . "\n";
-        $code .= 'public function get' . ucfirst($key) . ' ($language = null)' . $typeDeclaration . "\n";
+        $code .= 'public function get' . ucfirst($key) . ' (?string $language = null)' . $typeDeclaration . "\n";
         $code .= '{' . "\n";
 
         $code .= "\t" . '$data = $this->getLocalizedfields()->getLocalizedValue("' . $key . '", $language);' . "\n";

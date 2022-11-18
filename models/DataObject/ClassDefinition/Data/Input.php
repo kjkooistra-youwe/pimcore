@@ -94,16 +94,19 @@ class Input extends Data implements
     /**
      * @internal
      *
-     * @var bool
+     * @var array
      */
-    public $unique;
+    public $regexFlags = [];
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $showCharCount;
+    public bool $unique = false;
+
+    /**
+     * @internal
+     */
+    public bool $showCharCount = false;
 
     /**
      * @return string|int
@@ -131,11 +134,11 @@ class Input extends Data implements
     /**
      * @see ResourcePersistenceAwareInterface::getDataForResource
      *
-     * @param string $data
+     * @param string|null $data
      * @param null|Model\DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string
+     * @return string|null
      */
     public function getDataForResource($data, $object = null, $params = [])
     {
@@ -147,11 +150,11 @@ class Input extends Data implements
     /**
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
-     * @param string $data
+     * @param string|null $data
      * @param null|Model\DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string
+     * @return string|null
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
@@ -161,11 +164,11 @@ class Input extends Data implements
     /**
      * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      *
-     * @param string $data
+     * @param string|null $data
      * @param null|Model\DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string
+     * @return string|null
      */
     public function getDataForQueryResource($data, $object = null, $params = [])
     {
@@ -201,7 +204,7 @@ class Input extends Data implements
     }
 
     /**
-     * @param float $data
+     * @param string $data
      * @param Model\DataObject\Concrete $object
      * @param mixed $params
      *
@@ -251,6 +254,22 @@ class Input extends Data implements
     }
 
     /**
+     * @return array
+     */
+    public function getRegexFlags(): array
+    {
+        return $this->regexFlags;
+    }
+
+    /**
+     * @param array $regexFlags
+     */
+    public function setRegexFlags(array $regexFlags): void
+    {
+        $this->regexFlags = $regexFlags;
+    }
+
+    /**
      * @return bool
      */
     public function getUnique()
@@ -263,7 +282,7 @@ class Input extends Data implements
      */
     public function setUnique($unique)
     {
-        $this->unique = $unique;
+        $this->unique = (bool) $unique;
     }
 
     /**
@@ -279,7 +298,7 @@ class Input extends Data implements
      */
     public function setShowCharCount($showCharCount)
     {
-        $this->showCharCount = $showCharCount;
+        $this->showCharCount = (bool) $showCharCount;
     }
 
     /**
@@ -304,7 +323,7 @@ class Input extends Data implements
     public function checkValidity($data, $omitMandatoryCheck = false, $params = [])
     {
         if (!$omitMandatoryCheck && $this->getRegex() && strlen($data) > 0) {
-            if (!preg_match('#' . $this->getRegex() . '#', $data)) {
+            if (!preg_match('#' . $this->getRegex() . '#' . implode('', $this->getRegexFlags()), $data)) {
                 throw new Model\Element\ValidationException('Value in field [ ' . $this->getName() . " ] doesn't match input validation '" . $this->getRegex() . "'");
             }
         }

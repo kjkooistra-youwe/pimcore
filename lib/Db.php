@@ -15,13 +15,13 @@
 
 namespace Pimcore;
 
-use Pimcore\Db\Connection;
+use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 
 class Db
 {
     /**
-     * @return \Pimcore\Db\ConnectionInterface
+     * @return Connection
      */
     public static function getConnection()
     {
@@ -29,7 +29,7 @@ class Db
     }
 
     /**
-     * @return Db\ConnectionInterface
+     * @return Connection
      */
     public static function reset()
     {
@@ -39,14 +39,12 @@ class Db
     }
 
     /**
-     * @return \Pimcore\Db\ConnectionInterface|Connection
+     * @return Connection
      */
     public static function get()
     {
-        /**
-         * @var \Pimcore\Db\ConnectionInterface $db
-         */
-        $db = \Pimcore::getContainer()->get('database_connection');
+        /** @var Connection $db */
+        $db = \Pimcore::getContainer()->get('doctrine.dbal.default_connection');
 
         return $db;
     }
@@ -65,7 +63,7 @@ class Db
 
     public static function close()
     {
-        $db = \Pimcore::getContainer()->get('database_connection');
+        $db = \Pimcore::getContainer()->get('doctrine.dbal.default_connection');
         $db->close();
     }
 }

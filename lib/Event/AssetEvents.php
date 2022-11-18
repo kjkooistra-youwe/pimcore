@@ -15,6 +15,8 @@
 
 namespace Pimcore\Event;
 
+use Pimcore\Model\Asset;
+
 final class AssetEvents
 {
     /**
@@ -116,7 +118,27 @@ final class AssetEvents
 
     /**
      * Arguments:
-     *  - base_element | Pimcore\Model\Document | contains the base document used in copying process
+     *  - params | array | contains the values that were passed to getById() as the second parameter
+     *
+     * @Event("Pimcore\Event\Model\AssetEvent")
+     *
+     * @var string
+     */
+    const POST_LOAD = 'pimcore.asset.postLoad';
+
+    /**
+     * Arguments:
+     *  - target_element | Pimcore\Model\Asset | contains the target asset used in copying process
+     *
+     * @Event("Pimcore\Event\Model\AssetEvent")
+     *
+     * @var string
+     */
+    const PRE_COPY = 'pimcore.asset.preCopy';
+
+    /**
+     * Arguments:
+     *  - base_element | Pimcore\Model\Asset | contains the base asset used in copying process
      *
      * @Event("Pimcore\Event\Model\AssetEvent")
      *

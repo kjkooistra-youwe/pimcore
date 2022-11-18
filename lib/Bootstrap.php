@@ -71,9 +71,9 @@ class Bootstrap
         DataObject\Localizedfield::setGetFallbackValues(true);
 
         // CLI has no memory/time limits
-        @ini_set('memory_limit', -1);
-        @ini_set('max_execution_time', -1);
-        @ini_set('max_input_time', -1);
+        @ini_set('memory_limit', '-1');
+        @ini_set('max_execution_time', '-1');
+        @ini_set('max_input_time', '-1');
 
         // Error reporting is enabled in CLI
         @ini_set('display_errors', 'On');
@@ -144,9 +144,15 @@ class Bootstrap
         }
     }
 
-    private static function prepareEnvVariables()
+    private static function prepareEnvVariables(): void
     {
-        (new Dotenv())->bootEnv(PIMCORE_PROJECT_ROOT .'/.env');
+        if (!($_SERVER['PIMCORE_SKIP_DOTENV_FILE'] ?? false)) {
+            if (class_exists('Symfony\Component\Dotenv\Dotenv')) {
+                (new Dotenv())->bootEnv(PIMCORE_PROJECT_ROOT . '/.env');
+            } else {
+                $_SERVER += $_ENV;
+            }
+        }
     }
 
     public static function defineConstants()
@@ -196,21 +202,19 @@ class Bootstrap
         $resolveConstant('PIMCORE_CUSTOM_CONFIGURATION_DIRECTORY', PIMCORE_PROJECT_ROOT . '/config/pimcore');
         $resolveConstant('PIMCORE_CONFIGURATION_DIRECTORY', PIMCORE_PRIVATE_VAR . '/config');
         $resolveConstant('PIMCORE_LOG_DIRECTORY', PIMCORE_PRIVATE_VAR . '/log');
-        $resolveConstant('PIMCORE_LOG_FILEOBJECT_DIRECTORY', PIMCORE_PRIVATE_VAR . '/application-logger');
         $resolveConstant('PIMCORE_CACHE_DIRECTORY', PIMCORE_PRIVATE_VAR . '/cache/pimcore');
+        $resolveConstant('PIMCORE_LOG_FILEOBJECT_DIRECTORY', PIMCORE_PRIVATE_VAR . '/application-logger');
         $resolveConstant('PIMCORE_SYMFONY_CACHE_DIRECTORY', PIMCORE_PRIVATE_VAR . '/cache');
         $resolveConstant('PIMCORE_CLASS_DIRECTORY', PIMCORE_PRIVATE_VAR . '/classes');
         $resolveConstant('PIMCORE_CLASS_DEFINITION_DIRECTORY', PIMCORE_CLASS_DIRECTORY);
-        $resolveConstant('PIMCORE_CUSTOMLAYOUT_DIRECTORY', PIMCORE_CLASS_DEFINITION_DIRECTORY . '/customlayouts');
         $resolveConstant('PIMCORE_SYSTEM_TEMP_DIRECTORY', PIMCORE_PRIVATE_VAR . '/tmp');
-        $resolveConstant('PIMCORE_LOG_MAIL_PERMANENT', PIMCORE_PRIVATE_VAR . '/email');
 
         // configure PHP's error logging
         $resolveConstant('PIMCORE_PHP_ERROR_LOG', PIMCORE_LOG_DIRECTORY . '/php.log');
         $resolveConstant('PIMCORE_KERNEL_CLASS', '\App\Kernel');
     }
 
-    private static function autoload()
+    private static function autoload(): void
     {
         $loader = \Pimcore::getAutoloader();
 
@@ -257,7 +261,7 @@ class Bootstrap
 
         $conf = \Pimcore::getContainer()->getParameter('pimcore.config');
 
-        if (isset($conf['general']['timezone']) && !empty($conf['general']['timezone'])) {
+        if ($conf['general']['timezone']) {
             date_default_timezone_set($conf['general']['timezone']);
         }
 

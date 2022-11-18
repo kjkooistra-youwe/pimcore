@@ -24,45 +24,19 @@ final class Config
 {
     private const CONFIG_ID = 'custom_views';
 
-    /**
-     * @deprecated Will be removed in Pimcore 11
-     */
-    private const LEGACY_FILE = 'customviews.php';
-
     private static ?LocationAwareConfigRepository $locationAwareConfigRepository = null;
 
-    private static function getRepository()
+    private static function getRepository(): LocationAwareConfigRepository
     {
         if (!self::$locationAwareConfigRepository) {
-            $config = [];
             $containerConfig = \Pimcore::getContainer()->getParameter('pimcore.config');
-            if (isset($containerConfig[self::CONFIG_ID]['definitions'])) {
-                $config = $containerConfig[self::CONFIG_ID]['definitions'];
-            }
-
-            // @deprecated legacy will be removed in Pimcore 11
-            $loadLegacyConfigCallback = function ($legacyRepo, &$dataSource) {
-                $file = \Pimcore\Config::locateConfigFile(self::LEGACY_FILE);
-                if (is_file($file)) {
-                    $content = include($file);
-                    if (is_array($content)) {
-                        $dataSource = LocationAwareConfigRepository::LOCATION_LEGACY;
-
-                        return $content['views'];
-                    }
-                }
-
-                return null;
-            };
+            $config = $containerConfig[self::CONFIG_ID]['definitions'];
 
             self::$locationAwareConfigRepository = new LocationAwareConfigRepository(
                 $config,
                 'pimcore_custom_views',
-                PIMCORE_CONFIGURATION_DIRECTORY . '/custom-views',
-                'PIMCORE_WRITE_TARGET_CUSTOM_VIEWS',
-                null,
-                self::LEGACY_FILE,
-                $loadLegacyConfigCallback
+                $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_CUSTOM_VIEWS'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/custom-views',
+                'PIMCORE_WRITE_TARGET_CUSTOM_VIEWS'
             );
         }
 
@@ -70,7 +44,23 @@ final class Config
     }
 
     /**
-     * @return array|bool
+     * @param mixed $data
+     *
+     * @return array
+     */
+    protected static function flipArray(mixed $data): array
+    {
+        if (empty($data['classes'])) {
+            return [];
+        } else {
+            $tempClasses = explode(',', $data['classes']);
+
+            return array_fill_keys($tempClasses, null);
+        }
+    }
+
+    /**
+     * @return array
      *
      * @internal
      *
@@ -82,47 +72,14 @@ final class Config
         $keys = $repository->fetchAllKeys();
         foreach ($keys as $key) {
             list($data, $dataSource) = $repository->loadConfigByKey(($key));
-            if ($dataSource == LocationAwareConfigRepository::LOCATION_LEGACY) {
-                foreach ($data as $configKey) {
-                    $configId = $configKey['id'];
-                    if (!isset($config[$configId])) {
-                        $configKey['writeable'] = $repository->isWriteable($key, $dataSource);
-
-                        if (!is_array($configKey['classes'] ?? [])) {
-                            $flipArray = [];
-                            $tempClasses = explode(',', $configKey['classes']);
-
-                            foreach ($tempClasses as $tempClass) {
-                                $flipArray[$tempClass] = null;
-                            }
-                            $configKey['classes'] = $flipArray;
-                        }
-
-                        if (!empty($configKey['hidden'])) {
-                            continue;
-                        }
-
-                        $config[$configId] = $configKey;
-                    }
-                }
-            } else {
-                $data['writeable'] = $repository->isWriteable($key, $dataSource);
-                $data['id'] = $data['id'] ?? $key;
-
-                if (!is_array($data['classes'] ?? [])) {
-                    $flipArray = [];
-                    $tempClasses = explode(',', $data['classes']);
-
-                    foreach ($tempClasses as $tempClass) {
-                        $flipArray[$tempClass] = null;
-                    }
-                    $data['classes'] = $flipArray;
-                }
-
-                $config[$data['id']] = $data;
+            $data['writeable'] = $repository->isWriteable($key, $dataSource);
+            $data['id'] = $data['id'] ?? $key;
+            if (!is_array($data['classes'] ?? [])) {
+                $data['classes'] = self::flipArray($data);
             }
+
+            $config[$data['id']] = $data;
         }
-        //$config = new \Pimcore\Config\Config($config, true);
 
         return $config;
     }

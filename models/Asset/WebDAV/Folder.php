@@ -48,19 +48,17 @@ class Folder extends DAV\Collection
     {
         $children = [];
 
-        $childsList = new Asset\Listing();
+        $childrenList = new Asset\Listing();
 
-        $childsList->addConditionParam('parentId = ?', [$this->asset->getId()]);
+        $childrenList->addConditionParam('parentId = ?', [$this->asset->getId()]);
         $user = \Pimcore\Tool\Admin::getCurrentUser();
-        $childsList->filterAccessibleByUser($user);
+        $childrenList->filterAccessibleByUser($user, $this->asset);
 
-        foreach ($childsList as $child) {
+        foreach ($childrenList as $child) {
             try {
-                if ($child = $this->getChild($child)) {
-                    $children[] = $child;
-                }
+                $children[] = $this->getChild($child);
             } catch (\Exception $e) {
-                Logger::warning($e);
+                Logger::warning((string) $e);
             }
         }
 
@@ -70,7 +68,7 @@ class Folder extends DAV\Collection
     /**
      * @param Asset|string $name
      *
-     * @return DAV\INode|void
+     * @return File|Folder
      *
      * @throws DAV\Exception\NotFound
      */
@@ -185,7 +183,7 @@ class Folder extends DAV\Collection
     /**
      * @param string $name
      *
-     * @return $this|void
+     * @return $this
      *
      * @throws DAV\Exception\Forbidden
      * @throws \Exception

@@ -61,9 +61,14 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $maxItems;
+
+    /**
+     * @internal
+     */
+    public bool $assetInlineDownloadAllowed = false;
 
     /**
      * @internal
@@ -71,6 +76,11 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
      * @var string
      */
     public $assetUploadPath;
+
+    /**
+     * @internal
+     */
+    public bool $allowToClearRelation = true;
 
     /**
      * Type for the column to query
@@ -83,24 +93,18 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $relationType = true;
+    public bool $relationType = true;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $objectsAllowed = false;
+    public bool $objectsAllowed = false;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $assetsAllowed = false;
+    public bool $assetsAllowed = false;
 
     /**
      * Allowed asset types
@@ -113,10 +117,8 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $documentsAllowed = false;
+    public bool $documentsAllowed = false;
 
     /**
      * Allowed document types
@@ -129,10 +131,8 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $enableTextSelection = false;
+    public bool $enableTextSelection = false;
 
     /**
      * @return bool
@@ -348,7 +348,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
                 if ($element instanceof DataObject\Concrete) {
                     $return[] = [$element->getId(), $element->getRealFullPath(), DataObject::OBJECT_TYPE_OBJECT, $element->getClassName(), $element->getPublished()];
                 } elseif ($element instanceof DataObject\AbstractObject) {
-                    $return[] = [$element->getId(), $element->getRealFullPath(), DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_FOLDER];
+                    $return[] = [$element->getId(), $element->getRealFullPath(), DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_VARIANT, DataObject::OBJECT_TYPE_FOLDER];
                 } elseif ($element instanceof Asset) {
                     $return[] = [$element->getId(), $element->getRealFullPath(), 'asset', $element->getType()];
                 } elseif ($element instanceof Document) {
@@ -644,7 +644,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
     }
 
     /**
-     * @param string|int|null $maxItems
+     * @param int|null $maxItems
      *
      * @return $this
      */
@@ -656,11 +656,26 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getMaxItems()
     {
         return $this->maxItems;
+    }
+
+    /**
+     * @return $this
+     */
+    public function setAssetInlineDownloadAllowed(bool $assetInlineDownloadAllowed): static
+    {
+        $this->assetInlineDownloadAllowed = $assetInlineDownloadAllowed;
+
+        return $this;
+    }
+
+    public function getAssetInlineDownloadAllowed(): bool
+    {
+        return $this->assetInlineDownloadAllowed;
     }
 
     /**
@@ -683,6 +698,16 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
         return $this->assetUploadPath;
     }
 
+    public function isAllowedToClearRelation(): bool
+    {
+        return $this->allowToClearRelation;
+    }
+
+    public function setAllowToClearRelation(bool $allowToClearRelation): void
+    {
+        $this->allowToClearRelation = $allowToClearRelation;
+    }
+
     /**
      * {@inheritdoc}
      */
@@ -698,7 +723,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return array|string
+     * @return array
      */
     public function getDiffVersionPreview($data, $object = null, $params = [])
     {
@@ -775,7 +800,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
      * @param mixed $value
      * @param mixed $params
      *
-     * @return mixed
+     * @return array|null
      */
     public function denormalize($value, $params = [])
     {
@@ -816,7 +841,12 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
     }
 
     /**
-     * {@inheritdoc}
+     * @param Element\ElementInterface[]|null $originalData
+     * @param array|null $data
+     * @param null|DataObject\Concrete $object
+     * @param array $params
+     *
+     * @return array
      */
     protected function processDiffDataForEditMode($originalData, $data, $object = null, $params = [])
     {
@@ -889,7 +919,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return mixed
+     * @return array|null
      */
     public function getDiffDataFromEditmode($data, $object = null, $params = [])
     {
@@ -907,7 +937,7 @@ class ManyToManyRelation extends AbstractRelations implements QueryResourcePersi
             return $this->getDataFromEditmode($result, $object, $params);
         }
 
-        return;
+        return null;
     }
 
     /**

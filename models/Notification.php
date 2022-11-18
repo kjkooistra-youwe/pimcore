@@ -20,6 +20,7 @@ namespace Pimcore\Model;
 use Pimcore\Cache;
 use Pimcore\Event\Model\NotificationEvent;
 use Pimcore\Event\NotificationEvents;
+use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Model\Exception\NotFoundException;
 
 /**
@@ -27,6 +28,8 @@ use Pimcore\Model\Exception\NotFoundException;
  */
 class Notification extends AbstractModel
 {
+    use RecursionBlockingEventDispatchHelperTrait;
+
     /**
      * @internal
      *
@@ -51,14 +54,14 @@ class Notification extends AbstractModel
     /**
      * @internal
      *
-     * @var User
+     * @var User|null
      */
     protected $sender;
 
     /**
      * @internal
      *
-     * @var User
+     * @var User|null
      */
     protected $recipient;
 
@@ -72,14 +75,14 @@ class Notification extends AbstractModel
     /**
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     protected $type;
 
     /**
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     protected $message;
 
@@ -93,7 +96,7 @@ class Notification extends AbstractModel
     /**
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     protected $linkedElementType;
 
@@ -114,12 +117,12 @@ class Notification extends AbstractModel
         $cacheKey = sprintf('notification_%d', $id);
 
         try {
-            $notification = Cache\Runtime::get($cacheKey);
+            $notification = Cache\RuntimeCache::get($cacheKey);
         } catch (\Exception $ex) {
             try {
                 $notification = new self();
                 $notification->getDao()->getById($id);
-                Cache\Runtime::set($cacheKey, $notification);
+                Cache\RuntimeCache::set($cacheKey, $notification);
             } catch (NotFoundException $e) {
                 $notification = null;
             }
@@ -137,11 +140,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @param int $id
-     *
-     * @return Notification
+     * @return $this
      */
-    public function setId(int $id): self
+    public function setId(int $id): static
     {
         $this->id = $id;
 
@@ -157,11 +158,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @param string $creationDate
-     *
-     * @return Notification
+     * @return $this
      */
-    public function setCreationDate(string $creationDate): self
+    public function setCreationDate(string $creationDate): static
     {
         $this->creationDate = $creationDate;
 
@@ -177,11 +176,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @param string $modificationDate
-     *
-     * @return Notification
+     * @return $this
      */
-    public function setModificationDate(string $modificationDate): self
+    public function setModificationDate(string $modificationDate): static
     {
         $this->modificationDate = $modificationDate;
 
@@ -189,7 +186,7 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @return null|User
+     * @return User|null
      */
     public function getSender(): ?User
     {
@@ -197,11 +194,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @param null|User $sender
-     *
-     * @return Notification
+     * @return $this
      */
-    public function setSender(?User $sender): self
+    public function setSender(?User $sender): static
     {
         $this->sender = $sender;
 
@@ -217,11 +212,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @param null|User $recipient
-     *
-     * @return Notification
+     * @return $this
      */
-    public function setRecipient(?User $recipient): self
+    public function setRecipient(?User $recipient): static
     {
         $this->recipient = $recipient;
 
@@ -237,11 +230,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @param null|string $title
-     *
-     * @return Notification
+     * @return $this
      */
-    public function setTitle(?string $title): self
+    public function setTitle(?string $title): static
     {
         $this->title = $title;
 
@@ -257,11 +248,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @param null|string $type
-     *
-     * @return Notification
+     * @return $this
      */
-    public function setType(?string $type): self
+    public function setType(?string $type): static
     {
         $this->type = $type;
 
@@ -277,11 +266,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @param null|string $message
-     *
-     * @return Notification
+     * @return $this
      */
-    public function setMessage(?string $message): self
+    public function setMessage(?string $message): static
     {
         $this->message = $message;
 
@@ -297,11 +284,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @param null|Element\ElementInterface $linkedElement
-     *
-     * @return Notification
+     * @return $this
      */
-    public function setLinkedElement(?Element\ElementInterface $linkedElement): self
+    public function setLinkedElement(?Element\ElementInterface $linkedElement): static
     {
         $this->linkedElement = $linkedElement;
         $this->linkedElementType = Element\Service::getElementType($linkedElement);
@@ -310,7 +295,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @return null|string
+     * enum('document','asset', 'object) nullable
+     *
+     * @return string|null
      */
     public function getLinkedElementType(): ?string
     {
@@ -326,11 +313,9 @@ class Notification extends AbstractModel
     }
 
     /**
-     * @param bool $read
-     *
-     * @return Notification
+     * @return $this
      */
-    public function setRead(bool $read): self
+    public function setRead(bool $read): static
     {
         $this->read = $read;
 
@@ -342,9 +327,9 @@ class Notification extends AbstractModel
      */
     public function save(): void
     {
-        \Pimcore::getEventDispatcher()->dispatch(new NotificationEvent($this), NotificationEvents::PRE_SAVE);
+        $this->dispatchEvent(new NotificationEvent($this), NotificationEvents::PRE_SAVE);
         $this->getDao()->save();
-        \Pimcore::getEventDispatcher()->dispatch(new NotificationEvent($this), NotificationEvents::POST_SAVE);
+        $this->dispatchEvent(new NotificationEvent($this), NotificationEvents::POST_SAVE);
     }
 
     /**
@@ -352,8 +337,8 @@ class Notification extends AbstractModel
      */
     public function delete(): void
     {
-        \Pimcore::getEventDispatcher()->dispatch(new NotificationEvent($this), NotificationEvents::PRE_DELETE);
+        $this->dispatchEvent(new NotificationEvent($this), NotificationEvents::PRE_DELETE);
         $this->getDao()->delete();
-        \Pimcore::getEventDispatcher()->dispatch(new NotificationEvent($this), NotificationEvents::POST_DELETE);
+        $this->dispatchEvent(new NotificationEvent($this), NotificationEvents::POST_DELETE);
     }
 }

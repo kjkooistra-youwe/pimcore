@@ -19,19 +19,10 @@ use Pimcore\Model;
 
 class Document extends Url
 {
-    /**
-     * @var string|null
-     */
     protected ?string $_accesskey = null;
 
-    /**
-     * @var string|null
-     */
     protected ?string $_tabindex = null;
 
-    /**
-     * @var string|null
-     */
     protected ?string $_relation = null;
 
     /**
@@ -210,7 +201,7 @@ class Document extends Url
     /**
      * @param string $name
      *
-     * @return mixed|null
+     * @return mixed
      */
     public function getCustomSetting($name)
     {

@@ -20,10 +20,7 @@ namespace Pimcore\DataObject\GridColumnConfig\Operator;
  */
 final class Boolean extends AbstractOperator
 {
-    /**
-     * @var bool
-     */
-    private $skipNull;
+    private bool $skipNull;
 
     /**
      * @var string
@@ -49,17 +46,17 @@ final class Boolean extends AbstractOperator
         $result = new \stdClass();
         $result->label = $this->label;
 
-        $childs = $this->getChilds();
+        $children = $this->getChildren();
 
-        if ($this->getOperator() != 'and' && $this->getOperator() != 'or') {
+        if ($this->getOperator() !== 'and' && $this->getOperator() !== 'or') {
             return $result;
         }
 
-        if (!$childs) {
+        if (!$children) {
             return $result;
         } else {
             $valueArray = [];
-            foreach ($childs as $c) {
+            foreach ($children as $c) {
                 $childResult = $c->getLabeledValue($element);
                 $isArrayType = $childResult->isArrayType ?? false;
                 $childValues = $childResult->value ?? null;
@@ -83,9 +80,9 @@ final class Boolean extends AbstractOperator
 
             $resultValue = current($valueArray);
             foreach ($valueArray as $val) {
-                if ($this->getOperator() == 'and') {
+                if ($this->getOperator() === 'and') {
                     $resultValue = $val && $resultValue;
-                } elseif ($this->getOperator() == 'or') {
+                } else {
                     $resultValue = $val || $resultValue;
                 }
             }

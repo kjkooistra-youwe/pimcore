@@ -55,6 +55,7 @@ class ActionsButtonService
                 'iconCls' => $transition->getIconClass(),
                 'objectLayout' => $transition->getObjectLayout(),
                 'notes' => $notes,
+                'unsavedChangesBehaviour' => $transition->getOptions()['unsavedChangesBehaviour'],
             ];
         }
 
@@ -89,13 +90,7 @@ class ActionsButtonService
         return $globalActions;
     }
 
-    /**
-     * @param AbstractObject $object
-     * @param array $notes
-     *
-     * @return array
-     */
-    private function enrichNotes(AbstractObject $object, array $notes)
+    private function enrichNotes(AbstractObject $object, array $notes): array
     {
         if (!empty($notes['commentGetterFn'])) {
             $commentGetterFn = $notes['commentGetterFn'];

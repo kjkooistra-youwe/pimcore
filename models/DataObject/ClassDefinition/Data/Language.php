@@ -32,10 +32,8 @@ class Language extends Model\DataObject\ClassDefinition\Data\Select
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $onlySystemLanguages = false;
+    public bool $onlySystemLanguages = false;
 
     /**
      * @internal
@@ -98,7 +96,8 @@ class Language extends Model\DataObject\ClassDefinition\Data\Select
     /**
      * @return $this
      */
-    public function jsonSerialize()
+    #[\ReturnTypeWillChange]
+    public function jsonSerialize()// : static
     {
         if (Service::doRemoveDynamicOptions()) {
             $this->options = null;

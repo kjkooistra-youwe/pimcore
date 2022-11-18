@@ -24,12 +24,18 @@ use Symfony\Component\Workflow\MarkingStore\MarkingStoreInterface;
 
 class DataObjectMultipleStateMarkingStore implements MarkingStoreInterface
 {
+    /**
+     * @var string
+     */
     private $property;
 
+    /**
+     * @var \Symfony\Component\PropertyAccess\PropertyAccessor|PropertyAccessorInterface
+     */
     private $propertyAccessor;
 
     /**
-     * @param string                         $property
+     * @param string $property
      * @param PropertyAccessorInterface|null $propertyAccessor
      */
     public function __construct($property = 'marking', PropertyAccessorInterface $propertyAccessor = null)
@@ -72,11 +78,9 @@ class DataObjectMultipleStateMarkingStore implements MarkingStoreInterface
     }
 
     /**
-     * @param object $subject
-     *
-     * @return Concrete
+     * @throws LogicException
      */
-    private function checkIfSubjectIsValid($subject): Concrete
+    private function checkIfSubjectIsValid(object $subject): Concrete
     {
         if (!$subject instanceof Concrete) {
             throw new LogicException('data_object_multiple_state marking store works for pimcore data objects only.');

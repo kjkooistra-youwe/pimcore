@@ -47,8 +47,6 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
 
     /**
      * @internal
-     *
-     * @var ClassDefinition|null
      */
     protected ?ClassDefinition $class = null;
 
@@ -300,7 +298,7 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
         return $this->activeGroups;
     }
 
-    private function sanitizeActiveGroups($activeGroups)
+    private function sanitizeActiveGroups(array $activeGroups): array
     {
         $newList = [];
 
@@ -329,15 +327,7 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
         $this->activeGroups = $activeGroups;
     }
 
-    /**
-     * @param int $groupId
-     * @param int $keyId
-     * @param string $language
-     * @param Model\DataObject\ClassDefinition\Data $fielddefinition
-     *
-     * @return mixed
-     */
-    private function getFallbackValue($groupId, $keyId, $language, $fielddefinition)
+    private function getFallbackValue(int $groupId, int $keyId, string $language, ClassDefinition\Data $fielddefinition): mixed
     {
         $fallbackLanguages = Tool::getFallbackLanguagesFor($language);
         $data = null;
@@ -393,7 +383,7 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
 
         if (array_key_exists($groupId, $this->items) && array_key_exists($keyId, $this->items[$groupId])
                 && array_key_exists($language, $this->items[$groupId][$keyId])
-            ) {
+        ) {
             $data = $this->items[$groupId][$keyId][$language];
         }
 
@@ -436,14 +426,7 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
             }
         }
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($fieldDefinition instanceof PreGetDataInterface || method_exists($fieldDefinition, 'preGetData')) {
-            if (!$fieldDefinition instanceof PreGetDataInterface) {
-                trigger_deprecation('pimcore/pimcore', '10.1',
-                    sprintf('Usage of method_exists is deprecated since version 10.1 and will be removed in Pimcore 11.' .
-                    'Implement the %s interface instead.', PreGetDataInterface::class));
-            }
-
+        if ($fieldDefinition instanceof PreGetDataInterface) {
             $data = $fieldDefinition->preGetData($this, [
                 'data' => $data,
                 'language' => $language,
@@ -527,11 +510,6 @@ class Classificationstore extends Model\AbstractModel implements DirtyIndicatorI
         return new Model\DataObject\Classificationstore\Group($classificationstore, $groupConfig);
     }
 
-    /**
-     * @param int $groupId
-     *
-     * @return Classificationstore\GroupConfig|null
-     */
     private function getGroupConfigById(int $groupId): ?Classificationstore\GroupConfig
     {
         return Classificationstore\GroupConfig::getById($groupId);

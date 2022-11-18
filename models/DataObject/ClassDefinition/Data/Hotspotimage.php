@@ -280,9 +280,6 @@ class Hotspotimage extends Data implements ResourcePersistenceAwareInterface, Qu
             $marker = $rewritePath($data->getMarker());
             $hotspots = $rewritePath($data->getHotspots());
 
-            $marker = object2array($marker);
-            $hotspots = object2array($hotspots);
-
             return [
                 'id' => $imageId,
                 'hotspots' => $hotspots,
@@ -372,8 +369,8 @@ class Hotspotimage extends Data implements ResourcePersistenceAwareInterface, Qu
     public function getForCsvExport($object, $params = [])
     {
         $data = $this->getDataFromObjectParam($object, $params);
-        if ($data instanceof DataObject\Data\Hotspotimage) {
-            return base64_encode(Serialize::serialize($data));
+        if ($data instanceof DataObject\Data\Hotspotimage && $data->getImage() instanceof Asset\Image) {
+            return $data->getImage()->getFrontendFullPath();
         }
 
         return '';
@@ -501,7 +498,7 @@ class Hotspotimage extends Data implements ResourcePersistenceAwareInterface, Qu
         if ($data instanceof DataObject\Data\Hotspotimage && $data->getImage()) {
             $id = $data->getImage()->getId();
             if (array_key_exists('asset', $idMapping) && array_key_exists($id, $idMapping['asset'])) {
-                $data->setImage(Asset::getById($idMapping['asset'][$id]));
+                $data->setImage(Asset\Image::getById($idMapping['asset'][$id]));
 
                 // reset hotspot, marker & crop
                 $data->setHotspots(null);
@@ -520,13 +517,7 @@ class Hotspotimage extends Data implements ResourcePersistenceAwareInterface, Qu
         return $data;
     }
 
-    /**
-     * @param array|null $dataArray
-     * @param array $idMapping
-     *
-     * @return array
-     */
-    private function rewriteIdsInDataEntries($dataArray, $idMapping)
+    private function rewriteIdsInDataEntries(?array $dataArray, array $idMapping): array
     {
         $newDataArray = [];
         if ($dataArray) {
@@ -680,11 +671,15 @@ class Hotspotimage extends Data implements ResourcePersistenceAwareInterface, Qu
                 $type = $value['image']['type'];
                 $id = $value['image']['id'];
                 $asset = Element\Service::getElementById($type, $id);
-                $image->setImage($asset);
+                if ($asset instanceof Asset\Image) {
+                    $image->setImage($asset);
+                }
             }
 
             return $image;
         }
+
+        return null;
     }
 
     /**

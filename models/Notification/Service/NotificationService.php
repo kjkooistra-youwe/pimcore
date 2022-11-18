@@ -67,6 +67,14 @@ class NotificationService
             throw new \UnexpectedValueException(sprintf('No user found with the ID %d', $userId));
         }
 
+        if (empty($title)) {
+            throw new \UnexpectedValueException('Title of the Notification cannot be empty');
+        }
+
+        if (empty($message)) {
+            throw new \UnexpectedValueException('Message text of the Notification cannot be empty');
+        }
+
         $notification = new Notification();
         $notification->setRecipient($recipient);
         $notification->setSender($sender);
@@ -107,7 +115,7 @@ class NotificationService
             AND (
                 roles = ?
                 OR roles LIKE ?
-                OR roles LIKE ? 
+                OR roles LIKE ?
                 OR roles LIKE ?
             )',
             [
@@ -123,7 +131,7 @@ class NotificationService
         $listing->setOrder('ASC');
         $listing->load();
 
-        $users = $listing->getUsers() ?? [];
+        $users = $listing->getUsers();
         $users = $this->userService->filterUsersWithPermission($users);
 
         foreach ($users as $user) {

@@ -43,6 +43,13 @@ abstract class AbstractRelations extends Data implements
     public $classes = [];
 
     /**
+     * Optional display mode
+     *
+     * @internal
+     */
+    public ?string $displayMode = null;
+
+    /**
      * Optional path formatter class
      *
      * @internal
@@ -69,6 +76,21 @@ abstract class AbstractRelations extends Data implements
     public function setClasses($classes)
     {
         $this->classes = Element\Service::fixAllowedTypes($classes, 'classes');
+
+        return $this;
+    }
+
+    public function getDisplayMode(): ?string
+    {
+        return $this->displayMode;
+    }
+
+    /**
+     * @return $this
+     */
+    public function setDisplayMode(?string $displayMode): static
+    {
+        $this->displayMode = $displayMode;
 
         return $this;
     }
@@ -118,11 +140,11 @@ abstract class AbstractRelations extends Data implements
 
                 // relation needs to be an array with src_id, dest_id, type, fieldname
                 try {
-                    $db->insert('object_relations_' . $classId, $relation);
+                    $db->insert('object_relations_' . $classId, Db\Helper::quoteDataIdentifiers($db, $relation));
                 } catch (\Exception $e) {
                     Logger::error('It seems that the relation ' . $relation['src_id'] . ' => ' . $relation['dest_id']
                         . ' (fieldname: ' . $this->getName() . ') already exist -> please check immediately!');
-                    Logger::error($e);
+                    Logger::error((string) $e);
 
                     // try it again with an update if the insert fails, shouldn't be the case, but it seems that
                     // sometimes the insert throws an exception

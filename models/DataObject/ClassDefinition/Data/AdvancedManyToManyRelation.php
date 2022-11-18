@@ -62,24 +62,18 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $optimizedAdminLoading = false;
+    public bool $optimizedAdminLoading = false;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $enableBatchEdit;
+    public bool $enableBatchEdit = false;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $allowMultipleAssignments;
+    public bool $allowMultipleAssignments = false;
 
     /**
      * {@inheritdoc}
@@ -137,7 +131,7 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
             foreach ($targets as $targetType => $targetIds) {
                 $identifier = $targetType === 'object' ? 'o_id' : 'id';
 
-                $result = $db->fetchCol(
+                $result = $db->fetchFirstColumn(
                     'SELECT ' . $identifier . ' FROM ' . $targetType . 's'
                     . ' WHERE ' . $identifier . ' IN (' . implode(',', $targetIds) . ')'
                 );
@@ -281,7 +275,7 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
                     $className = '';
                 }
 
-                $result = $db->fetchAll(
+                $result = $db->fetchAllAssociative(
                     'SELECT '
                     . $identifier . ' id, '
                     . $typeCol . ' type' . $className
@@ -411,10 +405,8 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
                         $setter = 'set' . ucfirst($key);
                         $value = $element[$key] ?? null;
 
-                        if ($columnConfig['type'] === 'multiselect') {
-                            if (is_array($value) && count($value)) {
-                                $value = implode(',', $value);
-                            }
+                        if ($columnConfig['type'] === 'multiselect' && is_array($value)) {
+                            $value = implode(',', $value);
                         }
 
                         $metaData->$setter($value);
@@ -457,6 +449,9 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
         if (is_array($data) && count($data) > 0) {
             foreach ($data as $metaObject) {
                 $o = $metaObject->getElement();
+                if (!$o) {
+                    continue;
+                }
                 $item = Element\Service::getElementType($o) . ' ' . $o->getRealFullPath();
 
                 if (count($metaObject->getData())) {
@@ -601,28 +596,28 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
                 $ownerName = '/' . $context['containerType'] . '~' . $containerName . '/%';
             }
 
-            $sql = $db->quoteInto('o_id = ?', $objectId) . " AND ownertype = 'localizedfield' AND "
-                . $db->quoteInto('ownername LIKE ?', $ownerName)
-                . ' AND ' . $db->quoteInto('fieldname = ?', $this->getName())
-                . ' AND ' . $db->quoteInto('position = ?', $position);
+            $sql = Db\Helper::quoteInto($db, 'o_id = ?', $objectId) . " AND ownertype = 'localizedfield' AND "
+                . Db\Helper::quoteInto($db, 'ownername LIKE ?', $ownerName)
+                . ' AND ' . Db\Helper::quoteInto($db, 'fieldname = ?', $this->getName())
+                . ' AND ' . Db\Helper::quoteInto($db, 'position = ?', $position);
         } else {
-            $sql = $db->quoteInto('o_id = ?', $objectId) . ' AND ' . $db->quoteInto('fieldname = ?', $this->getName())
-                . ' AND ' . $db->quoteInto('position = ?', $position);
+            $sql = Db\Helper::quoteInto($db, 'o_id = ?', $objectId) . ' AND ' . Db\Helper::quoteInto($db, 'fieldname = ?', $this->getName())
+                . ' AND ' . Db\Helper::quoteInto($db, 'position = ?', $position);
 
             if ($context) {
                 if (!empty($context['fieldname'])) {
-                    $sql .= ' AND ' . $db->quoteInto('ownername = ?', $context['fieldname']);
+                    $sql .= ' AND ' . Db\Helper::quoteInto($db, 'ownername = ?', $context['fieldname']);
                 }
 
                 if (!DataObject::isDirtyDetectionDisabled() && $object instanceof Element\DirtyIndicatorInterface) {
                     if ($context['containerType']) {
-                        $sql .= ' AND ' . $db->quoteInto('ownertype = ?', $context['containerType']);
+                        $sql .= ' AND ' . Db\Helper::quoteInto($db, 'ownertype = ?', $context['containerType']);
                     }
                 }
             }
         }
 
-        $db->deleteWhere($table, $sql);
+        $db->executeStatement('DELETE FROM ' . $table . ' WHERE ' . $sql);
 
         if (!empty($multihrefMetadata)) {
             if ($object instanceof DataObject\Localizedfield || $object instanceof DataObject\Objectbrick\Data\AbstractData
@@ -686,20 +681,20 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
             $containerName = $context['fieldname'] ?? null;
 
             if ($context['containerType'] === 'objectbrick') {
-                $db->deleteWhere(
-                    'object_metadata_' . $object->getClassId(),
-                    $db->quoteInto('o_id = ?', $object->getId()) . " AND ownertype = 'localizedfield' AND "
-                    . $db->quoteInto('ownername LIKE ?', '/' . $context['containerType'] . '~' . $containerName . '/%')
-                    . ' AND ' . $db->quoteInto('fieldname = ?', $this->getName())
+                $db->executeStatement(
+                    'DELETE FROM object_metadata_' . $object->getClassId() . ' WHERE ' .
+                    Db\Helper::quoteInto($db, 'o_id = ?', $object->getId()) . " AND ownertype = 'localizedfield' AND "
+                    . Db\Helper::quoteInto($db, 'ownername LIKE ?', '/' . $context['containerType'] . '~' . $containerName . '/%')
+                    . ' AND ' . Db\Helper::quoteInto($db, 'fieldname = ?', $this->getName())
                 );
             } else {
                 $index = $context['index'];
 
-                $db->deleteWhere(
-                    'object_metadata_' . $object->getClassId(),
-                    $db->quoteInto('o_id = ?', $object->getId()) . " AND ownertype = 'localizedfield' AND "
-                    . $db->quoteInto('ownername LIKE ?', '/' . $context['containerType'] . '~' . $containerName . '/' . $index . '/%')
-                    . ' AND ' . $db->quoteInto('fieldname = ?', $this->getName())
+                $db->executeStatement(
+                    'DELETE FROM object_metadata_' . $object->getClassId() . ' WHERE ' .
+                    Db\Helper::quoteInto($db, 'o_id = ?', $object->getId()) . " AND ownertype = 'localizedfield' AND "
+                    . Db\Helper::quoteInto($db, 'ownername LIKE ?', '/' . $context['containerType'] . '~' . $containerName . '/' . $index . '/%')
+                    . ' AND ' . Db\Helper::quoteInto($db, 'fieldname = ?', $this->getName())
                 );
             }
         } else {
@@ -902,6 +897,8 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
 
             return $result;
         }
+
+        return null;
     }
 
     /**
@@ -970,7 +967,7 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return mixed
+     * @return array|null
      */
     public function getDiffDataFromEditmode($data, $object = null, $params = [])
     {
@@ -988,7 +985,7 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
             return $this->getDataFromEditmode($result, $object, $params);
         }
 
-        return;
+        return null;
     }
 
     /**
@@ -1012,7 +1009,7 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
      */
     public function isOptimizedAdminLoading(): bool
     {
-        return (bool) $this->optimizedAdminLoading;
+        return $this->optimizedAdminLoading;
     }
 
     /**
@@ -1020,7 +1017,7 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
      */
     public function setOptimizedAdminLoading($optimizedAdminLoading)
     {
-        $this->optimizedAdminLoading = $optimizedAdminLoading;
+        $this->optimizedAdminLoading = (bool) $optimizedAdminLoading;
     }
 
     /**
@@ -1038,7 +1035,7 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
      */
     public function setAllowMultipleAssignments($allowMultipleAssignments)
     {
-        $this->allowMultipleAssignments = $allowMultipleAssignments;
+        $this->allowMultipleAssignments = (bool) $allowMultipleAssignments;
 
         return $this;
     }
@@ -1056,7 +1053,7 @@ class AdvancedManyToManyRelation extends ManyToManyRelation implements IdRewrite
      */
     public function setEnableBatchEdit($enableBatchEdit)
     {
-        $this->enableBatchEdit = $enableBatchEdit;
+        $this->enableBatchEdit = (bool) $enableBatchEdit;
     }
 
     /**

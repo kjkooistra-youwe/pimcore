@@ -20,6 +20,7 @@ namespace Pimcore\Twig\Extension;
 use Pimcore\Tool\Admin;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Twig\Extension\AbstractExtension;
+use Twig\TwigFilter;
 use Twig\TwigFunction;
 
 /**
@@ -38,6 +39,16 @@ class AdminExtension extends AbstractExtension
         ];
     }
 
+    /**
+     * @return array
+     */
+    public function getFilters()
+    {
+        return [
+            new TwigFilter('pimcore_inline_icon', [$this, 'inlineIcon']),
+        ];
+    }
+
     public function minimize(array $paths): string
     {
         $returnHtml = '';
@@ -47,7 +58,7 @@ class AdminExtension extends AbstractExtension
             foreach ([PIMCORE_WEB_ROOT . '/bundles/pimcoreadmin/js/' . $path,
                         PIMCORE_WEB_ROOT . $path,
                     ] as $fullPath) {
-                if (file_exists($fullPath)) {
+                if (is_file($fullPath)) {
                     $scriptContents .= file_get_contents($fullPath) . "\n\n\n";
                     $found = true;
                 }
@@ -66,8 +77,25 @@ class AdminExtension extends AbstractExtension
         return $returnHtml;
     }
 
-    private function getScriptTag($url): string
+    private function getScriptTag(string $url): string
     {
         return '<script src="' . $url . '"></script>' . "\n";
+    }
+
+    /**
+     * @param string $icon
+     *
+     * @return string
+     */
+    public function inlineIcon(string $icon)
+    {
+        $content = file_get_contents($icon);
+
+        return sprintf('<img src="data:%s;base64,%s" title="%s" data-imgpath="%s" />',
+            mime_content_type($icon),
+            base64_encode($content),
+            basename($icon),
+            str_replace(PIMCORE_WEB_ROOT, '', $icon)
+        );
     }
 }

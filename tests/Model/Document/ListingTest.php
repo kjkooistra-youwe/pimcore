@@ -17,13 +17,14 @@ namespace Pimcore\Tests\Model\Document;
 
 use Pimcore\Db;
 use Pimcore\Model\Document;
-use Pimcore\Tests\Test\ModelTestCase;
-use Pimcore\Tests\Util\TestHelper;
+use Pimcore\Tests\Support\Test\ModelTestCase;
+use Pimcore\Tests\Support\Util\TestHelper;
 
 /**
  * Class ListingTest
  *
  * @package Pimcore\Tests\Model\Document
+ *
  * @group model.document.document
  */
 class ListingTest extends ModelTestCase

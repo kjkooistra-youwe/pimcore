@@ -38,6 +38,7 @@
 
 namespace Pimcore\Twig\Extension\Templating;
 
+use Pimcore\Bundle\AdminBundle\Security\ContentSecurityPolicyHandler;
 use Pimcore\Event\FrontendEvents;
 use Pimcore\Twig\Extension\Templating\Placeholder\CacheBusterAware;
 use Pimcore\Twig\Extension\Templating\Placeholder\Container;
@@ -157,7 +158,7 @@ class HeadScript extends CacheBusterAware implements RuntimeExtensionInterface
      * or script file to include.
      *
      * @param  string $mode Script or file
-     * @param  string $spec Script/url
+     * @param  null|string $spec Script/url
      * @param  string $placement Append, prepend, or set
      * @param  array $attrs Array of script attributes
      * @param  string $type Script type and/or array of script attributes
@@ -412,7 +413,8 @@ class HeadScript extends CacheBusterAware implements RuntimeExtensionInterface
      *
      * @return void
      */
-    public function offsetSet($index, $value)
+    #[\ReturnTypeWillChange]
+    public function offsetSet($index, $value)// : void
     {
         if (!$this->_isValid($value)) {
             throw new Exception('Invalid argument passed to offsetSet(); please use one of the helper methods, offsetSetScript() or offsetSetFile()');
@@ -481,6 +483,9 @@ class HeadScript extends CacheBusterAware implements RuntimeExtensionInterface
             }
         }
 
+        /** @var ContentSecurityPolicyHandler $cspHandler */
+        $cspHandler = \Pimcore::getContainer()->get(ContentSecurityPolicyHandler::class);
+        $attrString .= $cspHandler->getNonceHtmlAttribute();
         $addScriptEscape = !(isset($item->attributes['noescape']) && filter_var($item->attributes['noescape'], FILTER_VALIDATE_BOOLEAN));
 
         $html = '<script' . $attrString . '>';
@@ -519,7 +524,7 @@ class HeadScript extends CacheBusterAware implements RuntimeExtensionInterface
     /**
      * Retrieve string representation
      *
-     * @param  string|int $indent
+     * @param  null|string|int $indent
      *
      * @return string
      */
@@ -594,7 +599,7 @@ class HeadScript extends CacheBusterAware implements RuntimeExtensionInterface
      *
      * @param  string $type
      * @param  array $attributes
-     * @param  string $content
+     * @param  null|string $content
      *
      * @return \stdClass
      */

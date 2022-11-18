@@ -41,7 +41,7 @@ class Link extends Model\Document
      *
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     protected $internalType;
 
@@ -58,8 +58,6 @@ class Link extends Model\Document
      * Contains the direct link as plain text
      *
      * @internal
-     *
-     * @var string
      */
     protected string $direct = '';
 
@@ -67,8 +65,6 @@ class Link extends Model\Document
      * Type of the link (internal/direct)
      *
      * @internal
-     *
-     * @var string
      */
     protected string $linktype = 'internal';
 
@@ -81,8 +77,6 @@ class Link extends Model\Document
      * path of the link
      *
      * @internal
-     *
-     * @var string
      */
     protected string $href = '';
 
@@ -280,7 +274,7 @@ class Link extends Model\Document
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getInternalType()
     {
@@ -288,7 +282,7 @@ class Link extends Model\Document
     }
 
     /**
-     * @param string $type
+     * @param string|null $type
      *
      * @return $this
      */
@@ -315,7 +309,7 @@ class Link extends Model\Document
     }
 
     /**
-     * @param Model\Element\ElementInterface $element
+     * @param Model\Element\ElementInterface|null $element
      *
      * @return $this
      */
@@ -360,14 +354,14 @@ class Link extends Model\Document
         return $this->setElement($object);
     }
 
-    /**
-     * @return Model\Element\ElementInterface|null
-     */
-    private function setObjectFromId()
+    private function setObjectFromId(): ?Model\Element\ElementInterface
     {
         try {
             if ($this->internal) {
                 if ($this->internalType == 'document') {
+                    if ($this->getId() == $this->internal) {
+                        throw new \Exception('Prevented infinite redirection loop: attempted to linking "' . $this->getKey() . '" to itself. ');
+                    }
                     $this->object = Document::getById($this->internal);
                 } elseif ($this->internalType == 'asset') {
                     $this->object = Asset::getById($this->internal);
@@ -376,7 +370,7 @@ class Link extends Model\Document
                 }
             }
         } catch (\Exception $e) {
-            Logger::warn($e);
+            Logger::warn((string) $e);
             $this->internalType = '';
             $this->internal = null;
             $this->object = null;

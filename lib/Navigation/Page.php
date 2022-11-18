@@ -44,8 +44,6 @@ abstract class Page extends Container
 {
     /**
      * Page label
-     *
-     * @var string|null
      */
     protected ?string $_label = null;
 
@@ -58,36 +56,26 @@ abstract class Page extends Container
      * Example: http://www.example.org/foo.html#bar ("bar" is the fragment identifier)
      *
      * @link http://www.w3.org/TR/html401/intro/intro.html#fragment-uri
-     *
-     * @var string|null
      */
     protected ?string $_fragment = null;
 
     /**
      * Page id
-     *
-     * @var string|null
      */
     protected ?string $_id = null;
 
     /**
      * Style class for this page (CSS)
-     *
-     * @var string|null
      */
     protected ?string $_class = null;
 
     /**
      * A more descriptive title for this page
-     *
-     * @var string|null
      */
     protected ?string $_title = null;
 
     /**
      * This page's target
-     *
-     * @var string|null
      */
     protected ?string $_target = null;
 
@@ -98,8 +86,6 @@ abstract class Page extends Container
      * single character from the document character set.
      *
      * @link http://www.w3.org/TR/html401/interact/forms.html#access-keys
-     *
-     * @var string|null
      */
     protected ?string $_accesskey = null;
 
@@ -123,43 +109,31 @@ abstract class Page extends Container
 
     /**
      * Page order used by parent container
-     *
-     * @var int|null
      */
     protected ?int $_order = null;
 
     /**
      * Whether this page should be considered active
-     *
-     * @var bool
      */
     protected bool $_active = false;
 
     /**
      * Whether this page should be considered visible
-     *
-     * @var bool
      */
     protected bool $_visible = true;
 
     /**
      * Parent container
-     *
-     * @var Container|null
      */
     protected ?Container $_parent = null;
 
     /**
      * Custom page properties, used by __set(), __get() and __isset()
-     *
-     * @var array
      */
     protected array $_properties = [];
 
     /**
      * Custom HTML attributes
-     *
-     * @var array
      */
     protected array $_customHtmlAttribs = [];
 
@@ -215,7 +189,7 @@ abstract class Page extends Container
                 $page = new $type($options);
                 if (!$page instanceof self) {
                     throw new \Exception(sprintf(
-                            'Invalid argument: Detected type "%s", which is not an instance of Page',
+                        'Invalid argument: Detected type "%s", which is not an instance of Page',
                         $type
                     ));
                 }
@@ -241,7 +215,7 @@ abstract class Page extends Container
     /**
      * Page constructor
      *
-     * @param  array $options   [optional] page options. Default is null, which should set defaults.
+     * @param  array|null $options   [optional] page options. Default is null, which should set defaults.
      *
      * @throws \Exception    if invalid options are given
      */
@@ -649,7 +623,7 @@ abstract class Page extends Container
     /**
      * Sets page order to use in parent container
      *
-     * @param  int|string $order                 [optional] page order in container.
+     * @param  int|string|null $order                 [optional] page order in container.
      *                                    Default is null, which sets no
      *                                    specific order.
      *
@@ -1142,8 +1116,16 @@ abstract class Page extends Container
         return str_replace(' ', '', ucwords(str_replace('_', ' ', $property)));
     }
 
+    /**
+     * @param string|null $type
+     *
+     * @throws \Exception
+     *
+     * TODO: In Pimcore 11, deprecate/remove the IF block and mark these methods as internal in the phpdoc block
+     */
     public static function setDefaultPageType($type = null)
     {
+        // @phpstan-ignore-next-line
         if ($type !== null && !is_string($type)) {
             throw new \Exception(
                 'Cannot set default page type: type is no string but should be'
@@ -1153,6 +1135,9 @@ abstract class Page extends Container
         self::$_defaultPageType = $type;
     }
 
+    /**
+     * @return string
+     */
     public static function getDefaultPageType()
     {
         return self::$_defaultPageType;

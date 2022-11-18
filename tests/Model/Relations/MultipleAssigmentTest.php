@@ -21,13 +21,14 @@ use Pimcore\Model\DataObject\Data\ObjectMetadata;
 use Pimcore\Model\DataObject\MultipleAssignments;
 use Pimcore\Model\DataObject\RelationTest;
 use Pimcore\Model\DataObject\Service;
-use Pimcore\Tests\Test\ModelTestCase;
-use Pimcore\Tests\Util\TestHelper;
+use Pimcore\Tests\Support\Test\ModelTestCase;
+use Pimcore\Tests\Support\Util\TestHelper;
 
 /**
  * Class MultipleAssigmentTest
  *
  * @package Pimcore\Tests\Model\Relations
+ *
  * @group model.relations.multipleassignment
  */
 class MultipleAssigmentTest extends ModelTestCase
@@ -184,7 +185,7 @@ class MultipleAssigmentTest extends ModelTestCase
         \Pimcore::collectGarbage();
 
         //reload data object from database
-        $object = MultipleAssignments::getById($id, true);
+        $object = MultipleAssignments::getById($id, ['force' => true]);
 
         $metaDataList = $object->getMultipleManyToMany();
         $this->checkMultipleAssignmentsOnMultipleManyToMany($metaDataList, 'after loading');
@@ -231,7 +232,7 @@ class MultipleAssigmentTest extends ModelTestCase
         \Pimcore::collectGarbage();
 
         //reload data object from database
-        $object = MultipleAssignments::getById($id, true);
+        $object = MultipleAssignments::getById($id, ['force' => true]);
 
         $metaDataList = $object->getMultipleManyToManyObject();
         $this->checkMultipleAssignmentsOnMultipleManyToMany($metaDataList, 'after loading');

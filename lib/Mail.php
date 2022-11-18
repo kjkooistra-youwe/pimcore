@@ -28,6 +28,7 @@ use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\Header\Headers;
 use Symfony\Component\Mime\Header\MailboxListHeader;
 use Symfony\Component\Mime\Part\AbstractPart;
+use Twig\Sandbox\SecurityError;
 
 class Mail extends Email
 {
@@ -52,8 +53,6 @@ class Mail extends Email
 
     /**
      * Contains the email document Id
-     *
-     * @var int|null
      */
     private ?int $documentId = null;
 
@@ -107,7 +106,7 @@ class Mail extends Email
     /**
      * place to store original data before modifying message when sending in debug mode
      *
-     * @var array
+     * @var array|null
      */
     private $originalData;
 
@@ -228,7 +227,7 @@ class Mail extends Email
      */
     public function doRedirectMailsToDebugMailAddresses()
     {
-        if (static::$forceDebugMode) {
+        if (self::$forceDebugMode) {
             return true;
         }
 
@@ -240,7 +239,7 @@ class Mail extends Email
      *
      * @param array $options
      *
-     * @return \Pimcore\Mail
+     * @return $this
      */
     public function setHtml2TextOptions(array $options = [])
     {
@@ -262,7 +261,7 @@ class Mail extends Email
     /**
      * Clears list of recipient email addresses
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function clearRecipients()
     {
@@ -279,7 +278,7 @@ class Mail extends Email
     /**
      * Disables email logging
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function disableLogging()
     {
@@ -291,7 +290,7 @@ class Mail extends Email
     /**
      * Enables email logging (by default it's enabled)
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function enableLogging()
     {
@@ -315,7 +314,7 @@ class Mail extends Email
      *
      * @param array $params
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function setParams(array $params)
     {
@@ -332,7 +331,7 @@ class Mail extends Email
      * @param string|int $key
      * @param mixed $value
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function setParam($key, $value)
     {
@@ -382,7 +381,7 @@ class Mail extends Email
      *
      * @param array $params
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function unsetParams(array $params)
     {
@@ -398,7 +397,7 @@ class Mail extends Email
      *
      * @param string|int $key
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function unsetParam($key)
     {
@@ -414,9 +413,9 @@ class Mail extends Email
     /**
      * Sets the settings which are defined in the Document Settings (from,to,cc,bcc,replyTo)
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
-    private function setDocumentSettings()
+    private function setDocumentSettings(): static
     {
         $document = $this->getDocument();
 
@@ -477,7 +476,7 @@ class Mail extends Email
      *
      * @param  MailerInterface|null $mailer
      *
-     * @return \Pimcore\Mail Provides fluent interface
+     * @return $this Provides fluent interface
      */
     public function send(MailerInterface $mailer = null)
     {
@@ -511,7 +510,7 @@ class Mail extends Email
      *
      * @param MailerInterface|null $mailer
      *
-     * @return \Pimcore\Mail
+     * @return $this
      *
      * @throws \Exception
      */
@@ -593,11 +592,6 @@ class Mail extends Email
         return $this;
     }
 
-    /**
-     * @param array $addresses
-     *
-     * @return array
-     */
     private function filterLogAddresses(array $addresses): array
     {
         foreach ($addresses as $addrKey => $address) {
@@ -617,11 +611,6 @@ class Mail extends Email
         return $addresses;
     }
 
-    /**
-     * @param array $recipients
-     *
-     * @return array
-     */
     private function getDebugMailRecipients(array $recipients): array
     {
         $headers = $this->getHeaders();
@@ -646,17 +635,23 @@ class Mail extends Email
         return $recipients;
     }
 
-    /**
-     * @param string $string
-     *
-     * @return string
-     */
-    private function renderParams(string $string): string
+    private function renderParams(string $string, string $context): string
     {
-        $twig = \Pimcore::getContainer()->get('twig');
-        $template = $twig->createTemplate($string);
+        $templatingEngine = \Pimcore::getContainer()->get('pimcore.templating.engine.delegating');
 
-        return $template->render($this->getParams());
+        try {
+            $twig = $templatingEngine->getTwigEnvironment(true);
+            $template = $twig->createTemplate($string);
+
+            return $template->render($this->getParams());
+        } catch (SecurityError $e) {
+            Logger::err((string) $e);
+
+            throw new \Exception(sprintf('Failed rendering the %s: %s. Please check your twig sandbox security policy or contact the administrator.',
+                $context, substr($e->getMessage(), 0, strpos($e->getMessage(), ' in "__string'))));
+        } finally {
+            $templatingEngine->disableSandboxExtensionFromTwigEnvironment();
+        }
     }
 
     /**
@@ -675,7 +670,7 @@ class Mail extends Email
         }
 
         if ($subject) {
-            return $this->renderParams($subject);
+            return $this->renderParams($subject, 'subject');
         }
 
         return '';
@@ -706,7 +701,7 @@ class Mail extends Email
 
         $content = null;
         if ($html) {
-            $content = $this->renderParams($html);
+            $content = $this->renderParams($html, 'body');
 
             // modifying the content e.g set absolute urls...
             $content = MailHelper::embedAndModifyCss($content, $this->getDocument());
@@ -730,7 +725,7 @@ class Mail extends Email
 
         //if the content was manually set with $obj->text(); this content will be used
         if ($text) {
-            $content = $this->renderParams($text);
+            $content = $this->renderParams($text, 'body');
         } else {
             //creating text version from html email
             try {
@@ -751,7 +746,7 @@ class Mail extends Email
 
                 $content = $this->html2Text($htmlContent);
             } catch (\Exception $e) {
-                Logger::err($e);
+                Logger::err((string) $e);
                 $content = '';
             }
         }
@@ -818,7 +813,7 @@ class Mail extends Email
      *
      * @internal
      *
-     * @return \Pimcore\Mail
+     * @return $this
      */
     public function preventDebugInformationAppending()
     {
@@ -839,12 +834,7 @@ class Mail extends Email
         return $this->preventDebugInformationAppending;
     }
 
-    /**
-     * @param string $htmlContent
-     *
-     * @return string
-     */
-    private function html2Text($htmlContent)
+    private function html2Text(string $htmlContent): string
     {
         $content = '';
 
@@ -862,35 +852,9 @@ class Mail extends Email
     }
 
     /**
-     * @deprecated use text() instead. Will be removed in Pimcore 11
-     *
-     * @param string $bodyText
-     * @param string $charset
-     *
-     * @return $this
-     */
-    public function setBodyText($bodyText, string $charset = 'utf-8')
-    {
-        return $this->text($bodyText, $charset);
-    }
-
-    /**
-     * @deprecated use html() instead. Will be removed in Pimcore 11
-     *
-     * @param string $body
-     * @param string $charset
-     *
-     * @return \Pimcore\Mail
-     */
-    public function setBodyHtml($body, string $charset = 'utf-8')
-    {
-        return $this->html($body, $charset);
-    }
-
-    /**
      * @internal
      *
-     * @return array
+     * @return array|null
      */
     public function getOriginalData()
     {
@@ -900,25 +864,11 @@ class Mail extends Email
     /**
      * @internal
      *
-     * @param array $originalData
+     * @param array|null $originalData
      */
     public function setOriginalData($originalData)
     {
         $this->originalData = $originalData;
-    }
-
-    /**
-     * @deprecated use attach() instead. Will be removed in Pimcore 11
-     *
-     * @param string $data
-     * @param string|null $mimeType
-     * @param string|null $filename
-     *
-     * @return $this
-     */
-    public function createAttachment($data, $mimeType = null, $filename = null)
-    {
-        return $this->attach($data, $filename, $mimeType);
     }
 
     /**
@@ -944,25 +894,9 @@ class Mail extends Email
     }
 
     /**
-     * Set the subject of this message.
-     *
-     * @param string $subject
-     *
-     * @return $this
-     */
-    public function setSubject($subject)
-    {
-        return $this->subject($subject);
-    }
-
-    /**
      * format Address from old params(string $address, string $name)
-     *
-     * @param string|array $addresses
-     *
-     * @return array
      */
-    private function formatAddress(...$addresses)
+    private function formatAddress(string|array ...$addresses): array
     {
         //old param style with string name as second param
         if (isset($addresses[1]) && is_string($addresses[1])) {
@@ -974,8 +908,10 @@ class Mail extends Email
 
     /**
      * {@inheritdoc}
+     *
+     * @return $this
      */
-    public function addTo(...$addresses)
+    public function addTo(...$addresses): static
     {
         $addresses = $this->formatAddress(...$addresses);
 
@@ -984,8 +920,10 @@ class Mail extends Email
 
     /**
      * {@inheritdoc}
+     *
+     * @return $this
      */
-    public function addCc(...$addresses)
+    public function addCc(...$addresses): static
     {
         $addresses = $this->formatAddress(...$addresses);
 
@@ -994,8 +932,10 @@ class Mail extends Email
 
     /**
      * {@inheritdoc}
+     *
+     * @return $this
      */
-    public function addBcc(...$addresses)
+    public function addBcc(...$addresses): static
     {
         $addresses = $this->formatAddress(...$addresses);
 
@@ -1004,8 +944,10 @@ class Mail extends Email
 
     /**
      * {@inheritdoc}
+     *
+     * @return $this
      */
-    public function addFrom(...$addresses)
+    public function addFrom(...$addresses): static
     {
         $addresses = $this->formatAddress(...$addresses);
 
@@ -1014,8 +956,10 @@ class Mail extends Email
 
     /**
      * {@inheritdoc}
+     *
+     * @return $this
      */
-    public function addReplyTo(...$addresses)
+    public function addReplyTo(...$addresses): static
     {
         $addresses = $this->formatAddress(...$addresses);
 

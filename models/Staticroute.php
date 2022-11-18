@@ -66,7 +66,7 @@ final class Staticroute extends AbstractModel
     /**
      * @var array
      */
-    protected $siteId;
+    protected $siteId = [];
 
     /**
      * @var array
@@ -142,7 +142,7 @@ final class Staticroute extends AbstractModel
         $cacheKey = 'staticroute_' . $id;
 
         try {
-            $route = \Pimcore\Cache\Runtime::get($cacheKey);
+            $route = \Pimcore\Cache\RuntimeCache::get($cacheKey);
             if (!$route) {
                 throw new \Exception('Route in registry is null');
             }
@@ -151,7 +151,7 @@ final class Staticroute extends AbstractModel
                 $route = new self();
                 $route->setId($id);
                 $route->getDao()->getById();
-                \Pimcore\Cache\Runtime::set($cacheKey, $route);
+                \Pimcore\Cache\RuntimeCache::set($cacheKey, $route);
             } catch (NotFoundException $e) {
                 return null;
             }
@@ -210,14 +210,17 @@ final class Staticroute extends AbstractModel
 
     /**
      * Get the defaults defined in a string as array
-     *
-     * @return array
      */
-    private function getDefaultsArray()
+    private function getDefaultsArray(): array
     {
+        $defaultsString = $this->getDefaults();
+        if (empty($defaultsString)) {
+            return [];
+        }
+
         $defaults = [];
 
-        $t = explode('|', $this->getDefaults());
+        $t = explode('|', $defaultsString);
         foreach ($t as $v) {
             $d = explode('=', $v);
             if (strlen($d[0]) > 0 && strlen($d[1]) > 0) {
@@ -389,13 +392,17 @@ final class Staticroute extends AbstractModel
     }
 
     /**
-     * @param string|array $siteId
+     * @param string|array|null $siteId
      *
      * @return $this
      */
     public function setSiteId($siteId)
     {
         $result = [];
+
+        if (null === $siteId) {
+            $siteId = [];
+        }
 
         if (!is_array($siteId)) {
             // backwards compatibility
@@ -438,7 +445,7 @@ final class Staticroute extends AbstractModel
      * @param array $urlOptions
      * @param bool $encode
      *
-     * @return mixed|string
+     * @return string
      */
     public function assemble(array $urlOptions = [], $encode = true)
     {
@@ -543,7 +550,6 @@ final class Staticroute extends AbstractModel
     public function match($path, $params = [])
     {
         if (@preg_match($this->getPattern(), $path)) {
-
             // check for site
             if ($this->getSiteId()) {
                 if (!Site::isSiteRequest()) {

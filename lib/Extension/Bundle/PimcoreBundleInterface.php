@@ -50,13 +50,6 @@ interface PimcoreBundleInterface extends BundleInterface
     public function getInstaller();
 
     /**
-     * Get path to include in admin iframe
-     *
-     * @return string|RouteReferenceInterface|null
-     */
-    public function getAdminIframePath();
-
-    /**
      * Get javascripts to include in admin interface
      *
      * Strings will be directly included, RouteReferenceInterface objects are used to generate an URL through the

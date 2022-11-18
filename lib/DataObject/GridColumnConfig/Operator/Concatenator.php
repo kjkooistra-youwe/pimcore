@@ -25,10 +25,7 @@ final class Concatenator extends AbstractOperator
      */
     private $glue;
 
-    /**
-     * @var bool
-     */
-    private $forceValue;
+    private bool $forceValue;
 
     /**
      * {@inheritdoc}
@@ -54,17 +51,19 @@ final class Concatenator extends AbstractOperator
             $hasValue = false;
         }
 
-        $childs = $this->getChilds();
+        $children = $this->getChildren();
         $valueArray = [];
 
-        foreach ($childs as $c) {
+        foreach ($children as $c) {
             $childResult = $c->getLabeledValue($element);
             $childValues = (array)($childResult->value ?? []);
 
             foreach ($childValues as $value) {
                 if (!$hasValue) {
-                    if (!empty($value) || (method_exists($value, 'isEmpty') && !$value->isEmpty())) {
-                        $hasValue = true;
+                    if (is_object($value) && method_exists($value, 'isEmpty')) {
+                        $hasValue = !$value->isEmpty();
+                    } else {
+                        $hasValue = !empty($value);
                     }
                 }
 

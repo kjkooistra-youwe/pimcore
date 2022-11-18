@@ -31,7 +31,7 @@ class Dao extends Model\Dao\AbstractDao
      */
     public function getById($id)
     {
-        $data = $this->db->fetchRow('SELECT * FROM schedule_tasks WHERE id = ?', $id);
+        $data = $this->db->fetchAssociative('SELECT * FROM schedule_tasks WHERE id = ?', [$id]);
         if (!$data) {
             throw new Model\Exception\NotFoundException('there is no task for the requested id');
         }
@@ -53,7 +53,7 @@ class Dao extends Model\Dao\AbstractDao
     public function create()
     {
         $this->db->insert('schedule_tasks', []);
-        $this->model->setId($this->db->lastInsertId());
+        $this->model->setId((int) $this->db->lastInsertId());
     }
 
     /**

@@ -35,6 +35,7 @@ final class Console
 
     /**
      * @deprecated since v.6.9.
+     *
      * @static
      *
      * @return string "windows" or "unix"
@@ -103,7 +104,7 @@ final class Console
                 $paths = explode(PATH_SEPARATOR, $systemConfig['path_variable']);
             }
         } catch (\Exception $e) {
-            Logger::warning($e);
+            Logger::warning((string) $e);
         }
 
         array_push($paths, '');
@@ -231,7 +232,7 @@ final class Console
      * @param string $script
      * @param array $arguments
      * @param string|null $outputFile
-     * @param int|null $timeout
+     * @param float|null $timeout
      *
      * @return string
      */
@@ -278,6 +279,7 @@ final class Console
 
     /**
      * @deprecated since v.6.9. Use Symfony\Component\Process\Process instead. For long running background tasks use queues.
+     *
      * @static
      *
      * @param string $cmd
@@ -299,6 +301,7 @@ final class Console
 
     /**
      * @deprecated since v.6.9. For long running background tasks use queues.
+     *
      * @static
      *
      * @param string $cmd
@@ -349,6 +352,7 @@ final class Console
 
     /**
      * @deprecated since v.6.9. For long running background tasks use queues.
+     *
      * @static
      *
      * @param string $cmd
@@ -386,7 +390,7 @@ final class Console
             if (is_string($cmd)) {
                 $cmd = $nice . ' -n 19 ' . $cmd;
             } elseif (is_array($cmd)) {
-                array_unshift($cmd, $nice, '-n 19');
+                array_unshift($cmd, $nice, '-n', '19');
             }
         }
     }

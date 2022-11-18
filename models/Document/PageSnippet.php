@@ -27,7 +27,7 @@ use Pimcore\Model\Document\Editable\Loader\EditableLoaderInterface;
 
 /**
  * @method \Pimcore\Model\Document\PageSnippet\Dao getDao()
- * @method \Pimcore\Model\Version|null getLatestVersion($userId = null)
+ * @method \Pimcore\Model\Version|null getLatestVersion(?int $userId = null)
  */
 abstract class PageSnippet extends Model\Document
 {
@@ -36,14 +36,14 @@ abstract class PageSnippet extends Model\Document
     /**
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     protected $controller;
 
     /**
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     protected $template;
 
@@ -75,8 +75,6 @@ abstract class PageSnippet extends Model\Document
 
     /**
      * @internal
-     *
-     * @var bool
      */
     protected bool $supportsContentMaster = true;
 
@@ -89,10 +87,8 @@ abstract class PageSnippet extends Model\Document
 
     /**
      * @internal
-     *
-     * @var null|bool
      */
-    protected $staticGeneratorEnabled = null;
+    protected ?bool $staticGeneratorEnabled = null;
 
     /**
      * @internal
@@ -111,7 +107,7 @@ abstract class PageSnippet extends Model\Document
     /**
      * {@inheritdoc}
      */
-    public function save()
+    public function save(array $parameters = []): static
     {
         // checking the required editables renders the document, so this needs to be
         // before the database transaction, see also https://github.com/pimcore/pimcore/issues/8992
@@ -120,7 +116,7 @@ abstract class PageSnippet extends Model\Document
             throw new Model\Element\ValidationException('Prevented publishing document - missing values for required editables');
         }
 
-        return parent::save();
+        return parent::save($parameters);
     }
 
     /**
@@ -128,13 +124,14 @@ abstract class PageSnippet extends Model\Document
      */
     protected function update($params = [])
     {
-
         // update elements
-        $this->getEditables();
+        $editables = $this->getEditables();
         $this->getDao()->deleteAllEditables();
 
-        if (is_array($this->getEditables()) && count($this->getEditables()) > 0) {
-            foreach ($this->getEditables() as $name => $editable) {
+        parent::update($params);
+
+        if (is_array($editables) && count($editables)) {
+            foreach ($editables as $editable) {
                 if (!$editable->getInherited()) {
                     $editable->setDao(null);
                     $editable->setDocumentId($this->getId());
@@ -144,12 +141,8 @@ abstract class PageSnippet extends Model\Document
         }
 
         // scheduled tasks are saved in $this->saveVersion();
-
-        // update this
-        parent::update($params);
-
         // save version if needed
-        $this->saveVersion(false, false, isset($params['versionNote']) ? $params['versionNote'] : null);
+        $this->saveVersion(false, false, $params['versionNote'] ?? null);
     }
 
     /**
@@ -285,7 +278,7 @@ abstract class PageSnippet extends Model\Document
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getTemplate()
     {
@@ -293,7 +286,7 @@ abstract class PageSnippet extends Model\Document
     }
 
     /**
-     * @param string $controller
+     * @param string|null $controller
      *
      * @return $this
      */
@@ -305,7 +298,7 @@ abstract class PageSnippet extends Model\Document
     }
 
     /**
-     * @param string $template
+     * @param string|null $template
      *
      * @return $this
      */
@@ -414,28 +407,39 @@ abstract class PageSnippet extends Model\Document
     }
 
     /**
-     * @param int|null $contentMasterDocumentId
+     * @param int|string|null $contentMasterDocumentId
+     * @param bool $validate
      *
      * @return $this
      *
      * @throws \Exception
      */
-    public function setContentMasterDocumentId($contentMasterDocumentId)
+    public function setContentMasterDocumentId($contentMasterDocumentId, bool $validate = false)
     {
         // this is that the path is automatically converted to ID => when setting directly from admin UI
         if (!is_numeric($contentMasterDocumentId) && !empty($contentMasterDocumentId)) {
-            $contentMasterDocument = Document::getByPath($contentMasterDocumentId);
-            if ($contentMasterDocument instanceof self) {
+            if ($contentMasterDocument = Document\PageSnippet::getByPath($contentMasterDocumentId)) {
                 $contentMasterDocumentId = $contentMasterDocument->getId();
+            } else {
+                // Content master document was deleted or don't exist
+                $contentMasterDocumentId = null;
             }
         }
 
-        if (empty($contentMasterDocumentId)) {
-            $contentMasterDocument = null;
-        }
-
-        if ($contentMasterDocumentId && $contentMasterDocumentId == $this->getId()) {
-            throw new \Exception('You cannot use the current document as a master document, please choose a different one.');
+        // Don't set the content master document if the document is already part of the master document chain
+        if ($contentMasterDocumentId) {
+            if ($currentContentMasterDocument = Document\PageSnippet::getById($contentMasterDocumentId)) {
+                $maxDepth = 20;
+                do {
+                    if ($currentContentMasterDocument->getId() === $this->getId()) {
+                        throw new \Exception('This document is already part of the master document chain, please choose a different one.');
+                    }
+                    $currentContentMasterDocument = $currentContentMasterDocument->getContentMasterDocument();
+                } while ($currentContentMasterDocument && $maxDepth-- > 0 && $validate);
+            } else {
+                // Content master document was deleted or don't exist
+                $contentMasterDocumentId = null;
+            }
         }
 
         $this->contentMasterDocumentId = $contentMasterDocumentId;
@@ -452,26 +456,26 @@ abstract class PageSnippet extends Model\Document
     }
 
     /**
-     * @return Document|null
+     * @return Document\PageSnippet|null
      */
     public function getContentMasterDocument()
     {
         if ($masterDocumentId = $this->getContentMasterDocumentId()) {
-            return Document::getById($masterDocumentId);
+            return Document\PageSnippet::getById($masterDocumentId);
         }
 
         return null;
     }
 
     /**
-     * @param Document $document
+     * @param Document\PageSnippet|null $document
      *
      * @return $this
      */
     public function setContentMasterDocument($document)
     {
         if ($document instanceof self) {
-            $this->setContentMasterDocumentId($document->getId());
+            $this->setContentMasterDocumentId($document->getId(), true);
         } else {
             $this->setContentMasterDocumentId(null);
         }

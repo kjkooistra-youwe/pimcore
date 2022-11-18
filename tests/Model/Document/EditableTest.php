@@ -15,17 +15,17 @@
 
 namespace Pimcore\Tests\Model\Document;
 
-use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\Document\Editable\Input;
 use Pimcore\Model\Document\Page;
-use Pimcore\Tests\Helper\Document\TestDataHelper;
-use Pimcore\Tests\Test\ModelTestCase;
-use Pimcore\Tests\Util\TestHelper;
+use Pimcore\Tests\Support\Helper\Document\TestDataHelper;
+use Pimcore\Tests\Support\Test\ModelTestCase;
+use Pimcore\Tests\Support\Util\TestHelper;
 
 /**
  * Class ElementTest
  *
  * @package Pimcore\Tests\Model\Document
+ *
  * @group model.document.document
  */
 class EditableTest extends ModelTestCase
@@ -172,7 +172,7 @@ class EditableTest extends ModelTestCase
     /**
      * Calls fill* methods on the object as needed in test
      *
-     * @param Concrete $object
+     * @param Page $document
      * @param array|string $fields
      * @param array $returnData
      */
@@ -218,7 +218,7 @@ class EditableTest extends ModelTestCase
 
     public function reloadPage()
     {
-        $this->testPage = Page::getById($this->testPage->getId(), true);
+        $this->testPage = Page::getById($this->testPage->getId(), ['force' => true]);
     }
 
     public function testSelect()
@@ -260,5 +260,13 @@ class EditableTest extends ModelTestCase
 
         $this->reloadPage();
         $this->testDataHelper->assertWysiwyg($this->testPage, 'wysiwyg', $this->seed);
+    }
+
+    public function testBlock()
+    {
+        $this->createTestPage('block');
+
+        $this->reloadPage();
+        $this->testDataHelper->assertBlock($this->testPage, 'block', $this->seed);
     }
 }

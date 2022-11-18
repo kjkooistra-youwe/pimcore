@@ -26,16 +26,28 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
     use Model\DataObject\Traits\SimpleComparisonTrait;
     use Extension\ColumnType {
         getColumnType as public genericGetColumnType;
-
     }
     use Extension\QueryColumnType {
         getQueryColumnType as public genericGetQueryColumnType;
-
     }
 
     const DECIMAL_SIZE_DEFAULT = 64;
 
     const DECIMAL_PRECISION_DEFAULT = 0;
+
+    /**
+     * @var array
+     */
+    public static $validFilterOperators = [
+        '=',
+        'IS',
+        'IS NOT',
+        '!=',
+        '<',
+        '>',
+        '>=',
+        '<=',
+    ];
 
     /**
      * Static type of this element
@@ -56,7 +68,7 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
     /**
      * @internal
      *
-     * @var float
+     * @var float|int|string|null
      */
     public $defaultValue;
 
@@ -80,17 +92,13 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $integer = false;
+    public bool $integer = false;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $unsigned = false;
+    public bool $unsigned = false;
 
     /**
      * @internal
@@ -108,10 +116,8 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $unique;
+    public bool $unique = false;
 
     /**
      * This is the x part in DECIMAL(x, y) and denotes the total amount of digits. In MySQL this is called precision
@@ -126,7 +132,7 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
 
     /**
      * This is the y part in DECIMAL(x, y) and denotes amount of digits after a comma. In MySQL this is called scale. See
-     * commend on decimalSize.
+     * comment on decimalSize.
      *
      * @internal
      *
@@ -134,9 +140,6 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
      */
     public $decimalPrecision;
 
-    /**
-     * @return string
-     */
     private function getPhpdocType(): string
     {
         if ($this->getInteger()) {
@@ -174,7 +177,7 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
     }
 
     /**
-     * @return int|null
+     * @return float|int|string|null
      */
     public function getDefaultValue()
     {
@@ -186,7 +189,7 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
     }
 
     /**
-     * @param int $defaultValue
+     * @param float|int|string|null $defaultValue
      *
      * @return $this
      */
@@ -316,7 +319,7 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
      */
     public function setUnique($unique)
     {
-        $this->unique = $unique;
+        $this->unique = (bool) $unique;
     }
 
     /**
@@ -351,17 +354,11 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
         return $this->genericGetQueryColumnType();
     }
 
-    /**
-     * @return bool
-     */
     private function isDecimalType(): bool
     {
         return null !== $this->getDecimalSize() || null !== $this->getDecimalPrecision();
     }
 
-    /**
-     * @return string
-     */
     private function buildDecimalColumnType(): string
     {
         // decimalPrecision already existed in earlier versions to denote the amount of digits after the
@@ -423,13 +420,14 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
     }
 
     /**
-     * @see ResourcePersistenceAwareInterface::getDataFromResource
-     *
      * @param float|int|string $data
      * @param null|Model\DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return float|int|string
+     * @return float|int|string|null
+     *
+     * @see ResourcePersistenceAwareInterface::getDataFromResource
+     *
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
@@ -437,7 +435,7 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
             return $this->toNumeric($data);
         }
 
-        return $data;
+        return null;
     }
 
     /**
@@ -547,6 +545,39 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
     }
 
     /**
+     * returns sql query statement to filter according to this data types value(s)
+     *
+     * @param string $value
+     * @param string $operator
+     * @param array $params optional params used to change the behavior
+     *
+     * @return string
+     */
+    public function getFilterConditionExt($value, $operator, $params = [])
+    {
+        $db = \Pimcore\Db::get();
+        $name = $params['name'] ?: $this->name;
+        $key = $db->quoteIdentifier($name);
+        if (!empty($params['brickPrefix'])) {
+            $key = $params['brickPrefix'].$key;
+        }
+
+        if ($value === 'NULL') {
+            if ($operator === '=') {
+                $operator = 'IS';
+            } elseif ($operator === '!=') {
+                $operator = 'IS NOT';
+            }
+        }
+
+        if (is_numeric($value) && in_array($operator, self::$validFilterOperators)) {
+            return $key . ' ' . $operator . ' ' . $value . ' ';
+        }
+
+        return '';
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function isDiffChangeAllowed($object, $params = [])
@@ -561,15 +592,10 @@ class Numeric extends Data implements ResourcePersistenceAwareInterface, QueryRe
      */
     public function isEmpty($data)
     {
-        return strlen($data) < 1;
+        return !is_numeric($data);
     }
 
-    /**
-     * @param string $value
-     *
-     * @return float|int|string
-     */
-    private function toNumeric($value)
+    private function toNumeric(mixed $value): float|int|string
     {
         $value = str_replace(',', '.', (string) $value);
 

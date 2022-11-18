@@ -33,30 +33,18 @@ final class Config
 
     private static ?LocationAwareConfigRepository $locationAwareConfigRepository = null;
 
-    /**
-     * @deprecated Will be removed in Pimcore 11
-     */
-    private const LEGACY_FILE = 'perspectives.php';
-
-    /**
-     * @return LocationAwareConfigRepository
-     */
-    private static function getRepository()
+    private static function getRepository(): LocationAwareConfigRepository
     {
         if (!self::$locationAwareConfigRepository) {
-            $config = [];
             $containerConfig = \Pimcore::getContainer()->getParameter('pimcore.config');
-            if (isset($containerConfig[self::CONFIG_ID]['definitions'])) {
-                $config = $containerConfig[self::CONFIG_ID]['definitions'];
-            }
+            $config = $containerConfig[self::CONFIG_ID]['definitions'];
 
             self::$locationAwareConfigRepository = new LocationAwareConfigRepository(
                 $config,
                 'pimcore_perspectives',
-                PIMCORE_CONFIGURATION_DIRECTORY . '/perspectives',
-                'PIMCORE_WRITE_TARGET_PERSPECTIVES',
-                null,
-                self::LEGACY_FILE,
+                $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_PERSPECTIVES'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/perspectives',
+                'PIMCORE_WRITE_TARGET_PERSPECTIVES'
+
             );
         }
 
@@ -72,16 +60,16 @@ final class Config
     }
 
     /**
-     * @return \Pimcore\Config\Config
+     * @return array
      */
-    public static function get(): \Pimcore\Config\Config
+    public static function get(): array
     {
         $config = [];
         $repository = self::getRepository();
         $keys = $repository->fetchAllKeys();
         foreach ($keys as $key) {
             $configKey = $repository->loadConfigByKey(($key));
-            if (isset($configKey) && is_array(($configKey))) {
+            if (isset($configKey[0])) {
                 $configKey[0]['writeable'] = $repository->isWriteable($key, $configKey[1]);
                 $config = array_merge($config, [$key => $configKey[0]]);
             }
@@ -92,7 +80,7 @@ final class Config
             $config['default']['writeable'] = $repository->isWriteable();
         }
 
-        return new \Pimcore\Config\Config($config);
+        return $config;
     }
 
     /**
@@ -148,7 +136,7 @@ final class Config
                 'treeContextMenu' => [
                     'document' => [
                         'items' => [
-                            'addPrintPage' => \Pimcore\Config::getWeb2PrintConfig()->get('enableInDefaultView') ? true : false, // hide add print documents by default
+                            'addPrintPage' => \Pimcore\Config::getWeb2PrintConfig()['enableInDefaultView'] ? true : false, // hide add print documents by default
                         ],
                     ],
                 ],
@@ -233,7 +221,7 @@ final class Config
 
         $currentConfigName = $currentUser->getActivePerspective() ? $currentUser->getActivePerspective() : $currentUser->getFirstAllowedPerspective();
 
-        $config = self::get()->toArray();
+        $config = self::get();
         $result = [];
 
         if (isset($config[$currentConfigName])) {
@@ -258,6 +246,7 @@ final class Config
 
         $event = new GenericEvent(null, [
             'result' => $result,
+            'configName' => $currentConfigName,
         ]);
         \Pimcore::getEventDispatcher()->dispatch($event, AdminEvents::PERSPECTIVE_POST_GET_RUNTIME);
 
@@ -273,7 +262,7 @@ final class Config
      */
     protected static function getRuntimeElementTreeConfig($name)
     {
-        $masterConfig = self::get()->toArray();
+        $masterConfig = self::get();
 
         $config = $masterConfig[$name] ?? [];
 
@@ -354,11 +343,11 @@ final class Config
     public static function getAvailablePerspectives($user)
     {
         $currentConfigName = null;
-        $masterConfig = self::get()->toArray();
+        $masterConfig = self::get();
 
         if ($user instanceof User) {
             if ($user->isAdmin()) {
-                $config = self::get()->toArray();
+                $config = self::get();
             } else {
                 $config = [];
                 $roleIds = $user->getRoles();
@@ -384,7 +373,7 @@ final class Config
                     }
                 }
                 if (!$config) {
-                    $config = self::get()->toArray();
+                    $config = self::get();
                 }
             }
 
@@ -407,7 +396,7 @@ final class Config
                 $currentConfigName = reset($configNames);
             }
         } else {
-            $config = self::get()->toArray();
+            $config = self::get();
         }
 
         $result = [];

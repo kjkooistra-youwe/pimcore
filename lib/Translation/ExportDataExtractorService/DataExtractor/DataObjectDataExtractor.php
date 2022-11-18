@@ -47,6 +47,7 @@ class DataObjectDataExtractor extends AbstractElementDataExtractor
      * @param TranslationItem $translationItem
      * @param string $sourceLanguage
      * @param string[] $targetLanguages
+     * @param array|null $exportAttributes
      *
      * @return AttributeSet
      *
@@ -69,11 +70,7 @@ class DataObjectDataExtractor extends AbstractElementDataExtractor
     /**
      * used to extract data either with enabled or disabled inheritance
      *
-     * @param TranslationItem $translationItem
-     * @param string $sourceLanguage
      * @param string[] $targetLanguages
-     *
-     * @return AttributeSet
      *
      * @throws \Exception
      */
@@ -240,7 +237,6 @@ class DataObjectDataExtractor extends AbstractElementDataExtractor
         $fieldDefinitions = $object->getClass()->getFieldDefinitions();
         foreach ($fieldDefinitions as $fd) {
             if ($fd instanceof DataObject\ClassDefinition\Data\Block) {
-
                 /** @var DataObject\ClassDefinition\Data\Localizedfields|null $blockLocalizedFieldDefinition */
                 $blockLocalizedFieldDefinition = $fd->getFieldDefinition('localizedfields');
                 if ($blockLocalizedFieldDefinition) {
@@ -257,7 +253,6 @@ class DataObjectDataExtractor extends AbstractElementDataExtractor
                             if ($blockItems) {
                                 foreach ($blockItems as $blockItem) {
                                     if ($blockItem->getType() == 'localizedfields') {
-
                                         /** @var DataObject\Localizedfield $blockItemData */
                                         $blockItemData = $blockItem->getData();
 

@@ -15,6 +15,7 @@
 
 namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 
+use Pimcore\Db\Helper;
 use Pimcore\Model;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data;
@@ -68,21 +69,21 @@ class Multiselect extends Data implements
     /**
      * @internal
      *
-     * @var int
+     * @var string|int
      */
     public $height = 0;
 
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $maxItems;
 
     /**
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     public $renderType;
 
@@ -91,7 +92,7 @@ class Multiselect extends Data implements
      *
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     public $optionsProviderClass;
 
@@ -100,7 +101,7 @@ class Multiselect extends Data implements
      *
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     public $optionsProviderData;
 
@@ -124,10 +125,8 @@ class Multiselect extends Data implements
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $dynamicOptions = false;
+    public bool $dynamicOptions = false;
 
     /**
      * @return array
@@ -196,7 +195,7 @@ class Multiselect extends Data implements
     }
 
     /**
-     * @param int|string|null $maxItems
+     * @param int|null $maxItems
      *
      * @return $this
      */
@@ -208,7 +207,7 @@ class Multiselect extends Data implements
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getMaxItems()
     {
@@ -228,7 +227,7 @@ class Multiselect extends Data implements
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getRenderType()
     {
@@ -256,7 +255,7 @@ class Multiselect extends Data implements
     /**
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
-     * @param string $data
+     * @param string|null $data
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
@@ -264,7 +263,7 @@ class Multiselect extends Data implements
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
-        if (strlen($data)) {
+        if (strlen((string) $data)) {
             return explode(',', $data);
         }
 
@@ -312,11 +311,36 @@ class Multiselect extends Data implements
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string
+     * @return array|string
      */
     public function getDataForGrid($data, $object = null, $params = [])
     {
-        return $this->getDataForEditmode($data, $object, $params);
+        $optionsProvider = DataObject\ClassDefinition\Helper\OptionsProviderResolver::resolveProvider(
+            $this->getOptionsProviderClass(),
+            DataObject\ClassDefinition\Helper\OptionsProviderResolver::MODE_MULTISELECT
+        );
+
+        if ($optionsProvider === null) {
+            return $this->getDataForEditmode($data, $object, $params);
+        }
+
+        $context = $params['context'] ?? [];
+        $context['object'] = $object;
+        if ($object) {
+            $context['class'] = $object->getClass();
+        }
+
+        $context['fieldname'] = $this->getName();
+        $options = $optionsProvider->{'getOptions'}($context, $this);
+        $this->setOptions($options);
+
+        if (isset($params['purpose']) && $params['purpose'] === 'editmode') {
+            $result = $data;
+        } else {
+            $result = ['value' => $data, 'options' => $this->getOptions()];
+        }
+
+        return $result;
     }
 
     /**
@@ -416,7 +440,7 @@ class Multiselect extends Data implements
     /**
      * returns sql query statement to filter according to this data types value(s)
      *
-     * @param string $value
+     * @param mixed $value
      * @param string $operator
      * @param array $params optional params used to change the behavior
      *
@@ -431,6 +455,14 @@ class Multiselect extends Data implements
             $key = $db->quoteIdentifier($name);
             if (!empty($params['brickPrefix'])) {
                 $key = $params['brickPrefix'].$key;
+            }
+
+            if (str_contains($name, 'cskey') && is_array($value) && !empty($value)) {
+                $values = array_map(function ($val) use ($db) {
+                    return $db->quote('%' .Helper::escapeLike($val). '%');
+                }, $value);
+
+                return $key . ' LIKE ' . implode(' OR ' . $key . ' LIKE ', $values);
             }
 
             $value = "'%,".$value.",%'";
@@ -497,7 +529,7 @@ class Multiselect extends Data implements
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getOptionsProviderClass()
     {
@@ -505,7 +537,7 @@ class Multiselect extends Data implements
     }
 
     /**
-     * @param string $optionsProviderClass
+     * @param string|null $optionsProviderClass
      */
     public function setOptionsProviderClass($optionsProviderClass)
     {
@@ -513,7 +545,7 @@ class Multiselect extends Data implements
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getOptionsProviderData()
     {
@@ -521,7 +553,7 @@ class Multiselect extends Data implements
     }
 
     /**
-     * @param string $optionsProviderData
+     * @param string|null $optionsProviderData
      */
     public function setOptionsProviderData($optionsProviderData)
     {
@@ -532,7 +564,7 @@ class Multiselect extends Data implements
      * @param array|null $existingData
      * @param array $additionalData
      *
-     * @return mixed
+     * @return array
      */
     public function appendData($existingData, $additionalData)
     {
@@ -585,7 +617,7 @@ class Multiselect extends Data implements
      * @return $this
      */
     #[\ReturnTypeWillChange]
-    public function jsonSerialize()
+    public function jsonSerialize()// : static
     {
         if ($this->getOptionsProviderClass() && Service::doRemoveDynamicOptions()) {
             $this->options = null;
@@ -645,12 +677,10 @@ class Multiselect extends Data implements
      *
      * @param mixed $containerDefinition
      * @param array $params
-     *
-     * @return mixed
      */
     public function preSave($containerDefinition, $params = [])
     {
-        /** @var ?DataObject\ClassDefinition\DynamicOptionsProvider\MultiSelectOptionsProviderInterface $optionsProvider */
+        /** @var DataObject\ClassDefinition\DynamicOptionsProvider\MultiSelectOptionsProviderInterface|null $optionsProvider */
         $optionsProvider = DataObject\ClassDefinition\Helper\OptionsProviderResolver::resolveProvider(
             $this->getOptionsProviderClass(),
             DataObject\ClassDefinition\Helper\OptionsProviderResolver::MODE_MULTISELECT
@@ -678,8 +708,6 @@ class Multiselect extends Data implements
     /**
      * @param mixed $containerDefinition
      * @param array $params
-     *
-     * @return mixed
      */
     public function postSave($containerDefinition, $params = [])
     {
@@ -689,7 +717,7 @@ class Multiselect extends Data implements
     /**
      * { @inheritdoc }
      */
-    public function enrichFieldDefinition(/** array */ $context = []) /** : Data */
+    public function enrichFieldDefinition(/** array */ $context = []) /** : static */
     {
         $this->doEnrichDefinitionDefinition(null, $this->getName(),
             'fielddefinition', DataObject\ClassDefinition\Helper\OptionsProviderResolver::MODE_MULTISELECT, $context);
@@ -700,7 +728,7 @@ class Multiselect extends Data implements
     /**
      * {@inheritdoc}
      */
-    public function enrichLayoutDefinition(/*?Concrete */ $object, /**  array */ $context = []) // : self
+    public function enrichLayoutDefinition(/* ?Concrete */ $object, /* array */ $context = []) // : static
     {
         $this->doEnrichDefinitionDefinition($object, $this->getName(),
             'layout', DataObject\ClassDefinition\Helper\OptionsProviderResolver::MODE_MULTISELECT, $context);

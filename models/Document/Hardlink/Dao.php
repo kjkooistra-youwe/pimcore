@@ -37,10 +37,10 @@ class Dao extends Model\Document\Dao
             $this->model->setId($id);
         }
 
-        $data = $this->db->fetchRow("SELECT documents.*, documents_hardlink.*, tree_locks.locked FROM documents
+        $data = $this->db->fetchAssociative("SELECT documents.*, documents_hardlink.*, tree_locks.locked FROM documents
             LEFT JOIN documents_hardlink ON documents.id = documents_hardlink.id
             LEFT JOIN tree_locks ON documents.id = tree_locks.id AND tree_locks.type = 'document'
-                WHERE documents.id = ?", $this->model->getId());
+                WHERE documents.id = ?", [$this->model->getId()]);
 
         if (!empty($data['id'])) {
             $this->assignVariablesToModel($data);
@@ -56,14 +56,5 @@ class Dao extends Model\Document\Dao
         $this->db->insert('documents_hardlink', [
             'id' => $this->model->getId(),
         ]);
-    }
-
-    /**
-     * @throws \Exception
-     */
-    public function delete()
-    {
-        $this->db->delete('documents_hardlink', ['id' => $this->model->getId()]);
-        parent::delete();
     }
 }

@@ -49,14 +49,22 @@ class StaticPageGenerator
      */
     public function getStoragePath($document)
     {
-        return $document->getRealFullPath() . '.html';
+        $path = $document->getRealFullPath();
+
+        if ($document instanceof Document\Page && $document->getPrettyUrl()) {
+            $path = $document->getPrettyUrl();
+        } elseif ($path === '/') {
+            $path = '/%home';
+        }
+
+        return $path . '.html';
     }
 
     /**
      * @param Document\PageSnippet $document
      * @param array $params
      *
-     * @return bool|string
+     * @return bool
      */
     public function generate($document, $params = [])
     {

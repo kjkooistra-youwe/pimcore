@@ -7,7 +7,7 @@ The main benefit is that you have only one single translator for all your transl
 
 It automatically uses the locale specified on a document or from a fallback mechanism. 
 
-For more information, please also check out [Symfony's Translations Component](https://symfony.com/doc/5.2/translation.html). 
+For more information, please also check out [Symfony's Translations Component](https://symfony.com/doc/current/translation.html). 
 
 ![Shared Translations](../img/localization-translations.png)
 
@@ -37,7 +37,7 @@ You can also use variable interpolation in localized messages.
 </div>
 ```
 
-Parameters in translations can be wrapped in double curly braces (`{{` and `}}`) but you are free to use other placeholder wrappers as well, e.g. `%parameter%` like in the [Symfony docs](https://symfony.com/doc/5.2/translation.html#translatable-objects) also works.
+Parameters in translations can be wrapped in double curly braces (`{{` and `}}`) but you are free to use other placeholder wrappers as well, e.g. `%parameter%` like in the [Symfony docs](https://symfony.com/doc/current/translation.html#translatable-objects) also works.
 
 #### Example in a Controller
  
@@ -62,15 +62,17 @@ class ContentController extends FrontendController
 ```
 
 #### Translation Pluralization/Selection
-Since Pimcore uses Symfony Translator component in background, you can store and use the translations in ICU Message Format(supported by Symfony Translator) for Pluralization, Selection and more. [Read here](https://symfony.com/doc/5.2/translation/message_format.html)
-This can be achieved in Pimcore by selecting type "custom" on translation UI and passing required parameter in view/Controller. 
+Since Pimcore uses Symfony Translator component in background, you can store and use the translations in ICU Message Format(supported by Symfony Translator) for Pluralization, Selection and more. [Read here](https://symfony.com/doc/current/translation/message_format.html)
+This can be achieved in Pimcore by selecting type "ICU Format" on translation UI and passing required parameter in view/Controller. 
 e.g.
- - Add translation key and select type "custom".
+ - Add translation key and select type "ICU Format".
 
     ![Translation Pluralization1](../img/translation_pluralization1.png)
     
- - Click on language cell to edit and add translation in ICU format `{variable_name, function_name, function_statement}`.
-
+ - Click on language cell plain text button to edit 
+    ![Translation Pluralization1](../img/translation_pluralization1b.png)
+   
+   and add translation in ICU format `{variable_name, function_name, function_statement}`
     ![Translation Pluralization2](../img/translation_pluralization2.png)
 
  - Use in view

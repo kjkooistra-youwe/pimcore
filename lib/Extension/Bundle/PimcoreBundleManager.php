@@ -19,12 +19,13 @@ namespace Pimcore\Extension\Bundle;
 
 use Pimcore\Event\BundleManager\PathsEvent;
 use Pimcore\Event\BundleManagerEvents;
-use Pimcore\Extension\Bundle\Config\StateConfig;
 use Pimcore\Extension\Bundle\Exception\BundleNotFoundException;
 use Pimcore\Extension\Bundle\Installer\Exception\InstallationException;
 use Pimcore\HttpKernel\BundleCollection\ItemInterface;
 use Pimcore\Kernel;
 use Pimcore\Routing\RouteReferenceInterface;
+use Symfony\Component\OptionsResolver\Options;
+use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
@@ -33,10 +34,7 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  */
 class PimcoreBundleManager
 {
-    /**
-     * @var StateConfig
-     */
-    protected $stateConfig;
+    private static ?OptionsResolver $optionsResolver = null;
 
     /**
      * @var PimcoreBundleLocator
@@ -66,28 +64,20 @@ class PimcoreBundleManager
     /**
      * @var array
      */
-    protected $enabledBundles;
+    protected $manuallyRegisteredBundles;
 
     /**
-     * @var array
-     */
-    protected $manuallyRegisteredBundleState;
-
-    /**
-     * @param StateConfig $stateConfig
      * @param PimcoreBundleLocator $bundleLocator
      * @param Kernel $kernel
      * @param EventDispatcherInterface $dispatcher
      * @param RouterInterface $router
      */
     public function __construct(
-        StateConfig $stateConfig,
         PimcoreBundleLocator $bundleLocator,
         Kernel $kernel,
         EventDispatcherInterface $dispatcher,
         RouterInterface $router
     ) {
-        $this->stateConfig = $stateConfig;
         $this->bundleLocator = $bundleLocator;
         $this->kernel = $kernel;
         $this->dispatcher = $dispatcher;
@@ -95,8 +85,8 @@ class PimcoreBundleManager
     }
 
     /**
-     * List of currently active bundles from kernel. A bundle can be in this list without being enabled via extensions
-     * config file if it is registered manually on the kernel.
+     * List of currently active bundles from kernel. A bundle can be in this list, without being enabled via
+     * config file, if it is registered manually on the kernel.
      *
      * @param bool $onlyInstalled
      *
@@ -158,41 +148,31 @@ class PimcoreBundleManager
         return $this->availableBundles;
     }
 
-    /**
-     * Lists enabled bundle names
-     *
-     * @return array
-     */
-    public function getEnabledBundleNames(): array
+    public function getManuallyRegisteredBundleState(string $bundleClass): array
     {
-        $bundleNames = array_merge(
-            $this->getManuallyRegisteredBundleNames(true),
-            $this->stateConfig->getEnabledBundleNames()
-        );
+        $manuallyRegisteredBundles = $this->getManuallyRegisteredBundles();
 
-        $bundleNames = array_unique($bundleNames);
-        sort($bundleNames);
+        if (!isset($manuallyRegisteredBundles[$bundleClass])) {
+            throw new \InvalidArgumentException(sprintf('Bundle "%s" is not registered. 
+                Maybe you forgot to add it in the "config/bundles.php" or "Kernel::registerBundles()?', $bundleClass));
+        }
 
-        return $bundleNames;
+        return $manuallyRegisteredBundles[$bundleClass];
     }
 
     /**
-     * Returns names of manually registered bundles (not registered via extension manager)
-     *
-     * @param bool $onlyEnabled
-     *
-     * @return array
+     * Returns names of manually registered bundles
      */
     private function getManuallyRegisteredBundleNames(bool $onlyEnabled = false): array
     {
-        $state = $this->getManuallyRegisteredBundleState();
+        $manuallyRegisteredBundles = $this->getManuallyRegisteredBundles();
 
         if (!$onlyEnabled) {
-            return array_keys($state);
+            return array_keys($manuallyRegisteredBundles);
         }
 
         $bundleNames = [];
-        foreach ($state as $bundleName => $options) {
+        foreach ($manuallyRegisteredBundles as $bundleName => $options) {
             if ($options['enabled']) {
                 $bundleNames[] = $bundleName;
             }
@@ -202,13 +182,11 @@ class PimcoreBundleManager
     }
 
     /**
-     * Builds state infos about manually configured bundles (not registered via extension manager)
-     *
-     * @return array
+     * Builds state infos & return manually configured bundles
      */
-    private function getManuallyRegisteredBundleState()
+    private function getManuallyRegisteredBundles(): array
     {
-        if (null === $this->manuallyRegisteredBundleState) {
+        if (null === $this->manuallyRegisteredBundles) {
             $collection = $this->kernel->getBundleCollection();
             $enabledBundles = array_keys($this->getActiveBundles(false));
 
@@ -222,21 +200,56 @@ class PimcoreBundleManager
                     continue;
                 }
 
-                $bundles[$item->getBundleIdentifier()] = $this->stateConfig->normalizeOptions([
+                $bundles[$item->getBundleIdentifier()] = self::getOptionsResolver()->resolve([
                     'enabled' => in_array($item->getBundleIdentifier(), $enabledBundles),
                     'priority' => $item->getPriority(),
                     'environments' => $item->getEnvironments(),
                 ]);
             }
 
-            $this->manuallyRegisteredBundleState = $bundles;
+            $this->manuallyRegisteredBundles = $bundles;
         }
 
-        return $this->manuallyRegisteredBundleState;
+        return $this->manuallyRegisteredBundles;
+    }
+
+    private static function getOptionsResolver(): OptionsResolver
+    {
+        if (null !== self::$optionsResolver) {
+            return self::$optionsResolver;
+        }
+
+        $resolver = new OptionsResolver();
+
+        $defaults = [
+            'enabled' => false,
+            'priority' => 10,
+            'environments' => [],
+        ];
+
+        $resolver->setDefaults($defaults);
+
+        $resolver->setRequired(array_keys($defaults));
+
+        $resolver->setAllowedTypes('enabled', 'bool');
+        $resolver->setAllowedTypes('priority', 'int');
+        $resolver->setAllowedTypes('environments', 'array');
+
+        $resolver->setNormalizer('environments', function (Options $options, $value) {
+            // normalize to string and trim
+            $value = array_map(fn ($item) => trim((string) $item), $value);
+
+            // remove empty values
+            return array_filter($value, fn ($item) => !empty($item));
+        });
+
+        self::$optionsResolver = $resolver;
+
+        return self::$optionsResolver;
     }
 
     /**
-     * Determines if a bundle exists (is enabled or can be enabled)
+     * Determines if a bundle exists
      *
      * @param string|PimcoreBundleInterface $bundle
      *
@@ -305,135 +318,6 @@ class PimcoreBundleManager
         $this->validateBundleIdentifier($identifier);
 
         return in_array($identifier, $this->getManuallyRegisteredBundleNames(false));
-    }
-
-    /**
-     * Checks if a state change (enable/disable, priority, environments) is possible
-     *
-     * @param string $identifier
-     */
-    protected function validateStateChange(string $identifier)
-    {
-        if ($this->isManuallyRegistered($identifier)) {
-            throw new \LogicException(sprintf(
-                'Can\'t change state for bundle "%s" as it is programatically registered',
-                $identifier
-            ));
-        }
-    }
-
-    /**
-     * Determines if bundle is allowed to change state (can be enabled/disabled)
-     *
-     * @param string|PimcoreBundleInterface $bundle
-     *
-     * @return bool
-     */
-    public function canChangeState($bundle): bool
-    {
-        $identifier = $this->getBundleIdentifier($bundle);
-
-        $this->validateBundleIdentifier($identifier);
-
-        return !$this->isManuallyRegistered($bundle);
-    }
-
-    /**
-     * Reads bundle state from config
-     *
-     * @param string|PimcoreBundleInterface $bundle
-     *
-     * @return array
-     */
-    public function getState($bundle): array
-    {
-        $identifier = $this->getBundleIdentifier($bundle);
-
-        $this->validateBundleIdentifier($identifier);
-
-        if ($this->isManuallyRegistered($identifier)) {
-            return $this->getManuallyRegisteredBundleState()[$identifier];
-        }
-
-        return $this->stateConfig->getState($identifier);
-    }
-
-    /**
-     * Updates state for a bundle and writes it to config
-     *
-     * @param string|PimcoreBundleInterface $bundle
-     * @param array $options
-     */
-    public function setState($bundle, array $options)
-    {
-        $identifier = $this->getBundleIdentifier($bundle);
-
-        $this->validateBundleIdentifier($identifier);
-        $this->validateStateChange($identifier);
-
-        $this->stateConfig->setState($identifier, $options);
-    }
-
-    /**
-     * Batch updates bundle states
-     *
-     * @param array $states
-     */
-    public function setStates(array $states)
-    {
-        $updates = [];
-
-        foreach ($states as $bundle => $options) {
-            $identifier = $this->getBundleIdentifier($bundle);
-
-            $this->validateBundleIdentifier($identifier);
-            $this->validateStateChange($identifier);
-
-            $updates[$identifier] = $options;
-        }
-
-        $this->stateConfig->setStates($updates);
-    }
-
-    /**
-     * Enables a bundle
-     *
-     * @param string|PimcoreBundleInterface $bundle
-     * @param array $state Optional additional state config (see StateConfig)
-     */
-    public function enable($bundle, array $state = [])
-    {
-        $state = array_merge($state, [
-            'enabled' => true,
-        ]);
-
-        $this->setState($bundle, $state);
-    }
-
-    /**
-     * Disables a bundle
-     *
-     * @param string|PimcoreBundleInterface $bundle
-     */
-    public function disable($bundle)
-    {
-        $this->setState($bundle, ['enabled' => false]);
-    }
-
-    /**
-     * Determines if a bundle is enabled
-     *
-     * @param string|PimcoreBundleInterface $bundle
-     *
-     * @return bool
-     */
-    public function isEnabled($bundle): bool
-    {
-        $identifier = $this->getBundleIdentifier($bundle);
-
-        $this->validateBundleIdentifier($identifier);
-
-        return in_array($identifier, $this->getEnabledBundleNames());
     }
 
     /**
@@ -513,10 +397,6 @@ class PimcoreBundleManager
      */
     public function canBeInstalled(PimcoreBundleInterface $bundle): bool
     {
-        if (!$this->isEnabled($bundle)) {
-            return false;
-        }
-
         if (null === $installer = $this->loadBundleInstaller($bundle)) {
             return false;
         }
@@ -533,10 +413,6 @@ class PimcoreBundleManager
      */
     public function canBeUninstalled(PimcoreBundleInterface $bundle): bool
     {
-        if (!$this->isEnabled($bundle)) {
-            return false;
-        }
-
         if (null === $installer = $this->loadBundleInstaller($bundle)) {
             return false;
         }

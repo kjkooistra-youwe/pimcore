@@ -105,6 +105,16 @@ final class DocumentEvents
     const POST_DELETE_FAILURE = 'pimcore.document.postDeleteFailure';
 
     /**
+     * Arguments:
+     *  - params | array | contains the values that were passed to getById() as the second parameter
+     *
+     * @Event("Pimcore\Event\Model\DocumentEvent")
+     *
+     * @var string
+     */
+    const POST_LOAD = 'pimcore.document.postLoad';
+
+    /**
      * Processor contains the processor object used to generate the PDF
      *
      * Arguments:
@@ -145,12 +155,6 @@ final class DocumentEvents
      * Modify the configuration for the processor (when the pdf gets created)
      *
      * Arguments:
-     * WkHtmlToPdfAdapter:
-     *  - wkhtmltopdfBin | path to wkhtmltopdf binary
-     *  - options | configuration options
-     *  - srcUrl | path tho source html file
-     *  - dstFile | path to the output pdf file
-     *  - config | configuration which is passed from the pimcore admin interface
      *
      * PDFReactor:
      *  - config | configuration which is passed from the pimcore admin interface
@@ -162,6 +166,16 @@ final class DocumentEvents
      * @var string
      */
     const PRINT_MODIFY_PROCESSING_CONFIG = 'pimcore.document.print.processor.modifyConfig';
+
+    /**
+     * Arguments:
+     *  - target_element | Pimcore\Model\Document | contains the target document used in copying process
+     *
+     * @Event("Pimcore\Event\Model\DocumentEvent")
+     *
+     * @var string
+     */
+    const PRE_COPY = 'pimcore.document.preCopy';
 
     /**
      * Arguments:

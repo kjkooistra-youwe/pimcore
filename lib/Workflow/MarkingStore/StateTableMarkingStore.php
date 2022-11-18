@@ -36,8 +36,10 @@ class StateTableMarkingStore implements MarkingStoreInterface
 
     /**
      * {@inheritdoc}
+     *
+     * @return Marking
      */
-    public function getMarking($subject)// : Marking
+    public function getMarking($subject): Marking
     {
         $subject = $this->checkIfSubjectIsValid($subject);
 
@@ -90,11 +92,9 @@ class StateTableMarkingStore implements MarkingStoreInterface
     }
 
     /**
-     * @param object $subject
-     *
-     * @return ElementInterface
+     * @throws LogicException
      */
-    private function checkIfSubjectIsValid($subject): ElementInterface
+    private function checkIfSubjectIsValid(object $subject): ElementInterface
     {
         if (!$subject instanceof ElementInterface) {
             throw new LogicException('state_table marking store works for pimcore elements (documents, assets, data objects) only.');

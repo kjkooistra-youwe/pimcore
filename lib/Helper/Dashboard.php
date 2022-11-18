@@ -30,7 +30,7 @@ final class Dashboard
     protected $user;
 
     /**
-     * @var array
+     * @var array|null
      */
     protected $dashboards;
 
@@ -67,7 +67,7 @@ final class Dashboard
     }
 
     /**
-     * @return array|mixed
+     * @return array
      */
     protected function loadFile()
     {
@@ -83,10 +83,18 @@ final class Dashboard
                 }
             }
 
+            $perspectiveCfg = \Pimcore\Perspective\Config::getRuntimePerspective();
+            $dashboardCfg = $perspectiveCfg['dashboards'] ?? [];
+            $dashboardsPerspective = $dashboardCfg['predefined'] ?? [];
+
             if (empty($this->dashboards)) {
-                $perspectiveCfg = \Pimcore\Perspective\Config::getRuntimePerspective();
-                $dashboardCfg = $perspectiveCfg['dashboards'] ?? [];
-                $this->dashboards = $dashboardCfg['predefined'] ?? [];
+                $this->dashboards = $dashboardsPerspective;
+            } else {
+                foreach ($dashboardsPerspective as $key => $dashboard) {
+                    if (!isset($this->dashboards[$key])) {
+                        $this->dashboards[$key] = $dashboard;
+                    }
+                }
             }
         }
 
@@ -94,7 +102,7 @@ final class Dashboard
     }
 
     /**
-     * @return array|mixed
+     * @return array
      */
     public function getAllDashboards()
     {
@@ -104,7 +112,7 @@ final class Dashboard
     /**
      * @param string $key
      *
-     * @return mixed
+     * @return array
      */
     public function getDashboard($key = 'welcome')
     {

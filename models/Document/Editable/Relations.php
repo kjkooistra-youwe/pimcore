@@ -29,7 +29,7 @@ class Relations extends Model\Document\Editable implements \Iterator, IdRewriter
     /**
      * @internal
      *
-     * @var array
+     * @var Element\ElementInterface[]
      */
     protected $elements = [];
 
@@ -95,7 +95,7 @@ class Relations extends Model\Document\Editable implements \Iterator, IdRewriter
     /**
      * {@inheritdoc}
      */
-    public function getDataEditmode() /** : mixed */
+    public function getDataEditmode(): array
     {
         $this->setElements();
         $return = [];
@@ -105,7 +105,7 @@ class Relations extends Model\Document\Editable implements \Iterator, IdRewriter
                 if ($element instanceof DataObject\Concrete) {
                     $return[] = [$element->getId(), $element->getRealFullPath(), DataObject::OBJECT_TYPE_OBJECT, $element->getClassName()];
                 } elseif ($element instanceof DataObject\AbstractObject) {
-                    $return[] = [$element->getId(), $element->getRealFullPath(), DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_FOLDER];
+                    $return[] = [$element->getId(), $element->getRealFullPath(), DataObject::OBJECT_TYPE_OBJECT, DataObject::OBJECT_TYPE_VARIANT, DataObject::OBJECT_TYPE_FOLDER];
                 } elseif ($element instanceof Asset) {
                     $return[] = [$element->getId(), $element->getRealFullPath(), 'asset', $element->getType()];
                 } elseif ($element instanceof Document) {
@@ -219,7 +219,7 @@ class Relations extends Model\Document\Editable implements \Iterator, IdRewriter
     /**
      * { @inheritdoc }
      */
-    public function rewriteIds($idMapping) /** : void */
+    public function rewriteIds(array $idMapping): void
     {
         // reset existing elements store
         $this->elements = [];
@@ -256,7 +256,7 @@ class Relations extends Model\Document\Editable implements \Iterator, IdRewriter
     /**
      * {@inheritdoc}
      */
-    public function load() /** : void */
+    public function load(): void
     {
         $this->setElements();
     }
@@ -266,49 +266,52 @@ class Relations extends Model\Document\Editable implements \Iterator, IdRewriter
      */
 
     /**
-     * {@inheritdoc}
+     * @return void
      */
-    public function rewind()
+    #[\ReturnTypeWillChange]
+    public function rewind()// : void
     {
         $this->setElements();
         reset($this->elements);
     }
 
     /**
-     * {@inheritdoc}
+     * @return Element\ElementInterface|false
      */
-    public function current()
+    #[\ReturnTypeWillChange]
+    public function current()// : Element\ElementInterface|false
     {
         $this->setElements();
-        $var = current($this->elements);
 
-        return $var;
+        return current($this->elements);
     }
 
     /**
-     * {@inheritdoc}
+     * @return int|null
      */
-    public function key()
+    #[\ReturnTypeWillChange]
+    public function key()// : int|null
     {
         $this->setElements();
-        $var = key($this->elements);
 
-        return $var;
+        return key($this->elements);
     }
 
     /**
-     * {@inheritdoc}
+     * @return void
      */
-    public function next()
+    #[\ReturnTypeWillChange]
+    public function next()// : void
     {
         $this->setElements();
         next($this->elements);
     }
 
     /**
-     * {@inheritdoc}
+     * @return bool
      */
-    public function valid()
+    #[\ReturnTypeWillChange]
+    public function valid()// : bool
     {
         $this->setElements();
 
@@ -319,8 +322,6 @@ class Relations extends Model\Document\Editable implements \Iterator, IdRewriter
             }
         }
 
-        $var = $this->current() !== false;
-
-        return $var;
+        return $this->current() !== false;
     }
 }

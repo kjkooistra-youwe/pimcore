@@ -19,7 +19,6 @@ use Pimcore\Document\Editable\Block\BlockName;
 use Pimcore\Document\Editable\EditableHandler;
 use Pimcore\Extension\Document\Areabrick\AreabrickManagerInterface;
 use Pimcore\Extension\Document\Areabrick\EditableDialogBoxInterface;
-use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\Document;
 use Pimcore\Templating\Renderer\EditableRenderer;
@@ -183,10 +182,6 @@ class Areablock extends Model\Document\Editable implements BlockInterface
                 $disabled = true;
             }
 
-            if (!$this->getEditableHandler()->isBrickEnabled($this, $index['type']) && $config['dontCheckEnabled'] != true) {
-                $disabled = true;
-            }
-
             $this->blockStarted = false;
             $info = $this->buildInfoObject();
 
@@ -216,28 +211,20 @@ class Areablock extends Model\Document\Editable implements BlockInterface
      */
     public function buildInfoObject(): Area\Info
     {
+        $config = $this->getConfig();
         // create info object and assign it to the view
         $info = new Area\Info();
-
-        try {
-            $info->setId($this->currentIndex ? $this->currentIndex['type'] : null);
-            $info->setEditable($this);
-            $info->setIndex($this->current);
-        } catch (\Exception $e) {
-            Logger::err($e);
-        }
+        $info->setId($this->currentIndex ? $this->currentIndex['type'] : null);
+        $info->setEditable($this);
+        $info->setIndex($this->current);
 
         $params = [];
-
-        $config = $this->getConfig();
-        if (isset($config['params']) && is_array($config['params']) && array_key_exists($this->currentIndex['type'], $config['params'])) {
-            if (is_array($config['params'][$this->currentIndex['type']])) {
-                $params = $config['params'][$this->currentIndex['type']];
-            }
+        if (is_array($config['params'][$this->currentIndex['type']] ?? null)) {
+            $params = $config['params'][$this->currentIndex['type']];
         }
 
-        if (isset($config['globalParams'])) {
-            $params = array_merge($config['globalParams'], (array)$params);
+        if (is_array($config['globalParams'] ?? null)) {
+            $params = array_merge($config['globalParams'], $params);
         }
 
         $info->setParams($params);
@@ -329,10 +316,7 @@ class Areablock extends Model\Document\Editable implements BlockInterface
         $this->getBlockState()->popIndex();
     }
 
-    /**
-     * @return array
-     */
-    private function getToolBarDefaultConfig()
+    private function getToolBarDefaultConfig(): array
     {
         return [
             'areablock_toolbar' => [
@@ -485,14 +469,18 @@ class Areablock extends Model\Document\Editable implements BlockInterface
     }
 
     /**
+     * This method needs to be `protected` as it is used in other bundles such as pimcore/headless-documents
+     *
      * @param array $config
      * @param EditableRenderer $editableRenderer
      * @param string $dialogId
      * @param string $html
      *
      * @throws \Exception
+     *
+     * @internal
      */
-    private function renderDialogBoxEditables(array $config, EditableRenderer $editableRenderer, string $dialogId, string &$html)
+    protected function renderDialogBoxEditables(array $config, EditableRenderer $editableRenderer, string $dialogId, string &$html)
     {
         if (isset($config['items']) && is_array($config['items'])) {
             // layout component
@@ -585,13 +573,8 @@ class Areablock extends Model\Document\Editable implements BlockInterface
 
     /**
      * Sorts areas by index (sorting option) first, then by name
-     *
-     * @param array $areas
-     * @param array $config
-     *
-     * @return array
      */
-    private function sortAvailableAreas(array $areas, array $config)
+    private function sortAvailableAreas(array $areas, array $config): array
     {
         if (isset($config['sorting']) && is_array($config['sorting']) && count($config['sorting'])) {
             $sorting = $config['sorting'];

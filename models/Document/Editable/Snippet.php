@@ -32,8 +32,6 @@ class Snippet extends Model\Document\Editable implements IdRewriterInterface, Ed
      * Contains the ID of the linked snippet
      *
      * @internal
-     *
-     * @var int|null
      */
     protected ?int $id = null;
 
@@ -81,7 +79,7 @@ class Snippet extends Model\Document\Editable implements IdRewriterInterface, Ed
     /**
      * {@inheritdoc}
      */
-    public function getDataEditmode() /** : mixed */
+    public function getDataEditmode(): ?array
     {
         if ($this->snippet instanceof Document\Snippet) {
             return [
@@ -122,7 +120,6 @@ class Snippet extends Model\Document\Editable implements IdRewriterInterface, Ed
         $cacheKey = null;
         $cacheConfig = \Pimcore\Tool\Frontend::isOutputCacheEnabled();
         if ((isset($params['cache']) && $params['cache'] === true) || $cacheConfig) {
-
             // cleanup params to avoid serializing Element\ElementInterface objects
             $cacheParams = $params;
             array_walk($cacheParams, function (&$value, $key) {
@@ -239,7 +236,7 @@ class Snippet extends Model\Document\Editable implements IdRewriterInterface, Ed
     /**
      * {@inheritdoc}
      */
-    public function load() /** : void */
+    public function load(): void
     {
         if (!$this->snippet && $this->id) {
             $this->snippet = Document\Snippet::getById($this->id);
@@ -249,7 +246,7 @@ class Snippet extends Model\Document\Editable implements IdRewriterInterface, Ed
     /**
      * { @inheritdoc }
      */
-    public function rewriteIds($idMapping) /** : void */
+    public function rewriteIds(array $idMapping): void
     {
         $id = $this->getId();
         if (array_key_exists('document', $idMapping) && array_key_exists($id, $idMapping['document'])) {

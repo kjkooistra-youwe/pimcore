@@ -52,15 +52,10 @@ final class Localizedfield extends Model\AbstractModel implements
      */
     const STRICT_ENABLED = 1;
 
-    /**
-     * @var bool
-     */
     private static bool $getFallbackValues = false;
 
     /**
      * @internal
-     *
-     * @var array
      */
     protected array $items = [];
 
@@ -73,43 +68,30 @@ final class Localizedfield extends Model\AbstractModel implements
 
     /**
      * @internal
-     *
-     * @var ClassDefinition|null
      */
     protected ?ClassDefinition $class = null;
 
     /**
      * @internal
-     *
-     * @var array|null
      */
     protected ?array $context = [];
 
     /**
      * @internal
-     *
-     * @var int|null
      */
     protected ?int $objectId = null;
 
-    /**
-     * @var bool
-     */
     private static bool $strictMode = false;
 
     /**
      * list of dirty languages. if null then no language is dirty. if empty array then all languages are dirty
      *
      * @internal
-     *
-     * @var array|null
      */
     protected ?array $o_dirtyLanguages = null;
 
     /**
      * @internal
-     *
-     * @var bool
      */
     protected bool $_loadedAllLazyData = false;
 
@@ -173,6 +155,14 @@ final class Localizedfield extends Model\AbstractModel implements
         $this->items[] = $item;
         $this->markFieldDirty('_self');
         $this->markAllLanguagesAsDirty();
+    }
+
+    /**
+     * @return array
+     */
+    public function getItems(): array
+    {
+        return $this->items;
     }
 
     /**
@@ -425,13 +415,6 @@ final class Localizedfield extends Model\AbstractModel implements
         return $container->getFieldDefinitions($params);
     }
 
-    /**
-     * @param ClassDefinition\Data $fieldDefinition
-     * @param string $name
-     * @param string $language
-     *
-     * @internal
-     */
     private function loadLazyField(Model\DataObject\ClassDefinition\Data $fieldDefinition, string $name, string $language): void
     {
         $lazyKey = $this->buildLazyKey($name, $language);
@@ -463,6 +446,9 @@ final class Localizedfield extends Model\AbstractModel implements
      * @param bool $ignoreFallbackLanguage
      *
      * @return mixed
+     *
+     * @throws \Exception
+     * @throws Model\Exception\NotFoundException
      */
     public function getLocalizedValue(string $name, string $language = null, bool $ignoreFallbackLanguage = false)
     {
@@ -471,6 +457,10 @@ final class Localizedfield extends Model\AbstractModel implements
 
         $context = $this->getContext();
         $fieldDefinition = $this->getFieldDefinition($name, $context);
+
+        if (!$fieldDefinition instanceof ClassDefinition\Data) {
+            throw new Model\Exception\NotFoundException(sprintf('Field "%s" does not exist in localizedfields', $name));
+        }
 
         if ($fieldDefinition instanceof Model\DataObject\ClassDefinition\Data\CalculatedValue) {
             $valueData = new Model\DataObject\Data\CalculatedValue($fieldDefinition->getName());
@@ -554,13 +544,7 @@ final class Localizedfield extends Model\AbstractModel implements
             }
         }
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($fieldDefinition instanceof PreGetDataInterface || ($fieldDefinition && method_exists($fieldDefinition, 'preGetData'))) {
-            if (!$fieldDefinition instanceof PreGetDataInterface) {
-                trigger_deprecation('pimcore/pimcore', '10.1', sprintf('Usage of method_exists is deprecated since version 10.1 and will be removed in Pimcore 11.' .
-                    'Implement the %s interface instead.', PreGetDataInterface::class));
-            }
-
+        if ($fieldDefinition instanceof PreGetDataInterface) {
             $data = $fieldDefinition->preGetData(
                 $this,
                 [
@@ -639,14 +623,7 @@ final class Localizedfield extends Model\AbstractModel implements
             }
         }
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($fieldDefinition instanceof PreSetDataInterface || method_exists($fieldDefinition, 'preSetData')) {
-            if (!$fieldDefinition instanceof PreSetDataInterface) {
-                trigger_deprecation('pimcore/pimcore', '10.1',
-                    sprintf('Usage of method_exists is deprecated since version 10.1 and will be removed in Pimcore 11.' .
-                    'Implement the %s interface instead.', PreSetDataInterface::class));
-            }
-
+        if ($fieldDefinition instanceof PreSetDataInterface) {
             $value = $fieldDefinition->preSetData(
                 $this,
                 $value,

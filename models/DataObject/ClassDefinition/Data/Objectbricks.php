@@ -46,19 +46,17 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     public $maxItems;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $border = false;
+    public bool $border = false;
 
     /**
-     * @param string|int|null $maxItems
+     * @param int|null $maxItems
      *
      * @return $this
      */
@@ -70,7 +68,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getMaxItems()
     {
@@ -117,6 +115,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
                         'containerType' => 'objectbrick',
                         'containerKey' => $allowedBrickType,
                     ],
+                    'owner' => $data,
                     'fieldname' => $this->getName(),
                 ];
 
@@ -127,20 +126,11 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
         return $editmodeData;
     }
 
-    /**
-     * @param string $getter
-     * @param Objectbrick\Data\AbstractData $data
-     * @param array|null $params
-     * @param string $allowedBrickType
-     * @param int $level
-     *
-     * @return array|null
-     */
-    private function doGetDataForEditmode($getter, $data, $params, $allowedBrickType, $level = 0)
+    private function doGetDataForEditmode(string $getter, Objectbrick $data, ?array $params, string $allowedBrickType, int $level = 0): ?array
     {
         $object = $data->getObject();
         if ($object) {
-            $parent = DataObject\Service::hasInheritableParentObject($object, $this->getName());
+            $parent = DataObject\Service::hasInheritableParentObject($object);
         }
 
         if (!method_exists($data, $getter)) {
@@ -177,10 +167,10 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
             }
         }
 
-        $calculatedChilds = [];
-        self::collectCalculatedValueItems($collectionDef->getFieldDefinitions(), $calculatedChilds);
+        $calculatedChildren = [];
+        self::collectCalculatedValueItems($collectionDef->getFieldDefinitions(), $calculatedChildren);
 
-        foreach ($calculatedChilds as $fd) {
+        foreach ($calculatedChildren as $fd) {
             $fieldData = new DataObject\Data\CalculatedValue($fd->getName());
             $fieldData->setContextualData('objectbrick', $this->getName(), $allowedBrickType, $fd->getName(), null, null, $fd);
             $fieldData = $fd->getDataForEditmode($fieldData, $data->getObject(), $params);
@@ -202,22 +192,12 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
 
     /**
      * gets recursively attribute data from parent and fills objectData and metaData
-     *
-     * @param Objectbrick\Data\AbstractData $item
-     * @param string $key
-     * @param Data $fielddefinition
-     * @param int $level
-     * @param DataObject\Concrete|null $baseObject
-     * @param string $getter
-     * @param array|null $params
-     *
-     * @return mixed
      */
-    private function getDataForField($item, $key, $fielddefinition, $level, $baseObject, $getter, $params)
+    private function getDataForField(Objectbrick\Data\AbstractData $item, string $key, Data $fielddefinition, int $level, ?DataObject\Concrete $baseObject, string $getter, ?array $params): \stdClass
     {
         $result = new \stdClass();
         if ($baseObject) {
-            $parent = DataObject\Service::hasInheritableParentObject($baseObject, $key);
+            $parent = DataObject\Service::hasInheritableParentObject($baseObject);
         }
         $valueGetter = 'get' . ucfirst($key);
 
@@ -261,12 +241,9 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
             $result->metaData['inherited'] = $level != 0;
         } else {
             $fieldValue = null;
-            $editmodeValue = null;
-            if (!empty($item)) {
-                $fieldValue = $item->$valueGetter();
+            $fieldValue = $item->$valueGetter();
+            $editmodeValue = $fielddefinition->getDataForEditmode($fieldValue, $baseObject, $params);
 
-                $editmodeValue = $fielddefinition->getDataForEditmode($fieldValue, $baseObject, $params);
-            }
             if ($fielddefinition->isEmpty($fieldValue) && !empty($parent)) {
                 $backup = DataObject::getGetInheritedValues();
                 DataObject::setGetInheritedValues(true);
@@ -357,7 +334,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
     public function getVersionPreview($data, $object = null, $params = [])
     {
         // this is handled directly in the template
-        // /bundles/AdminBundle/Resources/views/Admin/DataObject/DataObject/previewVersion.html.twig
+        // /bundles/AdminBundle/templates/admin/data_object/data_object/preview_version.html.twig
         return 'BRICKS';
     }
 
@@ -541,7 +518,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
     {
         // getter
 
-        if ($class->getGenerateTypeDeclarations() && $this->getReturnTypeDeclaration() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface) {
+        if ($this->getReturnTypeDeclaration() && $this instanceof DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface) {
             $typeDeclaration = ': ' . $this->getReturnTypeDeclaration();
         } else {
             $typeDeclaration = '';
@@ -568,8 +545,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
         $code .= "\t\t" . '}' . "\n";
         $code .= "\t" . '}' . "\n";
 
-        //TODO Pimcore 11: remove method_exists BC layer
-        if ($this instanceof PreGetDataInterface || method_exists($this, 'preGetData')) {
+        if ($this instanceof PreGetDataInterface) {
             $code .= "\t" . '$data = $this->getClass()->getFieldDefinition("' . $key . '")->preGetData($this);' . "\n";
         }
 
@@ -619,13 +595,32 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
 
                     if (!$omitMandatoryCheck) {
                         foreach ($collectionDef->getFieldDefinitions() as $fd) {
+                            $key = $fd->getName();
+                            $getter = 'get' . ucfirst($key);
+
                             try {
-                                $key = $fd->getName();
-                                $getter = 'get' . ucfirst($key);
                                 $fd->checkValidity($item->$getter(), false, $params);
                             } catch (Model\Element\ValidationException $ve) {
-                                $ve->addContext($this->getName());
-                                $validationExceptions[] = $ve;
+                                if ($item->getObject()->getClass()->getAllowInherit() && $fd->supportsInheritance() && $fd->isEmpty($item->$getter())) {
+                                    //try again with parent data when inheritance is activated
+                                    try {
+                                        $getInheritedValues = DataObject::doGetInheritedValues();
+                                        DataObject::setGetInheritedValues(true);
+
+                                        $fd->checkValidity($item->$getter(), $omitMandatoryCheck, $params);
+
+                                        DataObject::setGetInheritedValues($getInheritedValues);
+                                    } catch (\Exception $e) {
+                                        if (!$e instanceof Model\Element\ValidationException) {
+                                            throw $e;
+                                        }
+                                        $e->addContext($this->getName());
+                                        $validationExceptions[] = $e;
+                                    }
+                                } else {
+                                    $ve->addContext($this->getName());
+                                    $validationExceptions[] = $ve;
+                                }
                             }
                         }
                     }
@@ -657,18 +652,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
         return 'NOT SUPPORTED';
     }
 
-    /**
-     * @param Objectbrick\Data\AbstractData $item
-     * @param string $key
-     * @param Data $fielddefinition
-     * @param int $level
-     * @param DataObject\Concrete $baseObject
-     * @param string $getter
-     * @param array $params
-     *
-     * @return mixed
-     */
-    private function getDiffDataForField($item, $key, $fielddefinition, $level, $baseObject, $getter, $params = [])
+    private function getDiffDataForField(Objectbrick\Data\AbstractData $item, string $key, Data $fielddefinition, int $level, DataObject\Concrete $baseObject, string $getter, array $params = []): ?array
     {
         $valueGetter = 'get' . ucfirst($key);
 
@@ -677,17 +661,9 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
         return $value;
     }
 
-    /**
-     * @param Objectbrick\Data\AbstractData $data
-     * @param string $getter
-     * @param array $params
-     * @param int $level
-     *
-     * @return array|null
-     */
-    private function doGetDiffDataForEditmode($data, $getter, $params = [], $level = 0)
+    private function doGetDiffDataForEditmode(Objectbrick $data, string $getter, array $params = [], int $level = 0): ?array
     {
-        $parent = DataObject\Service::hasInheritableParentObject($data->getObject(), $this->getName());
+        $parent = DataObject\Service::hasInheritableParentObject($data->getObject());
         $item = $data->$getter();
 
         if (!$item && !empty($parent)) {
@@ -842,13 +818,7 @@ class Objectbricks extends Data implements CustomResourcePersistingInterface, Ty
                 }
 
                 foreach ($collectionDef->getFieldDefinitions() as $fd) {
-                    //TODO Pimcore 11: remove method_exists BC layer
-                    if ($fd instanceof IdRewriterInterface || method_exists($fd, 'rewriteIds')) {
-                        if (!$fd instanceof IdRewriterInterface) {
-                            trigger_deprecation('pimcore/pimcore', '10.1',
-                                sprintf('Usage of method_exists is deprecated since version 10.1 and will be removed in Pimcore 11.' .
-                                'Implement the %s interface instead.', IdRewriterInterface::class));
-                        }
+                    if ($fd instanceof IdRewriterInterface) {
                         $d = $fd->rewriteIds($item, $idMapping, $params);
                         $setter = 'set' . ucfirst($fd->getName());
                         $item->$setter($d);

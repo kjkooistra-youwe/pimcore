@@ -18,8 +18,8 @@ namespace Pimcore\Tests\Model\DataType;
 use Pimcore\Model\DataObject\AbstractObject;
 use Pimcore\Model\DataObject\Inheritance;
 use Pimcore\Model\Element\ElementInterface;
-use Pimcore\Tests\Test\AbstractPropertiesTest;
-use Pimcore\Tests\Util\TestHelper;
+use Pimcore\Tests\Support\Test\AbstractPropertiesTest;
+use Pimcore\Tests\Support\Util\TestHelper;
 
 /**
  * @group properties
@@ -39,7 +39,7 @@ class PropertiesTest extends AbstractPropertiesTest
 
     public function reloadElement(): ElementInterface
     {
-        $this->testElement = AbstractObject::getById($this->testElement->getId(), true);
+        $this->testElement = AbstractObject::getById($this->testElement->getId(), ['force' => true]);
 
         return $this->testElement;
     }

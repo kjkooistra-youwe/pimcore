@@ -21,13 +21,14 @@ use Pimcore\Model;
 
 /**
  * @method \Pimcore\Model\Element\Note\Dao getDao()
+ * @method void delete()
  */
 final class Note extends Model\AbstractModel
 {
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     protected $id;
 
@@ -62,7 +63,7 @@ final class Note extends Model\AbstractModel
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     protected $user;
 
@@ -86,6 +87,13 @@ final class Note extends Model\AbstractModel
      * @var array
      */
     protected $data = [];
+
+    /**
+     * If the note is locked, it can't be deleted in the admin interface
+     *
+     * @internal
+     */
+    protected bool $locked = true;
 
     /**
      * @static
@@ -141,7 +149,6 @@ final class Note extends Model\AbstractModel
      */
     public function save()
     {
-
         // check if there's a valid user
         if (!$this->getUser()) {
             // try to use the logged in user
@@ -273,7 +280,7 @@ final class Note extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getId()
     {
@@ -333,10 +340,25 @@ final class Note extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getUser()
     {
         return $this->user;
+    }
+
+    /**
+     * @return $this
+     */
+    public function setLocked(bool $locked): static
+    {
+        $this->locked = $locked;
+
+        return $this;
+    }
+
+    public function getLocked(): bool
+    {
+        return $this->locked;
     }
 }

@@ -15,34 +15,46 @@
 
 namespace Pimcore\Model\DataObject\ClassDefinition\Layout;
 
+use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\DataObject\Concrete;
+use Twig\Sandbox\SecurityError;
 
 class Text extends Model\DataObject\ClassDefinition\Layout implements Model\DataObject\ClassDefinition\Data\LayoutDefinitionEnrichmentInterface
 {
     /**
      * Static type of this element
      *
+     * @internal
+     *
      * @var string
      */
     public $fieldtype = 'text';
 
     /**
+     * @internal
+     *
      * @var string
      */
     public $html = '';
 
     /**
+     * @internal
+     *
      * @var string
      */
     public $renderingClass;
 
     /**
+     * @internal
+     *
      * @var string
      */
     public $renderingData;
 
     /**
+     * @internal
+     *
      * @var bool
      */
     public $border = false;
@@ -118,7 +130,7 @@ class Text extends Model\DataObject\ClassDefinition\Layout implements Model\Data
     /**
      * {@inheritdoc}
      */
-    public function enrichLayoutDefinition(/*?Concrete */ $object, /**  array */ $context = []) // : self
+    public function enrichLayoutDefinition(/* ?Concrete */ $object, /* array */ $context = []) // : static
     {
         $renderer = Model\DataObject\ClassDefinition\Helper\DynamicTextResolver::resolveRenderingClass(
             $this->getRenderingClass()
@@ -132,13 +144,25 @@ class Text extends Model\DataObject\ClassDefinition\Layout implements Model\Data
             $this->html = $result;
         }
 
-        $twig = \Pimcore::getContainer()->get('twig');
-        $template = $twig->createTemplate($this->html);
-        $this->html = $template->render(array_merge($context,
-            [
-                'object' => $object,
-            ]
-        ));
+        $templatingEngine = \Pimcore::getContainer()->get('pimcore.templating.engine.delegating');
+
+        try {
+            $twig = $templatingEngine->getTwigEnvironment(true);
+            $template = $twig->createTemplate($this->html);
+            $this->html = $template->render(array_merge($context,
+                [
+                    'object' => $object,
+                ]
+            ));
+        } catch (SecurityError $e) {
+            Logger::err((string) $e);
+
+            $this->html = sprintf('<h2>Error</h2>Failed rendering the template: <b>%s</b>.
+                Please check your twig sandbox security policy or contact the administrator.',
+                substr($e->getMessage(), 0, strpos($e->getMessage(), ' in "__string')));
+        } finally {
+            $templatingEngine->disableSandboxExtensionFromTwigEnvironment();
+        }
 
         return $this;
     }

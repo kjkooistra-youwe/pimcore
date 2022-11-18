@@ -49,15 +49,14 @@ abstract class PimcoreLocationAwareConfigDao implements DaoInterface
             $this->settingsStoreScope,
             $params['storageDirectory'] ?? null,
             $params['writeTargetEnvVariableName'] ?? null,
-            null,
-            $params['legacyConfigFile'] ?? null
+            $params['defaultWriteLocation'] ?? null
         );
     }
 
     /**
      * @param string $id
      *
-     * @return mixed|null
+     * @return mixed
      */
     protected function getDataByName(string $id)
     {
@@ -90,6 +89,17 @@ abstract class PimcoreLocationAwareConfigDao implements DaoInterface
     }
 
     /**
+     * Removes config with corresponding id from the cache.
+     * A new cache entry will be generated upon requesting the config again.
+     *
+     * @param string $id
+     */
+    protected function invalidateCache(string $id): void
+    {
+        unset(self::$cache[$this->settingsStoreScope][$id]);
+    }
+
+    /**
      * @param string $id
      * @param array $data
      *
@@ -98,6 +108,7 @@ abstract class PimcoreLocationAwareConfigDao implements DaoInterface
     protected function saveData(string $id, $data)
     {
         $dao = $this;
+        $this->invalidateCache($id);
         $this->locationAwareConfigRepository->saveConfig($id, $data, function ($id, $data) use ($dao) {
             return $dao->prepareDataStructureForYaml($id, $data);
         });
@@ -129,7 +140,7 @@ abstract class PimcoreLocationAwareConfigDao implements DaoInterface
     /**
      * @return bool
      */
-    public function isWriteable(): ?bool
+    public function isWriteable(): bool
     {
         return $this->locationAwareConfigRepository->isWriteable($this->id, $this->dataSource);
     }
@@ -141,6 +152,7 @@ abstract class PimcoreLocationAwareConfigDao implements DaoInterface
      */
     protected function deleteData(string $id): void
     {
+        $this->invalidateCache($id);
         $this->locationAwareConfigRepository->deleteData($id, $this->dataSource);
     }
 }

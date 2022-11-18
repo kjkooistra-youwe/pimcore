@@ -26,14 +26,8 @@ final class EditmodeEditableDefinitionCollector
 {
     private bool $stopped = false;
 
-    /**
-     * @var array
-     */
     private array $editableDefinitions = [];
 
-    /**
-     * @var array
-     */
     private array $stash = [];
 
     /**
@@ -85,12 +79,7 @@ final class EditmodeEditableDefinitionCollector
         $this->editableDefinitions = array_pop($this->stash);
     }
 
-    /**
-     * @param mixed $value
-     *
-     * @return mixed
-     */
-    private function clearConfig($value)
+    private function clearConfig(mixed $value): mixed
     {
         if (is_array($value)) {
             foreach ($value as &$item) {

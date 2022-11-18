@@ -15,8 +15,11 @@
 
 namespace Pimcore\Model\DataObject\Classificationstore;
 
+use Pimcore\Cache;
+use Pimcore\Cache\RuntimeCache;
 use Pimcore\Event\DataObjectClassificationStoreEvents;
 use Pimcore\Event\Model\DataObject\ClassificationStore\CollectionConfigEvent;
+use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Model;
 
 /**
@@ -24,14 +27,16 @@ use Pimcore\Model;
  */
 final class CollectionConfig extends Model\AbstractModel
 {
+    use RecursionBlockingEventDispatchHelperTrait;
+
     /**
-     * Group id.
-     *
-     * @var int
+     * @var int|null
      */
     protected $id;
 
     /**
+     * Store ID
+     *
      * @var int
      */
     protected $storeId = 1;
@@ -60,14 +65,30 @@ final class CollectionConfig extends Model\AbstractModel
 
     /**
      * @param int $id
+     * @param bool|null $force
      *
      * @return self|null
      */
-    public static function getById($id)
+    public static function getById($id, ?bool $force = false)
     {
+        $id = (int)$id;
+        $cacheKey = self::getCacheKey($id);
+
         try {
+            if (!$force && RuntimeCache::isRegistered($cacheKey)) {
+                return RuntimeCache::get($cacheKey);
+            }
+            if (!$force && $config = Cache::load($cacheKey)) {
+                RuntimeCache::set($cacheKey, $config);
+
+                return $config;
+            }
+
             $config = new self();
-            $config->getDao()->getById((int)$id);
+            $config->getDao()->getById($id);
+
+            RuntimeCache::set($cacheKey, $config);
+            Cache::save($config, $cacheKey);
 
             return $config;
         } catch (Model\Exception\NotFoundException $e) {
@@ -78,18 +99,34 @@ final class CollectionConfig extends Model\AbstractModel
     /**
      * @param string $name
      * @param int $storeId
+     * @param bool|null $force
      *
      * @return self|null
      *
      * @throws \Exception
      */
-    public static function getByName($name, $storeId = 1)
+    public static function getByName($name, $storeId = 1, ?bool $force = false)
     {
+        $cacheKey = self::getCacheKey($storeId, $name);
+
         try {
+            if (!$force && RuntimeCache::isRegistered($cacheKey)) {
+                return RuntimeCache::get($cacheKey);
+            }
+
+            if (!$force && $config = Cache::load($cacheKey)) {
+                RuntimeCache::set($cacheKey, $config);
+
+                return $config;
+            }
+
             $config = new self();
             $config->setName($name);
             $config->setStoreId($storeId ? $storeId : 1);
             $config->getDao()->getByName();
+
+            RuntimeCache::set($cacheKey, $config);
+            Cache::save($config, $cacheKey);
 
             return $config;
         } catch (Model\Exception\NotFoundException $e) {
@@ -121,7 +158,7 @@ final class CollectionConfig extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getId()
     {
@@ -173,13 +210,17 @@ final class CollectionConfig extends Model\AbstractModel
     }
 
     /**
-     * Deletes the key value group configuration
+     * Deletes the key value collection configuration
      */
     public function delete()
     {
-        \Pimcore::getEventDispatcher()->dispatch(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_PRE_DELETE);
+        $this->dispatchEvent(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_PRE_DELETE);
+        if ($this->getId()) {
+            $this->removeCache();
+        }
+
         $this->getDao()->delete();
-        \Pimcore::getEventDispatcher()->dispatch(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_POST_DELETE);
+        $this->dispatchEvent(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_POST_DELETE);
     }
 
     /**
@@ -190,18 +231,20 @@ final class CollectionConfig extends Model\AbstractModel
         $isUpdate = false;
 
         if ($this->getId()) {
+            $this->removeCache();
+
             $isUpdate = true;
-            \Pimcore::getEventDispatcher()->dispatch(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_PRE_UPDATE);
+            $this->dispatchEvent(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_PRE_UPDATE);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_PRE_ADD);
+            $this->dispatchEvent(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_PRE_ADD);
         }
 
         $model = $this->getDao()->save();
 
         if ($isUpdate) {
-            \Pimcore::getEventDispatcher()->dispatch(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_POST_UPDATE);
+            $this->dispatchEvent(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_POST_UPDATE);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_POST_ADD);
+            $this->dispatchEvent(new CollectionConfigEvent($this), DataObjectClassificationStoreEvents::COLLECTION_CONFIG_POST_ADD);
         }
 
         return $model;
@@ -248,6 +291,20 @@ final class CollectionConfig extends Model\AbstractModel
     }
 
     /**
+     * Returns all groups belonging to this collection
+     *
+     * @return CollectionGroupRelation[]
+     */
+    public function getRelations()
+    {
+        $list = new CollectionGroupRelation\Listing();
+        $list->setCondition('colId = ' . $this->id);
+        $list = $list->load();
+
+        return $list;
+    }
+
+    /**
      * @return int
      */
     public function getStoreId()
@@ -261,5 +318,29 @@ final class CollectionConfig extends Model\AbstractModel
     public function setStoreId($storeId)
     {
         $this->storeId = $storeId;
+    }
+
+    /**
+     * Calculate cache key
+     */
+    private static function getCacheKey(int $id, string $name = null): string
+    {
+        $cacheKey = 'cs_collectionconfig_' . $id;
+        if ($name !== null) {
+            $cacheKey .= '_' . md5($name);
+        }
+
+        return $cacheKey;
+    }
+
+    private function removeCache(): void
+    {
+        // Remove runtime cache
+        RuntimeCache::set(self::getCacheKey($this->getId()), null);
+        RuntimeCache::set(self::getCacheKey($this->getStoreId(), $this->getName()), null);
+
+        // Remove persisted cache
+        Cache::remove(self::getCacheKey($this->getId()));
+        Cache::remove(self::getCacheKey($this->getStoreId(), $this->getName()));
     }
 }

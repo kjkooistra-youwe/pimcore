@@ -47,11 +47,8 @@ trait ElementWithMetadataComparisonTrait
             /** @var ElementMetadata|null $container2 */
             $container2 = $values2[$i];
 
-            if ((!$container1 && $container2) || ($container1 && !$container2)) {
-                return false;
-            }
-            if (!$container1 && !$container2) {
-                return true;
+            if (!$container1 || !$container2) {
+                return !$container1 && !$container2;
             }
 
             /** @var ElementInterface $el1 */
@@ -65,7 +62,7 @@ trait ElementWithMetadataComparisonTrait
 
             $data1 = $container1->getData();
             $data2 = $container2->getData();
-            if (serialize($data1) != serialize($data2)) {
+            if ($data1 != $data2) {
                 return false;
             }
         }

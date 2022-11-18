@@ -25,6 +25,15 @@ class Transition extends \Symfony\Component\Workflow\Transition implements Notes
     use NotesAwareTrait;
     use NotificationTrait;
 
+    public const UNSAVED_CHANGES_BEHAVIOUR_SAVE = 'save';
+
+    public const UNSAVED_CHANGES_BEHAVIOUR_IGNORE = 'ignore';
+
+    public const UNSAVED_CHANGES_BEHAVIOUR_WARN = 'warn';
+
+    /**
+     * @var array
+     */
     private $options;
 
     /**
@@ -41,6 +50,9 @@ class Transition extends \Symfony\Component\Workflow\Transition implements Notes
         $this->options = $options;
     }
 
+    /**
+     * @return array
+     */
     public function getOptions()
     {
         return $this->options;

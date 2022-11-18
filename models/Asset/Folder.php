@@ -15,7 +15,9 @@
 
 namespace Pimcore\Model\Asset;
 
+use Pimcore\Db\Helper;
 use Pimcore\File;
+use Pimcore\Messenger\AssetPreviewImageMessage;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
 use Pimcore\Tool\Storage;
@@ -33,7 +35,7 @@ class Folder extends Model\Asset
     /**
      * @internal
      *
-     * @var Asset[]
+     * @var Asset[]|null
      */
     protected $children;
 
@@ -47,9 +49,9 @@ class Folder extends Model\Asset
     /**
      * set the children of the document
      *
-     * @param Asset[] $children
+     * @param Asset[]|null $children
      *
-     * @return Folder
+     * @return $this
      */
     public function setChildren($children)
     {
@@ -69,12 +71,16 @@ class Folder extends Model\Asset
     public function getChildren()
     {
         if ($this->children === null) {
-            $list = new Asset\Listing();
-            $list->setCondition('parentId = ?', $this->getId());
-            $list->setOrderKey('filename');
-            $list->setOrder('asc');
+            if ($this->getId()) {
+                $list = new Asset\Listing();
+                $list->setCondition('parentId = ?', $this->getId());
+                $list->setOrderKey('filename');
+                $list->setOrder('asc');
 
-            $this->children = $list->getAssets();
+                $this->children = $list->getAssets();
+            } else {
+                $this->children = [];
+            }
         }
 
         return $this->children;
@@ -99,16 +105,20 @@ class Folder extends Model\Asset
     /**
      * @internal
      *
+     * @param bool $force
+     *
      * @return resource|null
      *
      * @throws \Doctrine\DBAL\Exception
      * @throws \League\Flysystem\FilesystemException
      */
-    public function getPreviewImage()
+    public function getPreviewImage(bool $force = false)
     {
         $storage = Storage::get('thumbnail');
-        $cacheFilePath = sprintf('%s/image-thumb__%s__-folder-preview%s.jpg',
-            rtrim($this->getRealFullPath(), '/'),
+        $cacheFilePath = sprintf(
+            '%s/%s/image-thumb__%s__-folder-preview%s.jpg',
+            rtrim($this->getRealPath(), '/'),
+            $this->getId(),
             $this->getId(),
             '-hdpi'
         );
@@ -119,7 +129,7 @@ class Folder extends Model\Asset
         $db = \Pimcore\Db::get();
         $condition = "path LIKE :path AND type IN ('image', 'video', 'document')";
         $conditionParams = [
-            'path' => $db->escapeLike($this->getRealFullPath()) . '/%',
+            'path' => Helper::escapeLike($this->getRealFullPath()) . '/%',
         ];
 
         if ($storage->fileExists($cacheFilePath)) {
@@ -131,19 +141,20 @@ class Folder extends Model\Asset
 
         $list = new Asset\Listing();
         $list->setCondition($condition, $conditionParams);
-        $list->setOrderKey('filename');
+        $list->setOrderKey('id');
         $list->setOrder('asc');
         $list->setLimit($limit);
 
-        $totalImages = $list->getTotalCount();
+        $totalImages = $list->getCount();
         $count = 0;
         $gutter = 5;
         $squareDimension = 130;
         $offsetTop = 0;
         $colums = 3;
+        $skipped = false;
 
         if ($totalImages) {
-            $collage = imagecreatetruecolor(($squareDimension * $colums) + ($gutter * ($colums - 1)), ceil(($totalImages / $colums)) * ($squareDimension + $gutter));
+            $collage = imagecreatetruecolor(($squareDimension * $colums) + ($gutter * ($colums - 1)), (int) ceil(($totalImages / $colums)) * ($squareDimension + $gutter));
             $background = imagecolorallocate($collage, 12, 15, 18);
             imagefill($collage, 0, 0, $background);
 
@@ -161,9 +172,15 @@ class Folder extends Model\Asset
                 }
 
                 if ($tileThumb) {
-                    if (!$tileThumb->exists()) {
+                    if (!$tileThumb->exists() && !$force) {
                         // only generate if all necessary thumbs are available
-                        return null;
+                        $skipped = true;
+
+                        \Pimcore::getContainer()->get('messenger.bus.pimcore-core')->dispatch(
+                            new AssetPreviewImageMessage($this->getId())
+                        );
+
+                        break;
                     }
 
                     $tile = imagecreatefromstring(stream_get_contents($tileThumb->getStream()));
@@ -176,10 +193,13 @@ class Folder extends Model\Asset
                 }
             }
 
-            if ($count) {
+            if ($count && !$skipped) {
                 $localFile = File::getLocalTempFilePath('jpg');
                 imagejpeg($collage, $localFile, 60);
-                $storage->write($cacheFilePath, file_get_contents($localFile));
+
+                if (filesize($localFile) > 0) {
+                    $storage->write($cacheFilePath, file_get_contents($localFile));
+                }
                 unlink($localFile);
 
                 return $storage->readStream($cacheFilePath);

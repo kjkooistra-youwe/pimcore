@@ -25,8 +25,6 @@ use Pimcore\Model;
  */
 class Dao extends Model\Dao\AbstractDao
 {
-    use Model\Element\ChildsCompatibilityTrait;
-
     /**
      * @param int $id
      *
@@ -35,9 +33,9 @@ class Dao extends Model\Dao\AbstractDao
     public function getById($id)
     {
         if ($this->model->getType()) {
-            $data = $this->db->fetchRow('SELECT * FROM users WHERE `type` = ? AND id = ?', [$this->model->getType(), $id]);
+            $data = $this->db->fetchAssociative('SELECT * FROM users WHERE `type` = ? AND id = ?', [$this->model->getType(), $id]);
         } else {
-            $data = $this->db->fetchRow('SELECT * FROM users WHERE `id` = ?', $id);
+            $data = $this->db->fetchAssociative('SELECT * FROM users WHERE `id` = ?', [$id]);
         }
 
         if ($data) {
@@ -54,7 +52,7 @@ class Dao extends Model\Dao\AbstractDao
      */
     public function getByName($name)
     {
-        $data = $this->db->fetchRow('SELECT * FROM users WHERE `type` = ? AND `name` = ?', [$this->model->getType(), $name]);
+        $data = $this->db->fetchAssociative('SELECT * FROM users WHERE `type` = ? AND `name` = ?', [$this->model->getType(), $name]);
 
         if ($data) {
             $this->assignVariablesToModel($data);
@@ -70,7 +68,7 @@ class Dao extends Model\Dao\AbstractDao
             'type' => $this->model->getType(),
         ]);
 
-        $this->model->setId($this->db->lastInsertId());
+        $this->model->setId((int) $this->db->lastInsertId());
     }
 
     /**
@@ -80,7 +78,11 @@ class Dao extends Model\Dao\AbstractDao
      */
     public function hasChildren()
     {
-        $c = $this->db->fetchOne('SELECT id FROM users WHERE parentId = ?', $this->model->getId());
+        if (!$this->model->getId()) {
+            return false;
+        }
+
+        $c = $this->db->fetchOne('SELECT id FROM users WHERE parentId = ?', [$this->model->getId()]);
 
         return (bool) $c;
     }

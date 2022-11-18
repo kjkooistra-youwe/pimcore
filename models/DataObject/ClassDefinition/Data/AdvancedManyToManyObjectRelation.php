@@ -33,7 +33,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     /**
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     public $allowedClassId;
 
@@ -49,14 +49,14 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
      *
      * @var array
      */
-    public $columns;
+    public $columns = [];
 
     /**
      * @internal
      *
      * @var string[]
      */
-    public $columnKeys;
+    public $columnKeys = [];
 
     /**
      * Static type of this element
@@ -69,17 +69,13 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $enableBatchEdit;
+    public bool $enableBatchEdit = false;
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $allowMultipleAssignments;
+    public bool $allowMultipleAssignments = false;
 
     /**
      * @internal
@@ -139,7 +135,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
                 $targets[] = $targetId;
             }
 
-            $existingTargets = $db->fetchCol(
+            $existingTargets = $db->fetchFirstColumn(
                 'SELECT o_id FROM objects WHERE o_id IN ('.implode(',', $targets).')'
             );
 
@@ -303,10 +299,8 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
                         $setter = 'set' . ucfirst($c['key']);
                         $value = $relation[$c['key']] ?? null;
 
-                        if ($c['type'] == 'multiselect') {
-                            if (is_array($value) && count($value)) {
-                                $value = implode(',', $value);
-                            }
+                        if ($c['type'] == 'multiselect' && is_array($value)) {
+                            $value = implode(',', $value);
                         }
 
                         $metaData->$setter($value);
@@ -528,28 +522,28 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
                 $ownerName = '/' . $context['containerType'] . '~' . $containerName . '/%';
             }
 
-            $sql = $db->quoteInto('o_id = ?', $objectId) . " AND ownertype = 'localizedfield' AND "
-                . $db->quoteInto('ownername LIKE ?', $ownerName)
-                . ' AND ' . $db->quoteInto('fieldname = ?', $this->getName())
-                . ' AND ' . $db->quoteInto('position = ?', $position);
+            $sql = Db\Helper::quoteInto($db, 'o_id = ?', $objectId) . " AND ownertype = 'localizedfield' AND "
+                . Db\Helper::quoteInto($db, 'ownername LIKE ?', $ownerName)
+                . ' AND ' . Db\Helper::quoteInto($db, 'fieldname = ?', $this->getName())
+                . ' AND ' . Db\Helper::quoteInto($db, 'position = ?', $position);
         } else {
-            $sql = $db->quoteInto('o_id = ?', $objectId) . ' AND ' . $db->quoteInto('fieldname = ?', $this->getName())
-                . ' AND ' . $db->quoteInto('position = ?', $position);
+            $sql = Db\Helper::quoteInto($db, 'o_id = ?', $objectId) . ' AND ' . Db\Helper::quoteInto($db, 'fieldname = ?', $this->getName())
+                . ' AND ' . Db\Helper::quoteInto($db, 'position = ?', $position);
 
             if ($context) {
                 if (!empty($context['fieldname'])) {
-                    $sql .= ' AND '.$db->quoteInto('ownername = ?', $context['fieldname']);
+                    $sql .= ' AND '.Db\Helper::quoteInto($db, 'ownername = ?', $context['fieldname']);
                 }
 
                 if (!DataObject::isDirtyDetectionDisabled() && $object instanceof Element\DirtyIndicatorInterface) {
                     if ($context['containerType']) {
-                        $sql .= ' AND '.$db->quoteInto('ownertype = ?', $context['containerType']);
+                        $sql .= ' AND '.Db\Helper::quoteInto($db, 'ownertype = ?', $context['containerType']);
                     }
                 }
             }
         }
 
-        $db->deleteWhere($table, $sql);
+        $db->executeStatement('DELETE FROM ' . $table . ' WHERE ' . $sql);
 
         if (!empty($objectsMetadata)) {
             if ($object instanceof DataObject\Localizedfield || $object instanceof DataObject\Objectbrick\Data\AbstractData
@@ -615,11 +609,11 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
             }
             $containerName = $context['fieldname'] ?? null;
             $index = $context['index'];
-            $db->deleteWhere(
-                'object_metadata_' . $object->getClassId(),
-                $db->quoteInto('o_id = ?', $object->getId()) . " AND ownertype = 'localizedfield' AND "
-                . $db->quoteInto('ownername LIKE ?', '/' . $context['containerType'] . '~' . $containerName . '/' . "$index . /%")
-                . ' AND ' . $db->quoteInto('fieldname = ?', $this->getName())
+            $db->executeStatement(
+                'DELETE FROM object_metadata_' . $object->getClassId()
+                . ' WHERE ' . Db\Helper::quoteInto($db, 'o_id = ?', $object->getId()) . " AND ownertype = 'localizedfield' AND "
+                . Db\Helper::quoteInto($db, 'ownername LIKE ?', '/' . $context['containerType'] . '~' . $containerName . '/' . "$index . /%")
+                . ' AND ' . Db\Helper::quoteInto($db, 'fieldname = ?', $this->getName())
             );
         } else {
             $deleteConditions = [
@@ -643,7 +637,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     }
 
     /**
-     * @param string $allowedClassId
+     * @param string|null $allowedClassId
      *
      * @return $this
      */
@@ -655,7 +649,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getAllowedClassId()
     {
@@ -715,7 +709,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     }
 
     /**
-     * @return mixed
+     * @return array
      */
     public function getColumns()
     {
@@ -748,7 +742,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
      */
     public function setEnableBatchEdit($enableBatchEdit)
     {
-        $this->enableBatchEdit = $enableBatchEdit;
+        $this->enableBatchEdit = (bool) $enableBatchEdit;
     }
 
     /**
@@ -806,7 +800,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     /**
      * {@inheritdoc}
      */
-    public function enrichLayoutDefinition(/*?Concrete */ $object, /**  array */ $context = []) // : self
+    public function enrichLayoutDefinition(/* ?Concrete */ $object, /* array */ $context = []) // : static
     {
         $classId = $this->allowedClassId;
 
@@ -865,8 +859,15 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
                 $this->visibleFieldDefinitions[$field]['fieldtype'] = $fd->getFieldType();
                 $this->visibleFieldDefinitions[$field]['noteditable'] = true;
 
-                if ($fd instanceof DataObject\ClassDefinition\Data\Select || $fd instanceof DataObject\ClassDefinition\Data\Multiselect) {
-                    if ($fd->getOptionsProviderClass()) {
+                if (
+                    $fd instanceof DataObject\ClassDefinition\Data\Select
+                    || $fd instanceof DataObject\ClassDefinition\Data\Multiselect
+                    || $fd instanceof DataObject\ClassDefinition\Data\BooleanSelect
+                ) {
+                    if (
+                        $fd instanceof DataObject\ClassDefinition\Data\Select
+                        || $fd instanceof DataObject\ClassDefinition\Data\Multiselect
+                    ) {
                         $this->visibleFieldDefinitions[$field]['optionsProviderClass'] = $fd->getOptionsProviderClass();
                     }
 
@@ -892,7 +893,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
                 $type = $elementData['type'];
                 $id = $elementData['id'];
                 $target = Element\Service::getElementById($type, $id);
-                if ($target) {
+                if ($target instanceof DataObject\Concrete) {
                     $columns = $elementMetadata['columns'];
                     $fieldname = $elementMetadata['fieldname'];
                     $data = $elementMetadata['data'];
@@ -1014,7 +1015,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
      */
     public function setAllowMultipleAssignments($allowMultipleAssignments)
     {
-        $this->allowMultipleAssignments = $allowMultipleAssignments;
+        $this->allowMultipleAssignments = (bool) $allowMultipleAssignments;
 
         return $this;
     }

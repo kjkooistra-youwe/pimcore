@@ -29,12 +29,12 @@ use Symfony\Component\Process\Process;
 class AssetsInstaller
 {
     /**
-     * @var \Closure
+     * @var \Closure|null
      */
     private $runCallback;
 
     /**
-     * @var string
+     * @var string|null
      */
     private $composerJsonSetting;
 
@@ -109,14 +109,14 @@ class AssetsInstaller
     }
 
     /**
-     * @param \Closure $runCallback
+     * @param \Closure|null $runCallback
      */
     public function setRunCallback(\Closure $runCallback = null)
     {
         $this->runCallback = $runCallback;
     }
 
-    private function configureOptions(OptionsResolver $resolver)
+    private function configureOptions(OptionsResolver $resolver): void
     {
         $defaults = [
             'symlink' => true,
@@ -148,10 +148,7 @@ class AssetsInstaller
         }
     }
 
-    /**
-     * @return string|null
-     */
-    private function readComposerJsonSetting()
+    private function readComposerJsonSetting(): ?string
     {
         if (null !== $this->composerJsonSetting) {
             return $this->composerJsonSetting;
@@ -162,14 +159,10 @@ class AssetsInstaller
             $contents = file_get_contents($file);
 
             if (!empty($contents)) {
-                try {
-                    $json = json_decode($contents, true);
+                $json = json_decode($contents, true);
 
-                    if (JSON_ERROR_NONE === json_last_error() && $json && isset($json['extra']) && isset($json['extra']['symfony-assets-install'])) {
-                        $this->composerJsonSetting = $json['extra']['symfony-assets-install'];
-                    }
-                } catch (\Exception $e) {
-                    // noop
+                if (JSON_ERROR_NONE === json_last_error() && $json && isset($json['extra']) && isset($json['extra']['symfony-assets-install'])) {
+                    $this->composerJsonSetting = $json['extra']['symfony-assets-install'];
                 }
             }
         }

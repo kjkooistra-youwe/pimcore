@@ -33,10 +33,7 @@ final class AnyGetter extends AbstractOperator
      */
     private $param1;
 
-    /**
-     * @var bool
-     */
-    private $isArrayType;
+    private bool $isArrayType;
 
     /**
      * @var string
@@ -48,10 +45,7 @@ final class AnyGetter extends AbstractOperator
      */
     private $forwardParam1;
 
-    /**
-     * @var bool
-     */
-    private $returnLastResult;
+    private bool $returnLastResult;
 
     /**
      * {@inheritdoc}
@@ -82,12 +76,12 @@ final class AnyGetter extends AbstractOperator
         $result = new \stdClass();
         $result->label = $this->label;
 
-        $childs = $this->getChilds();
+        $children = $this->getChildren();
 
         $getter = 'get'.ucfirst($this->attribute);
         $fallbackGetter = $this->attribute;
 
-        if (!$childs) {
+        if (!$children) {
             $result->value = null;
             if ($this->attribute && method_exists($element, $getter)) {
                 $result->value = $element->$getter($this->getParam1());
@@ -99,16 +93,16 @@ final class AnyGetter extends AbstractOperator
                 $result->value = $result->value->getObjectVars();
             }
         } else {
-            if (count($childs) > 1) {
+            if (count($children) > 1) {
                 $result->isArrayType = true;
             }
             $resultElements = [];
 
-            if (!is_array($childs)) {
-                $childs = [$childs];
+            if (!is_array($children)) {
+                $children = [$children];
             }
 
-            foreach ($childs as $c) {
+            foreach ($children as $c) {
                 $forwardObject = $element;
 
                 if ($this->forwardAttribute) {
@@ -159,7 +153,7 @@ final class AnyGetter extends AbstractOperator
                 }
                 $resultElements[] = $resultElementValue;
             }
-            if (count($childs) == 1) {
+            if (count($children) == 1) {
                 $result->value = $resultElements[0];
             } else {
                 $result->value = $resultElements;

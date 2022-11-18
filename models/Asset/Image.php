@@ -49,8 +49,10 @@ class Image extends Model\Asset
             }
         }
 
-        $this->clearThumbnails($this->clearThumbnailsOnSave);
-        $this->clearThumbnailsOnSave = false; // reset to default
+        if ($params['isUpdate']) {
+            $this->clearThumbnails($this->clearThumbnailsOnSave);
+            $this->clearThumbnailsOnSave = false; // reset to default
+        }
 
         parent::update($params);
     }
@@ -105,42 +107,55 @@ class Image extends Model\Asset
         if ($facedetectBin) {
             $faceCoordinates = [];
             $thumbnail = $this->getThumbnail(Image\Thumbnail\Config::getPreviewConfig());
-            $image = $thumbnail->getLocalFile();
-            $imageWidth = $thumbnail->getWidth();
-            $imageHeight = $thumbnail->getHeight();
+            $reference = $thumbnail->getPathReference();
+            if (in_array($reference['type'], ['asset', 'thumbnail'])) {
+                $image = $thumbnail->getLocalFile();
 
-            $command = [$facedetectBin, $image];
-            Console::addLowProcessPriority($command);
-            $process = new Process($command);
-            $process->run();
-            $result = $process->getOutput();
-            if (strpos($result, "\n")) {
-                $faces = explode("\n", trim($result));
-
-                foreach ($faces as $coordinates) {
-                    list($x, $y, $width, $height) = explode(' ', $coordinates);
-
-                    // percentages
-                    $Px = $x / $imageWidth * 100;
-                    $Py = $y / $imageHeight * 100;
-                    $Pw = $width / $imageWidth * 100;
-                    $Ph = $height / $imageHeight * 100;
-
-                    $faceCoordinates[] = [
-                        'x' => $Px,
-                        'y' => $Py,
-                        'width' => $Pw,
-                        'height' => $Ph,
-                    ];
+                if (null === $image) {
+                    return false;
                 }
 
-                $this->setCustomSetting('faceCoordinates', $faceCoordinates);
+                $imageWidth = $thumbnail->getWidth();
+                $imageHeight = $thumbnail->getHeight();
 
-                return true;
+                $command = [$facedetectBin, $image];
+                Console::addLowProcessPriority($command);
+                $process = new Process($command);
+                $process->run();
+                $result = $process->getOutput();
+                if (strpos($result, "\n")) {
+                    $faces = explode("\n", trim($result));
+
+                    foreach ($faces as $coordinates) {
+                        list($x, $y, $width, $height) = explode(' ', $coordinates);
+
+                        // percentages
+                        $Px = (int) $x / $imageWidth * 100;
+                        $Py = (int) $y / $imageHeight * 100;
+                        $Pw = (int) $width / $imageWidth * 100;
+                        $Ph = (int) $height / $imageHeight * 100;
+
+                        $faceCoordinates[] = [
+                            'x' => $Px,
+                            'y' => $Py,
+                            'width' => $Pw,
+                            'height' => $Ph,
+                        ];
+                    }
+
+                    $this->setCustomSetting('faceCoordinates', $faceCoordinates);
+
+                    return true;
+                }
             }
         }
 
         return false;
+    }
+
+    private function isLowQualityPreviewEnabled(): bool
+    {
+        return \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['image']['low_quality_image_preview']['enabled'];
     }
 
     /**
@@ -154,9 +169,7 @@ class Image extends Model\Asset
      */
     public function generateLowQualityPreview($generator = null)
     {
-        $config = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['image']['low_quality_image_preview'];
-
-        if (!$config['enabled']) {
+        if (!$this->isLowQualityPreviewEnabled()) {
             return false;
         }
 
@@ -164,6 +177,10 @@ class Image extends Model\Asset
         if (class_exists('Imagick')) {
             // Imagick fallback
             $path = $this->getThumbnail(Image\Thumbnail\Config::getPreviewConfig())->getLocalFile();
+
+            if (null === $path) {
+                return false;
+            }
 
             $imagick = new \Imagick($path);
             $imagick->setImageFormat('jpg');
@@ -210,7 +227,7 @@ EOT;
 
         if (Tool::isFrontend()) {
             $path = urlencode_ignore_slash($storagePath);
-            $prefix = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['frontend_prefixes']['source'];
+            $prefix = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['frontend_prefixes']['thumbnail'];
             $path = $prefix . $path;
         }
 
@@ -224,13 +241,12 @@ EOT;
         return $path;
     }
 
-    /**
-     * @return string
-     */
-    private function getLowQualityPreviewStoragePath()
+    private function getLowQualityPreviewStoragePath(): string
     {
-        return sprintf('%s/image-thumb__%s__-low-quality-preview.svg',
+        return sprintf(
+            '%s/%s/image-thumb__%s__-low-quality-preview.svg',
             rtrim($this->getRealPath(), '/'),
+            $this->getId(),
             $this->getId()
         );
     }
@@ -240,6 +256,10 @@ EOT;
      */
     public function getLowQualityPreviewDataUri(): ?string
     {
+        if (!$this->isLowQualityPreviewEnabled()) {
+            return null;
+        }
+
         try {
             $dataUri = 'data:image/svg+xml;base64,' . base64_encode(Storage::get('thumbnail')->read($this->getLowQualityPreviewStoragePath()));
         } catch (\Exception $e) {
@@ -268,7 +288,7 @@ EOT;
     /**
      * Returns a path to a given thumbnail or an thumbnail configuration.
      *
-     * @param string|array|Image\Thumbnail\Config $config
+     * @param null|string|array|Image\Thumbnail\Config $config
      * @param bool $deferred
      *
      * @return Image\Thumbnail
@@ -340,6 +360,10 @@ EOT;
 
         if (!$path) {
             $path = $this->getLocalFile();
+        }
+
+        if (!$path) {
+            return null;
         }
 
         $dimensions = null;
@@ -481,10 +505,8 @@ EOT;
 
     /**
      * Checks if this object represents an animated gif file
-     *
-     * @return bool
      */
-    private function isAnimatedGif()
+    private function isAnimatedGif(): bool
     {
         $isAnimated = false;
 
@@ -509,10 +531,8 @@ EOT;
 
     /**
      * Checks if this object represents an animated png file
-     *
-     * @return bool
      */
-    private function isAnimatedPng()
+    private function isAnimatedPng(): bool
     {
         $isAnimated = false;
 

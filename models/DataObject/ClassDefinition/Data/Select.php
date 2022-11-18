@@ -78,7 +78,7 @@ class Select extends Data implements
      *
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     public $optionsProviderClass;
 
@@ -87,7 +87,7 @@ class Select extends Data implements
      *
      * @internal
      *
-     * @var string
+     * @var string|null
      */
     public $optionsProviderData;
 
@@ -120,10 +120,8 @@ class Select extends Data implements
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $dynamicOptions = false;
+    public bool $dynamicOptions = false;
 
     /**
      * @return int
@@ -134,7 +132,7 @@ class Select extends Data implements
     }
 
     /**
-     * @param int|null $columnLength
+     * @param int $columnLength
      *
      * @return $this
      */
@@ -152,7 +150,7 @@ class Select extends Data implements
      *
      * @param string $type
      */
-    private function correctColumnDefinition($type)
+    private function correctColumnDefinition(string $type): void
     {
         if (preg_match("/(.*)\((\d+)\)/i", $this->$type, $matches)) {
             $this->{'set' . ucfirst($type)}($matches[1]);
@@ -241,11 +239,11 @@ class Select extends Data implements
     /**
      * @see ResourcePersistenceAwareInterface::getDataForResource
      *
-     * @param string $data
+     * @param string|null $data
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string
+     * @return string|null
      */
     public function getDataForResource($data, $object = null, $params = [])
     {
@@ -257,11 +255,11 @@ class Select extends Data implements
     /**
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
-     * @param string $data
+     * @param string|null $data
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string
+     * @return string|null
      */
     public function getDataFromResource($data, $object = null, $params = [])
     {
@@ -271,11 +269,11 @@ class Select extends Data implements
     /**
      * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      *
-     * @param string $data
+     * @param string|null $data
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
-     * @return string
+     * @return string|null
      */
     public function getDataForQueryResource($data, $object = null, $params = [])
     {
@@ -378,13 +376,17 @@ class Select extends Data implements
     }
 
     /**
-     * @param string|null $data
+     * @param array|string|null $data
      *
      * @return bool
      */
     public function isEmpty($data)
     {
-        return strlen($data) < 1;
+        if (is_array($data)) {
+            return count($data) < 1;
+        }
+
+        return (string) $data === '';
     }
 
     /**
@@ -416,7 +418,7 @@ class Select extends Data implements
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getOptionsProviderClass()
     {
@@ -424,7 +426,7 @@ class Select extends Data implements
     }
 
     /**
-     * @param string $optionsProviderClass
+     * @param string|null $optionsProviderClass
      */
     public function setOptionsProviderClass($optionsProviderClass)
     {
@@ -432,7 +434,7 @@ class Select extends Data implements
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getOptionsProviderData()
     {
@@ -440,7 +442,7 @@ class Select extends Data implements
     }
 
     /**
-     * @param string $optionsProviderData
+     * @param string|null $optionsProviderData
      */
     public function setOptionsProviderData($optionsProviderData)
     {
@@ -450,7 +452,7 @@ class Select extends Data implements
     /**
      * { @inheritdoc }
      */
-    public function enrichFieldDefinition(/** array */ $context = []) /** : Data */
+    public function enrichFieldDefinition(/** array */ $context = []) /** : static */
     {
         $this->doEnrichDefinitionDefinition(null, $this->getName(),
             'fielddefinition', DataObject\ClassDefinition\Helper\OptionsProviderResolver::MODE_SELECT, $context);
@@ -461,7 +463,7 @@ class Select extends Data implements
     /**
      * {@inheritdoc}
      */
-    public function enrichLayoutDefinition(/*?Concrete */ $object, /**  array */ $context = []) // : self
+    public function enrichLayoutDefinition(/* ?Concrete */ $object, /* array */ $context = []) // : static
     {
         $this->doEnrichDefinitionDefinition($object, $this->getName(),
             'layout', DataObject\ClassDefinition\Helper\OptionsProviderResolver::MODE_SELECT, $context);
@@ -575,7 +577,7 @@ class Select extends Data implements
      * @return $this
      */
     #[\ReturnTypeWillChange]
-    public function jsonSerialize()
+    public function jsonSerialize()// : static
     {
         if ($this->getOptionsProviderClass() && Service::doRemoveDynamicOptions()) {
             $this->options = null;

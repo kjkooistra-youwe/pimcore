@@ -15,15 +15,15 @@
 
 namespace Pimcore\Tests\Model\Inheritance;
 
-use Pimcore\Db\Connection;
+use Doctrine\DBAL\Connection;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\DataObject\Folder;
 use Pimcore\Model\DataObject\Inheritance;
 use Pimcore\Model\DataObject\RelationTest;
 use Pimcore\Model\DataObject\Service;
-use Pimcore\Tests\Test\ModelTestCase;
-use Pimcore\Tests\Util\TestHelper;
+use Pimcore\Tests\Support\Test\ModelTestCase;
+use Pimcore\Tests\Support\Util\TestHelper;
 
 class GeneralTest extends ModelTestCase
 {
@@ -50,7 +50,7 @@ class GeneralTest extends ModelTestCase
         $one = new Inheritance();
         $one->setKey('one');
         $one->setParentId(1);
-        $one->setPublished(1);
+        $one->setPublished(true);
 
         $one->setNormalInput('parenttext');
         $one->save();
@@ -58,7 +58,7 @@ class GeneralTest extends ModelTestCase
         $two = new Inheritance();
         $two->setKey('two');
         $two->setParentId($one->getId());
-        $two->setPublished(1);
+        $two->setPublished(true);
         $two->setNormalInput('childtext');
         $two->save();
 
@@ -159,7 +159,7 @@ class GeneralTest extends ModelTestCase
         $one = new Inheritance();
         $one->setKey('one');
         $one->setParentId(1);
-        $one->setPublished(1);
+        $one->setPublished(true);
 
         $one->setNormalInput('parenttext');
         $one->setRelation($target);
@@ -170,7 +170,7 @@ class GeneralTest extends ModelTestCase
         $two = new Inheritance();
         $two->setKey('one');
         $two->setParentId($one->getId());
-        $two->setPublished(1);
+        $two->setPublished(true);
 
         $two->setNormalInput('parenttext');
         $two->save();
@@ -187,13 +187,13 @@ class GeneralTest extends ModelTestCase
 
         // enable inheritance and set the target
         DataObject::setGetInheritedValues(true);
-        $two = Concrete::getById($two->getId(), true);
+        $two = Concrete::getById($two->getId(), ['force' => true]);
         $two->setRelation($target);
         $two->save();
 
         // disable inheritance and check that the relation has been set on "two"
         DataObject::setGetInheritedValues(false);
-        $two = Concrete::getById($two->getId(), true);
+        $two = Concrete::getById($two->getId(), ['force' => true]);
         $fetchedTarget = $two->getRelation();
         $this->assertTrue($fetchedTarget && $fetchedTarget->getId() == $target->getId(), 'expectected inherited target');
 
@@ -217,7 +217,7 @@ class GeneralTest extends ModelTestCase
         $one = new Inheritance();
         $one->setKey('one');
         $one->setParentId(1);
-        $one->setPublished(1);
+        $one->setPublished(true);
 
         $one->setNormalInput('parenttext');
         $one->save();
@@ -230,7 +230,7 @@ class GeneralTest extends ModelTestCase
         $two = new Inheritance();
         $two->setKey('two');
         $two->setParentId($folder->getId());
-        $two->setPublished(1);
+        $two->setPublished(true);
 
         $two->setNormalInput('childtext');
         $two->save();
@@ -280,7 +280,7 @@ class GeneralTest extends ModelTestCase
         $one = new Inheritance();
         $one->setKey('one');
         $one->setParentId(1);
-        $one->setPublished(1);
+        $one->setPublished(true);
 
         $one->setNormalInput('parenttext');
         $one->save();
@@ -293,7 +293,7 @@ class GeneralTest extends ModelTestCase
         $two = new Inheritance();
         $two->setKey('two');
         $two->setParentId($objectBetween->getId());
-        $two->setPublished(1);
+        $two->setPublished(true);
 
         $two->setNormalInput('childtext');
         $two->save();

@@ -29,7 +29,7 @@ use Pimcore\Model\Element\DirtyIndicatorInterface;
 
 /**
  * @method \Pimcore\Model\DataObject\Concrete\Dao getDao()
- * @method \Pimcore\Model\Version|null getLatestVersion($userId = null)
+ * @method \Pimcore\Model\Version|null getLatestVersion(?int $userId = null)
  */
 class Concrete extends DataObject implements LazyLoadedFieldsInterface
 {
@@ -42,6 +42,15 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
      * @var array|null
      */
     protected $__rawRelationData = null;
+
+    /**
+     * @internal
+     *
+     * Necessary for assigning object reference to corresponding fields while wakeup
+     *
+     * @var array
+     */
+    public $__objectAwareFields = [];
 
     /**
      * @internal
@@ -59,8 +68,6 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
 
     /**
      * @internal
-     *
-     * @var ClassDefinition|null
      */
     protected ?ClassDefinition $o_class = null;
 
@@ -153,12 +160,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
                                 throw $newException;
                             }
                         } else {
-                            if ($e instanceof Model\Element\ValidationException) {
-                                throw $e;
-                            }
-                            $exceptionClass = get_class($e);
-
-                            throw new $exceptionClass($e->getMessage() . ' fieldname=' . $fd->getName(), $e->getCode(), $e);
+                            throw $e;
                         }
                     }
                 }
@@ -167,15 +169,23 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
             }
         }
 
+        $preUpdateEvent = new DataObjectEvent($this, [
+            'validationExceptions' => $validationExceptions,
+            'message' => 'Validation failed: ',
+            'separator' => ' / ',
+        ]);
+        \Pimcore::getEventDispatcher()->dispatch($preUpdateEvent, DataObjectEvents::PRE_UPDATE_VALIDATION_EXCEPTION);
+        $validationExceptions = $preUpdateEvent->getArgument('validationExceptions');
+
         if ($validationExceptions) {
-            $message = 'Validation failed: ';
+            $message = $preUpdateEvent->getArgument('message');
             $errors = [];
 
             /** @var Model\Element\ValidationException $e */
             foreach ($validationExceptions as $e) {
                 $errors[] = $e->getAggregatedMessage();
             }
-            $message .= implode(' / ', $errors);
+            $message .= implode($preUpdateEvent->getArgument('separator'), $errors);
 
             throw new Model\Element\ValidationException($message);
         }
@@ -377,7 +387,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
     /**
      * @param ClassDefinition|null $o_class
      *
-     * @return self
+     * @return $this
      */
     public function setClass(?ClassDefinition $o_class)
     {
@@ -469,7 +479,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
     /**
      * @param bool $omitMandatoryCheck
      *
-     * @return self
+     * @return $this
      */
     public function setOmitMandatoryCheck($omitMandatoryCheck)
     {
@@ -500,7 +510,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
      */
     public function getValueFromParent($key, $params = null)
     {
-        $parent = $this->getNextParentForInheritance($key);
+        $parent = $this->getNextParentForInheritance();
         if ($parent) {
             $method = 'get' . $key;
             if (method_exists($parent, $method)) {
@@ -516,11 +526,9 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
     /**
      * @internal
      *
-     * @param string $fieldName allows to disable inheritance for single field by overriding the corresponding data object class
-     *
-     * @return AbstractObject|null
+     * @return Concrete|null
      */
-    public function getNextParentForInheritance($fieldName = null)
+    public function getNextParentForInheritance()
     {
         return $this->getClosestParentOfClass($this->getClassId());
     }
@@ -530,7 +538,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
      *
      * @return self|null
      */
-    private function getClosestParentOfClass(string $classId): ?self
+    public function getClosestParentOfClass(string $classId): ?self
     {
         $parent = $this->getParent();
         if ($parent instanceof AbstractObject) {
@@ -551,8 +559,6 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
 
     /**
      * get object relation data as array for a specific field
-     *
-     * @internal
      *
      * @param string $fieldName
      * @param bool $forOwner
@@ -611,10 +617,15 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
                 throw new \Exception("Static getter '::getBy".ucfirst($realPropertyName)."' is not allowed for fieldtype '" . $field->getFieldType() . "'");
             }
 
-            if ($field instanceof Model\DataObject\ClassDefinition\Data\Localizedfields) {
-                $arguments = array_pad($arguments, 6, 0);
+            $db = Db::get();
 
-                [$localizedPropertyName, $value, $locale, $limit, $offset, $objectTypes] = $arguments;
+            if ($field instanceof Model\DataObject\ClassDefinition\Data\Localizedfields) {
+                $localizedPropertyName = empty($arguments[0]) ? throw new \InvalidArgumentException('Mandatory argument $field not set.') : $arguments[0];
+                $value = array_key_exists(1, $arguments) ? $arguments[1] : throw new \InvalidArgumentException('Mandatory argument $value not set.');
+                $locale = $arguments[2] ?? null;
+                $limit = $arguments[3] ?? null;
+                $offset = $arguments[4] ?? 0;
+                $objectTypes = $arguments[5] ?? null;
 
                 $localizedField = $field->getFieldDefinition($localizedPropertyName);
 
@@ -628,20 +639,20 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
                     throw new \Exception("Static getter '::getBy".ucfirst($realPropertyName)."' is not allowed for fieldtype '" . $localizedField->getFieldType() . "'");
                 }
 
-                $defaultCondition = $localizedPropertyName . ' = ' . Db::get()->quote($value) . ' ';
+                $defaultCondition = $db->quoteIdentifier($localizedPropertyName) . ' = ' . $db->quote($value) . ' ';
                 $listConfig = [
                     'condition' => $defaultCondition,
                 ];
 
-                if ($locale) {
-                    $listConfig['locale'] = $locale;
-                }
+                $listConfig['locale'] = $locale;
             } else {
-                $arguments = array_pad($arguments, 4, 0);
-                [$value, $limit, $offset, $objectTypes] = $arguments;
+                $value = array_key_exists(0, $arguments) ? $arguments[0] : throw new \InvalidArgumentException('Mandatory argument $value not set.');
+                $limit = $arguments[1] ?? null;
+                $offset = $arguments[2] ?? 0;
+                $objectTypes = $arguments[3] ?? null;
 
                 if (!$field instanceof AbstractRelations) {
-                    $defaultCondition = $realPropertyName . ' = ' . Db::get()->quote($value) . ' ';
+                    $defaultCondition = $db->quoteIdentifier($realPropertyName) . ' = ' . $db->quote($value) . ' ';
                 }
                 $listConfig = [
                     'condition' => $defaultCondition,
@@ -649,12 +660,8 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
             }
 
             if (!is_array($limit)) {
-                if ($limit) {
-                    $listConfig['limit'] = $limit;
-                }
-                if ($offset) {
-                    $listConfig['offset'] = $offset;
-                }
+                $listConfig['limit'] = $limit;
+                $listConfig['offset'] = $offset;
             } else {
                 $listConfig = array_merge($listConfig, $limit);
                 $limitCondition = $limit['condition'] ?? '';
@@ -663,7 +670,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
 
             $list = static::makeList($listConfig, $objectTypes);
 
-            if ($field instanceof AbstractRelations && $field->isFilterable()) {
+            if ($field instanceof AbstractRelations) {
                 $list = $field->addListingFilter($list, $value);
             }
 
@@ -691,7 +698,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
      *
      * @throws \Exception
      */
-    public function save()
+    public function save(array $parameters = []): static
     {
         $isDirtyDetectionDisabled = DataObject::isDirtyDetectionDisabled();
 
@@ -702,12 +709,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
         }
 
         try {
-            $params = [];
-            if (func_num_args() && is_array(func_get_arg(0))) {
-                $params = func_get_arg(0);
-            }
-
-            parent::save($params);
+            parent::save($parameters);
             if ($this instanceof DirtyIndicatorInterface) {
                 $this->resetDirtyMap();
             }
@@ -787,6 +789,13 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
         if (property_exists($this, 'localizedfields') && $this->localizedfields instanceof Localizedfield) {
             $this->localizedfields->setObject($this, false);
         }
+
+        // renew object reference to other object aware fields
+        foreach ($this->__objectAwareFields as $objectAwareField => $exists) {
+            if (isset($this->$objectAwareField) && $this->$objectAwareField instanceof ObjectAwareFieldInterface) {
+                $this->$objectAwareField->setObject($this);
+            }
+        }
     }
 
     /**
@@ -814,7 +823,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
         $conditionParts = Service::buildConditionPartsFromDescriptor($descriptor);
 
         $query = 'SELECT * FROM ' . $table . ' WHERE ' . implode(' AND ', $conditionParts);
-        $result = $db->fetchAll($query);
+        $result = $db->fetchAllAssociative($query);
 
         return $result;
     }
@@ -886,8 +895,7 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
     {
         if ($this->__rawRelationData === null) {
             $db = Db::get();
-            $relations = $db->fetchAll('SELECT * FROM object_relations_' . $this->getClassId() . ' WHERE src_id = ?', [$this->getId()]);
-            $this->__rawRelationData = $relations ?? [];
+            $this->__rawRelationData = $db->fetchAllAssociative('SELECT * FROM object_relations_' . $this->getClassId() . ' WHERE src_id = ?', [$this->getId()]);
         }
 
         return $this->__rawRelationData;

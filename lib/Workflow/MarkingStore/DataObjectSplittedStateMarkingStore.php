@@ -60,9 +60,11 @@ class DataObjectSplittedStateMarkingStore implements MarkingStoreInterface
     /**
      * {@inheritdoc}
      *
+     * @return Marking
+     *
      * @throws LogicException
      */
-    public function getMarking($subject)// : Marking
+    public function getMarking($subject): Marking
     {
         $this->checkIfSubjectIsValid($subject);
 
@@ -133,7 +135,7 @@ class DataObjectSplittedStateMarkingStore implements MarkingStoreInterface
         return $places;
     }
 
-    private function setProperty(Concrete $subject, $property, $places)
+    private function setProperty(Concrete $subject, string $property, mixed $places): void
     {
         $fd = $subject->getClass()->getFieldDefinition($property);
 
@@ -153,11 +155,9 @@ class DataObjectSplittedStateMarkingStore implements MarkingStoreInterface
     }
 
     /**
-     * @param object $subject
-     *
-     * @return Concrete
+     * @throws LogicException
      */
-    private function checkIfSubjectIsValid($subject): Concrete
+    private function checkIfSubjectIsValid(object $subject): Concrete
     {
         if (!$subject instanceof Concrete) {
             throw new LogicException('data_object_splitted_state marking store works for pimcore data objects only.');
@@ -166,7 +166,10 @@ class DataObjectSplittedStateMarkingStore implements MarkingStoreInterface
         return $subject;
     }
 
-    private function validateStateMapping(array $places, array $stateMapping)
+    /**
+     * @throws LogicException
+     */
+    private function validateStateMapping(array $places, array $stateMapping): void
     {
         $diff = array_diff($places, array_keys($stateMapping));
 

@@ -64,10 +64,8 @@ class Date extends Data implements ResourcePersistenceAwareInterface, QueryResou
 
     /**
      * @internal
-     *
-     * @var bool
      */
-    public $useCurrentDate;
+    public bool $useCurrentDate = false;
 
     /**
      * @see ResourcePersistenceAwareInterface::getDataForResource
@@ -97,7 +95,7 @@ class Date extends Data implements ResourcePersistenceAwareInterface, QueryResou
     /**
      * @see ResourcePersistenceAwareInterface::getDataFromResource
      *
-     * @param int $data
+     * @param string|null $data
      * @param null|DataObject\Concrete $object
      * @param mixed $params
      *
@@ -153,14 +151,9 @@ class Date extends Data implements ResourcePersistenceAwareInterface, QueryResou
         return null;
     }
 
-    /**
-     * @param int $timestamp
-     *
-     * @return \Carbon\Carbon
-     */
-    private function getDateFromTimestamp($timestamp)
+    private function getDateFromTimestamp(float|int|string $timestamp): Carbon
     {
-        $date = new \Carbon\Carbon();
+        $date = new Carbon();
         $date->setTimestamp($timestamp);
 
         return $date;
@@ -205,7 +198,7 @@ class Date extends Data implements ResourcePersistenceAwareInterface, QueryResou
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return int|null|string
+     * @return int|null
      */
     public function getDataForGrid($data, $object = null, $params = [])
     {
@@ -314,11 +307,12 @@ class Date extends Data implements ResourcePersistenceAwareInterface, QueryResou
     }
 
     /** See parent class.
+     *
      * @param array $data
      * @param DataObject\Concrete|null $object
      * @param mixed $params
      *
-     * @return mixed
+     * @return Carbon|null
      */
     public function getDiffDataFromEditmode($data, $object = null, $params = [])
     {

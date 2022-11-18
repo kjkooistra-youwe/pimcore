@@ -51,17 +51,14 @@ class Task extends Model\AbstractModel
     protected $action;
 
     /**
-     * @var int
+     * @var int|null
      */
     protected $version;
 
-    /**
-     * @var bool
-     */
-    protected $active;
+    protected bool $active = false;
 
     /**
-     * @var null|int
+     * @var int|null
      */
     protected $userId;
 
@@ -75,7 +72,7 @@ class Task extends Model\AbstractModel
         $cacheKey = 'scheduled_task_' . $id;
 
         try {
-            $task = \Pimcore\Cache\Runtime::get($cacheKey);
+            $task = \Pimcore\Cache\RuntimeCache::get($cacheKey);
             if (!$task) {
                 throw new \Exception('Scheduled Task in Registry is not valid');
             }
@@ -83,7 +80,7 @@ class Task extends Model\AbstractModel
             try {
                 $task = new self();
                 $task->getDao()->getById((int)$id);
-                \Pimcore\Cache\Runtime::set($cacheKey, $task);
+                \Pimcore\Cache\RuntimeCache::set($cacheKey, $task);
             } catch (Model\Exception\NotFoundException $e) {
                 return null;
             }
@@ -95,7 +92,7 @@ class Task extends Model\AbstractModel
     /**
      * @param array $data
      *
-     * @return Task
+     * @return self
      */
     public static function create($data)
     {
@@ -155,7 +152,7 @@ class Task extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getVersion()
     {
@@ -223,7 +220,7 @@ class Task extends Model\AbstractModel
     }
 
     /**
-     * @param int $version
+     * @param int|null $version
      *
      * @return $this
      */
@@ -266,11 +263,9 @@ class Task extends Model\AbstractModel
     }
 
     /**
-     * @param int|null $userId
-     *
      * @return $this
      */
-    public function setUserId(?int $userId): self
+    public function setUserId(?int $userId): static
     {
         $this->userId = $userId;
 

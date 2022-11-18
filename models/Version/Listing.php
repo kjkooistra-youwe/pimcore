@@ -28,8 +28,6 @@ class Listing extends Model\Listing\AbstractListing
 {
     /**
      * @internal
-     *
-     * @var bool
      */
     protected bool $loadAutoSave = false;
 
@@ -42,9 +40,9 @@ class Listing extends Model\Listing\AbstractListing
     }
 
     /**
-     * @param bool $loadAutoSave
+     * @return $this
      */
-    public function setLoadAutoSave(bool $loadAutoSave): self
+    public function setLoadAutoSave(bool $loadAutoSave): static
     {
         $this->loadAutoSave = $loadAutoSave;
 
@@ -62,7 +60,7 @@ class Listing extends Model\Listing\AbstractListing
     /**
      * @param Model\Version[]|null $versions
      *
-     * @return static
+     * @return $this
      */
     public function setVersions($versions)
     {

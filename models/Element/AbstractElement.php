@@ -15,12 +15,14 @@
 
 namespace Pimcore\Model\Element;
 
-use Pimcore\Cache\Runtime;
+use Pimcore\Cache;
+use Pimcore\Cache\RuntimeCache;
 use Pimcore\Event\AdminEvents;
 use Pimcore\Event\Model\ElementEvent;
+use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Model;
-use Pimcore\Model\DataObject\AbstractObject;
 use Pimcore\Model\Element\Traits\DirtyIndicatorTrait;
+use Pimcore\Model\User;
 
 /**
  * @method Model\Document\Dao|Model\Asset\Dao|Model\DataObject\AbstractObject\Dao getDao()
@@ -29,6 +31,7 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
 {
     use ElementDumpStateTrait;
     use DirtyIndicatorTrait;
+    use RecursionBlockingEventDispatchHelperTrait;
 
     /**
      * @internal
@@ -40,9 +43,322 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
     /**
      * @internal
      *
-     * @var int
+     * @var int|null
      */
     protected $__dataVersionTimestamp = null;
+
+    /**
+     * @internal
+     *
+     * @var string|null
+     */
+    protected $path;
+
+    /**
+     * @internal
+     */
+    protected ?array $properties = null;
+
+    /**
+     * @internal
+     */
+    public static bool $doNotRestoreKeyAndPath = false;
+
+    /**
+     * @internal
+     */
+    protected ?int $id = null;
+
+    /**
+     * @internal
+     */
+    protected ?int $creationDate = null;
+
+    /**
+     * @internal
+     *
+     * @var int|null
+     */
+    protected $modificationDate;
+
+    /**
+     * @internal
+     *
+     * @var int
+     */
+    protected $versionCount = 0;
+
+    /**
+     * @internal
+     */
+    protected ?int $userOwner = null;
+
+    /**
+     * @internal
+     */
+    protected ?string $locked = null;
+
+    /**
+     * @internal
+     */
+    protected ?int $userModification = null;
+
+    /**
+     * @internal
+     */
+    protected ?int $parentId = null;
+
+    /**
+     * @return string|null
+     */
+    public function getPath()
+    {
+        return $this->path;
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return $this
+     */
+    public function setPath($path)
+    {
+        $this->path = (string) $path;
+
+        return $this;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function getParentId()
+    {
+        return $this->parentId;
+    }
+
+    /**
+     * @param int $parentId
+     *
+     * @return $this
+     */
+    public function setParentId($parentId)
+    {
+        $parentId = (int) $parentId;
+        $this->parentId = $parentId;
+        $this->parent = null;
+
+        return $this;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function getUserModification()
+    {
+        return $this->userModification;
+    }
+
+    /**
+     * @param int $userModification
+     *
+     * @return $this
+     */
+    public function setUserModification($userModification)
+    {
+        $this->markFieldDirty('userModification');
+        $this->userModification = (int) $userModification;
+
+        return $this;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function getCreationDate()
+    {
+        return $this->creationDate;
+    }
+
+    /**
+     * @param int $creationDate
+     *
+     * @return $this
+     */
+    public function setCreationDate($creationDate)
+    {
+        $this->creationDate = (int) $creationDate;
+
+        return $this;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function getModificationDate()
+    {
+        return $this->modificationDate;
+    }
+
+    /**
+     * @param int $modificationDate
+     *
+     * @return $this
+     */
+    public function setModificationDate($modificationDate)
+    {
+        $this->markFieldDirty('modificationDate');
+
+        $this->modificationDate = (int) $modificationDate;
+
+        return $this;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function getUserOwner()
+    {
+        return $this->userOwner;
+    }
+
+    /**
+     * @param int $userOwner
+     *
+     * @return $this
+     */
+    public function setUserOwner($userOwner)
+    {
+        $this->userOwner = (int) $userOwner;
+
+        return $this;
+    }
+
+    /**
+     * enum('self','propagate') nullable
+     *
+     * @return string|null
+     */
+    public function getLocked()
+    {
+        if (empty($this->locked)) {
+            return null;
+        }
+
+        return $this->locked;
+    }
+
+    /**
+     * enum('self','propagate') nullable
+     *
+     * @param string|null $locked
+     *
+     * @return $this
+     */
+    public function setLocked($locked)
+    {
+        $this->locked = $locked;
+
+        return $this;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function getId()
+    {
+        return $this->id;
+    }
+
+    /**
+     * @param int|null $id
+     *
+     * @return $this
+     */
+    public function setId($id)
+    {
+        $this->id = $id ? (int)$id : null;
+
+        return $this;
+    }
+
+    /**
+     * @var self|null
+     */
+    protected $parent = null;
+
+    /**
+     * @return self|null
+     */
+    public function getParent()
+    {
+        if ($this->parent === null) {
+            $parent = Service::getElementById(Service::getElementType($this), $this->getParentId());
+            $this->setParent($parent);
+        }
+
+        return $this->parent;
+    }
+
+    /**
+     * @return Model\Property[]
+     */
+    public function getProperties()
+    {
+        $type = Service::getElementType($this);
+
+        if ($this->properties === null) {
+            // try to get from cache
+            $cacheKey = $type . '_properties_' . $this->getId();
+            $properties = Cache::load($cacheKey);
+            if (!is_array($properties)) {
+                $properties = $this->getDao()->getProperties();
+                $elementCacheTag = $this->getCacheTag();
+                $cacheTags = [$type . '_properties' => $type . '_properties', $elementCacheTag => $elementCacheTag];
+                Cache::save($properties, $cacheKey, $cacheTags);
+            }
+
+            $this->setProperties($properties);
+        }
+
+        return $this->properties;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setProperties(?array $properties)
+    {
+        $this->properties = $properties;
+
+        return $this;
+    }
+
+    /**
+     * @param string $name
+     * @param string $type
+     * @param mixed $data
+     * @param bool $inherited
+     * @param bool $inheritable
+     *
+     * @return $this
+     */
+    public function setProperty($name, $type, $data, $inherited = false, $inheritable = false)
+    {
+        $this->getProperties();
+
+        $property = new Model\Property();
+        $property->setType($type);
+        $property->setCid($this->getId());
+        $property->setName($name);
+        $property->setCtype(Service::getElementType($this));
+        $property->setData($data);
+        $property->setInherited($inherited);
+        $property->setInheritable($inheritable);
+
+        $this->properties[$name] = $property;
+
+        return $this;
+    }
 
     /**
      * @internal
@@ -57,7 +373,7 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
             $this->setVersionCount(1);
         }
 
-        $modificationDateKey = $this instanceof AbstractObject ? 'o_modificationDate' : 'modificationDate';
+        $modificationDateKey = 'modificationDate';
         if (!$this->isFieldDirty($modificationDateKey)) {
             $updateTime = time();
             $this->setModificationDate($updateTime);
@@ -68,11 +384,11 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
         }
 
         // auto assign user if possible, if not changed explicitly, if no user present, use ID=0 which represents the "system" user
-        $userModificationKey = $this instanceof AbstractObject ? 'o_userModification' : 'userModification';
+        $userModificationKey = 'userModification';
         if (!$this->isFieldDirty($userModificationKey)) {
             $userId = 0;
             $user = \Pimcore\Tool\Admin::getCurrentUser();
-            if ($user instanceof Model\User) {
+            if ($user instanceof User) {
                 $userId = $user->getId();
             }
             $this->setUserModification($userId);
@@ -121,13 +437,31 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
     }
 
     /**
+     * @return int
+     */
+    public function getVersionCount(): int
+    {
+        return $this->versionCount ? $this->versionCount : 0;
+    }
+
+    /**
+     * @return $this
+     */
+    public function setVersionCount(?int $versionCount): static
+    {
+        $this->versionCount = (int) $versionCount;
+
+        return $this;
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function getCacheTag()
     {
         $elementType = Service::getElementType($this);
 
-        return $elementType . '_' . $this->getId();
+        return Service::getElementCacheTag($elementType, $this->getId());
     }
 
     /**
@@ -141,7 +475,7 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
     {
         $elementType = Service::getElementTypeByClassName(static::class);
 
-        return $elementType . '_' . $id;
+        return Service::getElementCacheTag($elementType, $id);
     }
 
     /**
@@ -189,11 +523,15 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
     }
 
     /**
-     * @internal
+     * @param User|null $user
      *
      * @return array
+     *
+     * @throws \Exception
+     *
+     * @internal
      */
-    public function getUserPermissions()
+    public function getUserPermissions(?User $user = null)
     {
         $baseClass = Service::getBaseClassNameForElement($this);
         $workspaceClass = '\\Pimcore\\Model\\User\\Workspace\\' . $baseClass;
@@ -203,10 +541,32 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
         $ignored = ['userId', 'cid', 'cpath', 'dao'];
         $permissions = [];
 
-        foreach ($vars as $name => $defaultValue) {
-            if (!in_array($name, $ignored)) {
-                $permissions[$name] = $this->isAllowed($name);
-            }
+        $columns = array_diff(array_keys($vars), $ignored);
+        $defaultValue = 0;
+
+        if (null === $user) {
+            $user = \Pimcore\Tool\Admin::getCurrentUser();
+        }
+
+        if ((!$user && php_sapi_name() === 'cli') || $user?->isAdmin()) {
+            $defaultValue = 1;
+        }
+
+        foreach ($columns as $name) {
+            $permissions[$name] = $defaultValue;
+        }
+
+        if (!$user || $user->isAdmin() || !$user->isAllowed(Service::getElementType($this) . 's')) {
+            return $permissions;
+        }
+
+        $permissions = $this->getDao()->areAllowed($columns, $user);
+
+        foreach ($permissions as $type => $isAllowed) {
+            $event = new ElementEvent($this, ['isAllowed' => $isAllowed, 'permissionType' => $type, 'user' => $user]);
+            \Pimcore::getEventDispatcher()->dispatch($event, AdminEvents::ELEMENT_PERMISSION_IS_ALLOWED);
+
+            $permissions[$type] = $event->getArgument('isAllowed');
         }
 
         return $permissions;
@@ -215,7 +575,7 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
     /**
      * {@inheritdoc}
      */
-    public function isAllowed($type, ?Model\User $user = null)
+    public function isAllowed($type, ?User $user = null)
     {
         if (null === $user) {
             $user = \Pimcore\Tool\Admin::getCurrentUser();
@@ -234,6 +594,9 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
             return true;
         }
 
+        if (!$user->isAllowed(Service::getElementType($this) . 's')) {
+            return false;
+        }
         $isAllowed = $this->getDao()->isAllowed($type, $user);
 
         $event = new ElementEvent($this, ['isAllowed' => $isAllowed, 'permissionType' => $type, 'user' => $user]);
@@ -383,19 +746,48 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
     }
 
     /**
-     * {@inheritdoc}
+     * @internal
+     *
+     * @return string[]
      */
-    public function __sleep()
+    protected function getBlockedVars(): array
     {
-        $parentVars = parent::__sleep();
-        $blockedVars = ['dependencies'];
-
-        return array_diff($parentVars, $blockedVars);
+        return ['dependencies', 'parent'];
     }
 
     /**
      * {@inheritdoc}
      */
+    public function __sleep()
+    {
+        if ($this->isInDumpState()) {
+            // this is if we want to make a full dump of the object (eg. for a new version), including children for recyclebin
+            $this->removeInheritedProperties();
+        }
+
+        return array_diff(parent::__sleep(), $this->getBlockedVars());
+    }
+
+    public function __wakeup()
+    {
+        if ($this->isInDumpState()) {
+            // set current key and path this is necessary because the serialized data can have a different path than the original element ( element was renamed or moved )
+            $originalElement = static::getById($this->getId());
+
+            if ($originalElement && !self::$doNotRestoreKeyAndPath) {
+                // set key and path for DataObject and Document (assets have different wakeup call)
+                $this->setKey($originalElement->getKey());
+                $this->setPath($originalElement->getRealPath());
+            }
+        }
+
+        if ($this->isInDumpState() && $this->properties !== null) {
+            $this->renewInheritedProperties();
+        }
+
+        $this->setInDumpState(false);
+    }
+
     public function __clone()
     {
         parent::__clone();
@@ -449,8 +841,8 @@ abstract class AbstractElement extends Model\AbstractModel implements ElementInt
 
         // add to registry to avoid infinite regresses in the following $this->getDao()->getProperties()
         $cacheKey = self::getCacheKey($this->getId());
-        if (!Runtime::isRegistered($cacheKey)) {
-            Runtime::set($cacheKey, $this);
+        if (!RuntimeCache::isRegistered($cacheKey)) {
+            RuntimeCache::set($cacheKey, $this);
         }
 
         $myProperties = $this->getProperties();

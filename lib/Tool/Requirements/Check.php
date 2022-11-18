@@ -32,26 +32,24 @@ final class Check implements \ArrayAccess
     public $name;
 
     /**
-     * @var string
+     * @var string|null
      */
     public $link;
 
     /**
-     * @var string
+     * @var int
      */
     public $state;
 
     /**
-     * @var string
+     * @var string|null
      */
     public $message;
 
     /**
-     * Check constructor.
-     *
-     * @param array $data
+     * @param array{name: string, link?: string, state: int, message?: string} $data
      */
-    public function __construct(array $data = [])
+    public function __construct(array $data)
     {
         foreach ($data as $key => $value) {
             $this->$key = $value;
@@ -75,7 +73,7 @@ final class Check implements \ArrayAccess
     }
 
     /**
-     * @return string
+     * @return string|null
      */
     public function getLink()
     {
@@ -91,7 +89,7 @@ final class Check implements \ArrayAccess
     }
 
     /**
-     * @return string
+     * @return int
      */
     public function getState()
     {
@@ -99,7 +97,7 @@ final class Check implements \ArrayAccess
     }
 
     /**
-     * @param string $state
+     * @param int $state
      */
     public function setState($state)
     {
@@ -131,8 +129,7 @@ final class Check implements \ArrayAccess
      *
      * @return bool
      */
-    #[\ReturnTypeWillChange]
-    public function offsetExists($offset)
+    public function offsetExists($offset): bool
     {
         return isset($this->$offset);
     }
@@ -140,20 +137,18 @@ final class Check implements \ArrayAccess
     /**
      * @param string $offset
      *
-     * @return string
+     * @return string|int|null
      */
-    #[\ReturnTypeWillChange]
-    public function offsetGet($offset)
+    public function offsetGet($offset): string|int|null
     {
         return $this->{'get'.$offset}();
     }
 
     /**
      * @param string $offset
-     * @param string $value
+     * @param string|int $value
      */
-    #[\ReturnTypeWillChange]
-    public function offsetSet($offset, $value)
+    public function offsetSet($offset, $value): void
     {
         $this->{'set'.$offset}($value);
     }
@@ -161,8 +156,7 @@ final class Check implements \ArrayAccess
     /**
      * @param string $offset
      */
-    #[\ReturnTypeWillChange]
-    public function offsetUnset($offset)
+    public function offsetUnset($offset): void
     {
         unset($this->$offset);
     }

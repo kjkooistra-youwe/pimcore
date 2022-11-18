@@ -37,7 +37,7 @@ class Dao extends Model\Dao\AbstractDao
             $this->model->setId($id);
         }
 
-        $data = $this->db->fetchRow('SELECT * FROM targeting_rules WHERE id = ?', $this->model->getId());
+        $data = $this->db->fetchAssociative('SELECT * FROM targeting_rules WHERE id = ?', [$this->model->getId()]);
 
         if (!empty($data['id'])) {
             $data['conditions'] = (isset($data['conditions']) ? Serialize::unserialize($data['conditions']) : []);
@@ -60,7 +60,7 @@ class Dao extends Model\Dao\AbstractDao
             $this->model->setName($name);
         }
 
-        $data = $this->db->fetchAll('SELECT id FROM targeting_rules WHERE name = ?', [$this->model->getName()]);
+        $data = $this->db->fetchAllAssociative('SELECT id FROM targeting_rules WHERE name = ?', [$this->model->getName()]);
 
         if (count($data) === 1) {
             $this->getById($data[0]['id']);
@@ -118,6 +118,6 @@ class Dao extends Model\Dao\AbstractDao
     public function create()
     {
         $this->db->insert('targeting_rules', []);
-        $this->model->setId($this->db->lastInsertId());
+        $this->model->setId((int) $this->db->lastInsertId());
     }
 }

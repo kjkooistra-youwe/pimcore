@@ -16,8 +16,10 @@
 namespace Pimcore\Model\DataObject\Classificationstore;
 
 use Pimcore\Cache;
+use Pimcore\Cache\RuntimeCache;
 use Pimcore\Event\DataObjectClassificationStoreEvents;
 use Pimcore\Event\Model\DataObject\ClassificationStore\GroupConfigEvent;
+use Pimcore\Event\Traits\RecursionBlockingEventDispatchHelperTrait;
 use Pimcore\Model;
 
 /**
@@ -26,8 +28,10 @@ use Pimcore\Model;
  */
 final class GroupConfig extends Model\AbstractModel
 {
+    use RecursionBlockingEventDispatchHelperTrait;
+
     /**
-     * @var int
+     * @var int|null
      */
     protected $id;
 
@@ -41,7 +45,7 @@ final class GroupConfig extends Model\AbstractModel
     /**
      * Parent id
      *
-     * @var int
+     * @var int|null
      */
     protected $parentId;
 
@@ -71,27 +75,30 @@ final class GroupConfig extends Model\AbstractModel
 
     /**
      * @param int $id
+     * @param bool|null $force
      *
      * @return self|null
      */
-    public static function getById($id)
+    public static function getById($id, ?bool $force = false)
     {
+        $id = (int)$id;
+        $cacheKey = self::getCacheKey($id);
+
         try {
-            $cacheKey = 'cs_groupconfig_' . $id;
-            if (Cache\Runtime::isRegistered($cacheKey)) {
-                $config = Cache\Runtime::get($cacheKey);
-                if ($config) {
-                    return $config;
-                }
+            if (!$force && Cache\RuntimeCache::isRegistered($cacheKey)) {
+                return Cache\RuntimeCache::get($cacheKey);
             }
 
-            if (!$config = Cache::load($cacheKey)) {
-                $config = new self();
-                $config->getDao()->getById((int)$id);
-                Cache::save($config, $cacheKey, [], null, 0, true);
-            }
+            if (!$force && $config = Cache::load($cacheKey)) {
+                Cache\RuntimeCache::set($cacheKey, $config);
 
-            Cache\Runtime::set($cacheKey, $config);
+                return $config;
+            }
+            $config = new self();
+            $config->getDao()->getById($id);
+
+            Cache\RuntimeCache::set($cacheKey, $config);
+            Cache::save($config, $cacheKey);
 
             return $config;
         } catch (Model\Exception\NotFoundException $e) {
@@ -102,18 +109,33 @@ final class GroupConfig extends Model\AbstractModel
     /**
      * @param string $name
      * @param int $storeId
+     * @param bool|null $force
      *
      * @return self|null
      *
      * @throws \Exception
      */
-    public static function getByName($name, $storeId = 1)
+    public static function getByName($name, $storeId = 1, ?bool $force = false)
     {
+        $cacheKey = self::getCacheKey($storeId, $name);
+
         try {
+            if (!$force && Cache\RuntimeCache::isRegistered($cacheKey)) {
+                return Cache\RuntimeCache::get($cacheKey);
+            }
+            if (!$force && $config = Cache::load($cacheKey)) {
+                Cache\RuntimeCache::set($cacheKey, $config);
+
+                return $config;
+            }
+
             $config = new self();
             $config->setName($name);
             $config->setStoreId($storeId ? $storeId : 1);
             $config->getDao()->getByName();
+
+            Cache\RuntimeCache::set($cacheKey, $config);
+            Cache::save($config, $cacheKey);
 
             return $config;
         } catch (Model\Exception\NotFoundException $e) {
@@ -145,7 +167,7 @@ final class GroupConfig extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getId()
     {
@@ -153,7 +175,7 @@ final class GroupConfig extends Model\AbstractModel
     }
 
     /**
-     * @return int
+     * @return int|null
      */
     public function getParentId()
     {
@@ -171,7 +193,7 @@ final class GroupConfig extends Model\AbstractModel
     /**
      * @param string $name
      *
-     * @return self
+     * @return $this
      */
     public function setName($name)
     {
@@ -217,13 +239,13 @@ final class GroupConfig extends Model\AbstractModel
      */
     public function delete()
     {
-        \Pimcore::getEventDispatcher()->dispatch(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_PRE_DELETE);
-        $cacheKey = 'cs_groupconfig_' . $this->getId();
-        Cache\Runtime::set($cacheKey, null);
-        Cache::remove($cacheKey);
+        $this->dispatchEvent(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_PRE_DELETE);
+        if ($this->getId()) {
+            self::removeCache();
+        }
 
         $this->getDao()->delete();
-        \Pimcore::getEventDispatcher()->dispatch(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_POST_DELETE);
+        $this->dispatchEvent(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_POST_DELETE);
     }
 
     /**
@@ -234,22 +256,20 @@ final class GroupConfig extends Model\AbstractModel
         $isUpdate = false;
 
         if ($this->getId()) {
-            $cacheKey = 'cs_groupconfig_' . $this->getId();
-            Cache\Runtime::set($cacheKey, null);
-            Cache::remove($cacheKey);
+            self::removeCache();
 
             $isUpdate = true;
-            \Pimcore::getEventDispatcher()->dispatch(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_PRE_UPDATE);
+            $this->dispatchEvent(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_PRE_UPDATE);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_PRE_ADD);
+            $this->dispatchEvent(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_PRE_ADD);
         }
 
         $model = $this->getDao()->save();
 
         if ($isUpdate) {
-            \Pimcore::getEventDispatcher()->dispatch(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_POST_UPDATE);
+            $this->dispatchEvent(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_POST_UPDATE);
         } else {
-            \Pimcore::getEventDispatcher()->dispatch(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_POST_ADD);
+            $this->dispatchEvent(new GroupConfigEvent($this), DataObjectClassificationStoreEvents::GROUP_CONFIG_POST_ADD);
         }
 
         return $model;
@@ -323,5 +343,29 @@ final class GroupConfig extends Model\AbstractModel
     public function setStoreId($storeId)
     {
         $this->storeId = $storeId;
+    }
+
+    /**
+     * Calculate cache key
+     */
+    private static function getCacheKey(int $id, string $name = null): string
+    {
+        $cacheKey = 'cs_groupconfig_' . $id;
+        if ($name !== null) {
+            $cacheKey .= '_' . md5($name);
+        }
+
+        return $cacheKey;
+    }
+
+    private function removeCache(): void
+    {
+        // Remove runtime cache
+        RuntimeCache::set(self::getCacheKey($this->getId()), null);
+        RuntimeCache::set(self::getCacheKey($this->getStoreId(), $this->getName()), null);
+
+        // Remove persisted cache
+        Cache::remove(self::getCacheKey($this->getId()));
+        Cache::remove(self::getCacheKey($this->getStoreId(), $this->getName()));
     }
 }

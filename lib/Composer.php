@@ -22,7 +22,7 @@ use Symfony\Component\Process\PhpExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
- * {@internal}
+ * @internal
  */
 class Composer
 {
@@ -75,40 +75,6 @@ class Composer
 
     /**
      * @param Event $event
-     */
-    public static function executeMigrationsUp(Event $event)
-    {
-        $consoleDir = static::getConsoleDir($event, 'pimcore migrations');
-
-        if (null === $consoleDir) {
-            return;
-        }
-
-        // execute migrations
-        $isInstalled = null;
-
-        try {
-            $process = static::executeCommand($event, $consoleDir,
-                ['internal:migration-helpers', '--is-installed'], 30, false);
-
-            if ($process->getExitCode() === 0 && trim($process->getOutput()) === '1') {
-                $isInstalled = true;
-            }
-        } catch (\Throwable $e) {
-            // noting to do
-        }
-
-        if ($isInstalled) {
-            self::clearDataCache($event, $consoleDir);
-            static::executeCommand($event, $consoleDir, ['doctrine:migrations:migrate', '-n', '--prefix', 'Pimcore\\Bundle\\CoreBundle']);
-            self::clearDataCache($event, $consoleDir);
-        } else {
-            $event->getIO()->write('<comment>Skipping migrations ... (either Pimcore is not installed yet or current status of migrations is not available)</comment>', true);
-        }
-    }
-
-    /**
-     * @param Event $event
      * @param string $consoleDir
      */
     public static function clearDataCache($event, $consoleDir)
@@ -136,7 +102,7 @@ class Composer
 
         // ensure that there's a random secret defined
         if (strpos($parameters, 'ThisTokenIsNotSoSecretChangeIt')) {
-            $parameters = preg_replace_callback('/ThisTokenIsNotSoSecretChangeIt/', function ($match) {
+            $parameters = preg_replace_callback('/ThisTokenIsNotSoSecretChangeIt(Immediately)?/', function ($match) {
                 // generate a unique token for each occurrence
                 return base64_encode(random_bytes(32));
             }, $parameters);
@@ -264,7 +230,7 @@ class Composer
         return true;
     }
 
-    private static function removeDecoration($string)
+    private static function removeDecoration(string $string): string
     {
         return preg_replace("/\033\[[^m]*m/", '', $string);
     }
@@ -302,6 +268,8 @@ class Composer
             array_push($command, '--symlink', '--relative');
         }
 
+        $command[] = '--ignore-maintenance-mode';
+
         if (!static::hasDirectory($event, 'public-dir', $webDir, 'install assets')) {
             return;
         }
@@ -330,6 +298,7 @@ class Composer
         $command = ['cache:clear'];
         if (!$options['symfony-cache-warmup']) {
             $command[] = '--no-warmup';
+            $command[] = '--ignore-maintenance-mode';
         }
 
         static::executeCommand($event, $consoleDir, $command, $options['process-timeout']);

@@ -28,10 +28,7 @@ final class RequiredBy extends AbstractOperator
      */
     private $elementType;
 
-    /**
-     * @var bool
-     */
-    private $onlyCount;
+    private bool $onlyCount;
 
     /**
      * {@inheritdoc}
@@ -73,8 +70,8 @@ final class RequiredBy extends AbstractOperator
             $result->value = $count;
         } else {
             $resultList = [];
-            $query = 'select * from dependencies where targettype = ? AND targetid = ' . $element->getId() . $typeCondition;
-            $dependencies = $db->fetchAll($query, [Service::getElementType($element), $element->getId()]);
+            $query = 'select * from dependencies where targettype = ? AND targetid = ?'. $typeCondition;
+            $dependencies = $db->fetchAllAssociative($query, [Service::getElementType($element), $element->getId()]);
             foreach ($dependencies as $dependency) {
                 $sourceType = $dependency['sourcetype'];
                 $sourceId = $dependency['sourceid'];
