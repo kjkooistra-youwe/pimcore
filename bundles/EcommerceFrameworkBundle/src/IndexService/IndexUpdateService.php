@@ -24,14 +24,8 @@ use Pimcore\Logger;
 
 class IndexUpdateService
 {
-    /**
-     * @var IndexService
-     */
-    protected $indexService;
+    protected IndexService $indexService;
 
-    /**
-     * @param IndexService $indexService
-     */
     public function __construct(IndexService $indexService)
     {
         $this->indexService = $indexService;
@@ -80,7 +74,7 @@ class IndexUpdateService
     {
         $qb = $this->createBasicStoreTableSelectQuery($storeTableName, $tenantNameFilterList);
         $qb->andWhere('in_preparation_queue = 1');
-        $rows = $qb->execute()->fetchAllAssociative();
+        $rows = $qb->executeQuery()->fetchAllAssociative();
 
         $result = [];
 
@@ -135,7 +129,7 @@ class IndexUpdateService
     {
         $qb = $this->createBasicStoreTableSelectQuery($storeTableName, $tenantNameFilterList);
         $qb->andWhere('crc_current != crc_index OR ISNULL(crc_index)');
-        $rows = $qb->execute()->fetchAllAssociative();
+        $rows = $qb->executeQuery()->fetchAllAssociative();
 
         $result = [];
         foreach ($rows as $row) {
@@ -156,9 +150,9 @@ class IndexUpdateService
      * @param string[]|null $tenantNameList optional list of tenant names for which the update should happen. If null, then the parameter
      *        will be ignored. If the array is empty, then no update will take place.
      */
-    public function resetIdsInPreparation(array $idList, string $triggerInfo, array $tenantNameList = null)
+    public function resetIdsInPreparation(array $idList, string $triggerInfo, array $tenantNameList = null): void
     {
-        return $this->resetIds($idList, $triggerInfo, false, $tenantNameList);
+        $this->resetIds($idList, $triggerInfo, false, $tenantNameList);
     }
 
     /**
@@ -170,9 +164,9 @@ class IndexUpdateService
      * @param string[]|null $tenantNameList optional list of tenant names for which the update should happen. If null, then the parameter
      *        will be ignored. If the array is empty, then no update will take place.
      */
-    public function resetIdsUpdateIndex(array $idList, string $triggerInfo, array $tenantNameList = null)
+    public function resetIdsUpdateIndex(array $idList, string $triggerInfo, array $tenantNameList = null): void
     {
-        return $this->resetIds($idList, $triggerInfo, true, $tenantNameList);
+        $this->resetIds($idList, $triggerInfo, true, $tenantNameList);
     }
 
     /**
@@ -186,7 +180,7 @@ class IndexUpdateService
      * @param string[]|null $tenantNameList optional list of tenant names for which the update should happen. If null, then the parameter
      *        will be ignored. If the array is empty, then no update will take place.
      */
-    protected function resetIds(array $idList, string $triggerInfo, bool $onlyResetUpdateIndex = false, array $tenantNameList = null)
+    protected function resetIds(array $idList, string $triggerInfo, bool $onlyResetUpdateIndex = false, array $tenantNameList = null): void
     {
         if (count($idList) <= 0) {
             return;
@@ -222,9 +216,9 @@ class IndexUpdateService
 
                 $qb->setParameter('triggerInfo', $triggerInfo);
                 $ids = implode(',', $idList);
-                $qb->where(sprintf('o_id in (%s)', $ids));
+                $qb->where(sprintf('id in (%s)', $ids));
 
-                $qb->execute();
+                $qb->executeQuery();
             }
         }
     }
@@ -236,13 +230,12 @@ class IndexUpdateService
      *      - an optional list of tenants that should be used for filtering.
      *      - by default, all tenants will be used.
      *
-     * @return QueryBuilder
      */
     protected function createBasicStoreTableSelectQuery(string $storeTableName, array $tenantNameFilterList): QueryBuilder
     {
         $qb = Db::get()->createQueryBuilder();
         $qb
-            ->select('o_id as id')
+            ->select('id as id')
             ->addSelect('group_concat(tenant) as tenants')
             ->addSelect('count(tenant) as numTenants')
             ->from($storeTableName, 'storeTable')
@@ -256,7 +249,7 @@ class IndexUpdateService
             ));
         }
 
-        $qb->groupBy('o_id')
+        $qb->groupBy('id')
             ->orderBy('numTenants', 'desc')
         ;
 
@@ -270,7 +263,6 @@ class IndexUpdateService
      *      - an optional list of tenants that should be used for filtering.
      *      - by default, all tenants will be used.
      *
-     * @return QueryBuilder
      */
     protected function createBasicStoreTableUpdateQuery(string $storeTableName, array $tenantNameFilterList): QueryBuilder
     {

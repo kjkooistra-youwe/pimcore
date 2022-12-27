@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -31,7 +32,7 @@ use Pimcore\Tool\Storage;
  */
 class RecyclebinTest extends ModelTestCase
 {
-    protected $user;
+    protected User $user;
 
     public function setUp(): void
     {
@@ -45,7 +46,7 @@ class RecyclebinTest extends ModelTestCase
     {
         if (!$user = User::getByName('test-user')) {
             $user = new User();
-            $user->setAdmin(1);
+            $user->setAdmin(true);
             $user
                 ->setName('test-user')
                 ->save();
@@ -107,7 +108,7 @@ class RecyclebinTest extends ModelTestCase
         $parent->delete();
 
         $recycledItems = new Item\Listing();
-        $recycledItems->setCondition('path = ?', $parentPath);
+        $recycledItems->setCondition('`path` = ?', $parentPath);
 
         $this->assertEquals(2, $recycledItems->current()->getAmount(), 'Expected 2 recycled item');
 
@@ -156,7 +157,7 @@ class RecyclebinTest extends ModelTestCase
 
         //restore deleted items (parent + child)
         $recycledItems = new Item\Listing();
-        $recycledItems->setCondition('path = ?', $sourceObjectPath);
+        $recycledItems->setCondition('`path` = ?', $sourceObjectPath);
         $recycledItems->current()->restore();
 
         //load relation and check if relation loads correctly

@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -52,11 +53,6 @@ class LogoutListener implements EventSubscriberInterface, LoggerAwareInterface
         ];
     }
 
-    /**
-     * @param TokenStorageInterface $tokenStorage
-     * @param RouterInterface $router
-     * @param EventDispatcherInterface $eventDispatcher
-     */
     public function __construct(
         protected TokenStorageInterface $tokenStorage,
         protected RouterInterface $router,
@@ -66,21 +62,14 @@ class LogoutListener implements EventSubscriberInterface, LoggerAwareInterface
 
     /**
      * @param LogoutEvent $event
-     *
-     * @return RedirectResponse|Response
      */
-    public function onLogout(LogoutEvent $event): RedirectResponse|Response
+    public function onLogout(LogoutEvent $event): void
     {
         $request = $event->getRequest();
 
-        return $this->onLogoutSuccess($request);
+        $event->setResponse($this->onLogoutSuccess($request));
     }
 
-    /**
-     * @param Request $request
-     *
-     * @return RedirectResponse|Response
-     */
     public function onLogoutSuccess(Request $request): RedirectResponse|Response
     {
         $this->logger->debug('Logging out');
@@ -102,7 +91,7 @@ class LogoutListener implements EventSubscriberInterface, LoggerAwareInterface
                 $adminSession->remove('user');
             }
 
-            Session::invalidate();
+            $adminSession->clear();
 
             return $event;
         });

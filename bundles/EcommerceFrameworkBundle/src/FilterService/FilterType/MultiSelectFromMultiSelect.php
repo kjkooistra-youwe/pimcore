@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -40,7 +41,7 @@ class MultiSelectFromMultiSelect extends SelectFromMultiSelect
 
         $values = [];
         foreach ($rawValues as $v) {
-            $explode = explode(WorkerInterface::MULTISELECT_DELIMITER, $v['value']);
+            $explode = explode(WorkerInterface::MULTISELECT_DELIMITER, (string) $v['value']);
             foreach ($explode as $e) {
                 if (!empty($e)) {
                     if (!empty($values[$e])) {
@@ -72,7 +73,7 @@ class MultiSelectFromMultiSelect extends SelectFromMultiSelect
      *
      * @return string[]
      */
-    public function addCondition(AbstractFilterDefinitionType $filterDefinition, ProductListInterface $productList, $currentFilter, $params, $isPrecondition = false)
+    public function addCondition(AbstractFilterDefinitionType $filterDefinition, ProductListInterface $productList, array $currentFilter, array $params, bool $isPrecondition = false): array
     {
         $field = $this->getField($filterDefinition);
         $preSelect = $this->getPreSelect($filterDefinition);

@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -25,31 +26,23 @@ use Pimcore\Model\DataObject\Fieldcollection\Data\OrderByFields;
  */
 class ListHelper
 {
-    /**
-     * @param \Pimcore\Model\DataObject\FilterDefinition $filterDefinition
-     * @param ProductListInterface $productList
-     * @param array $params
-     * @param FilterService $filterService
-     * @param bool $loadFullPage
-     * @param bool $excludeLimitOfFirstpage
-     */
     public function setupProductList(
         \Pimcore\Model\DataObject\FilterDefinition $filterDefinition,
         ProductListInterface $productList,
-        &$params,
+        array &$params,
         FilterService $filterService,
-        $loadFullPage,
-        $excludeLimitOfFirstpage = false
-    ) {
+        bool $loadFullPage,
+        bool $excludeLimitOfFirstpage = false
+    ): void {
         $orderByOptions = [];
-        $orderKeysAsc = explode(',', $filterDefinition->getOrderByAsc());
+        $orderKeysAsc = explode(',', ($filterDefinition->getOrderByAsc() ?? ''));
         foreach ($orderKeysAsc as $orderByEntry) {
             if (!empty($orderByEntry)) {
                 $orderByOptions[$orderByEntry]['asc'] = true;
             }
         }
 
-        $orderKeysDesc = explode(',', $filterDefinition->getOrderByDesc());
+        $orderKeysDesc = explode(',', ($filterDefinition->getOrderByDesc() ?? ''));
         foreach ($orderKeysDesc as $orderByEntry) {
             if (!empty($orderByEntry)) {
                 $orderByOptions[$orderByEntry]['desc'] = true;
@@ -79,14 +72,14 @@ class ListHelper
                 $productList->setLimit($pageLimit);
             } elseif ($loadFullPage && $excludeLimitOfFirstpage) {
                 $offset += $limitOnFirstLoad;
-                $productList->setLimit($pageLimit - $limitOnFirstLoad);
+                $productList->setLimit(intval($pageLimit - $limitOnFirstLoad));
             } else {
-                $productList->setLimit($limitOnFirstLoad);
+                $productList->setLimit((int)$limitOnFirstLoad);
             }
         } else {
-            $productList->setLimit($pageLimit);
+            $productList->setLimit((int)$pageLimit);
         }
-        $productList->setOffset($offset);
+        $productList->setOffset((int)$offset);
 
         $params['pageLimit'] = $pageLimit;
 
@@ -136,12 +129,7 @@ class ListHelper
         $params['orderByOptions'] = $orderByOptions;
     }
 
-    /**
-     * @param int $page
-     *
-     * @return string
-     */
-    public function createPagingQuerystring($page)
+    public function createPagingQuerystring(int $page): string
     {
         $params = $_REQUEST;
         $params['page'] = $page;
@@ -161,12 +149,7 @@ class ListHelper
         return $string;
     }
 
-    /**
-     * @param array $conditions
-     *
-     * @return AbstractCategory|null
-     */
-    public function getFirstFilteredCategory($conditions)
+    public function getFirstFilteredCategory(array $conditions): ?AbstractCategory
     {
         if (!empty($conditions)) {
             foreach ($conditions as $c) {

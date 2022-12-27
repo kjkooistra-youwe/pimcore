@@ -16,36 +16,24 @@
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\ProductList\DefaultMysql;
 
 use Doctrine\DBAL\Connection;
-use Monolog\Logger;
 use Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\ProductList\DefaultMysql;
 use Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\ProductList\ProductListInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * @internal
  */
 class Dao
 {
-    /**
-     * @var Connection
-     */
-    private $db;
+    private Connection $db;
 
-    /**
-     * @var DefaultMysql
-     */
-    private $model;
+    private DefaultMysql $model;
 
-    /**
-     * @var int
-     */
-    private $lastRecordCount;
+    private int $lastRecordCount;
 
-    /**
-     * @var Logger
-     */
-    protected $logger;
+    protected LoggerInterface $logger;
 
-    public function __construct(DefaultMysql $model, Logger $logger)
+    public function __construct(DefaultMysql $model, LoggerInterface $logger)
     {
         $this->model = $model;
         $this->db = \Pimcore\Db::get();
@@ -53,7 +41,7 @@ class Dao
         $this->logger = $logger;
     }
 
-    public function load($condition, $orderBy = null, $limit = null, $offset = null)
+    public function load($condition, $orderBy = null, $limit = null, $offset = null): array
     {
         if ($condition) {
             $condition = 'WHERE ' . $condition;
@@ -73,18 +61,18 @@ class Dao
 
         if ($this->model->getVariantMode() == ProductListInterface::VARIANT_MODE_INCLUDE_PARENT_OBJECT) {
             if ($orderBy) {
-                $query = 'SELECT SQL_CALC_FOUND_ROWS DISTINCT o_virtualProductId as o_id, priceSystemName FROM '
+                $query = 'SELECT SQL_CALC_FOUND_ROWS DISTINCT virtualProductId as id, priceSystemName FROM '
                     . $this->model->getCurrentTenantConfig()->getTablename() . ' a '
                     . $this->model->getCurrentTenantConfig()->getJoins()
-                    . $condition . ' GROUP BY o_virtualProductId, priceSystemName' . $orderBy . ' ' . $limit;
+                    . $condition . ' GROUP BY virtualProductId, priceSystemName' . $orderBy . ' ' . $limit;
             } else {
-                $query = 'SELECT SQL_CALC_FOUND_ROWS DISTINCT o_virtualProductId as o_id, priceSystemName FROM '
+                $query = 'SELECT SQL_CALC_FOUND_ROWS DISTINCT virtualProductId as id, priceSystemName FROM '
                     . $this->model->getCurrentTenantConfig()->getTablename() . ' a '
                     . $this->model->getCurrentTenantConfig()->getJoins()
                     . $condition . ' ' . $limit;
             }
         } else {
-            $query = 'SELECT SQL_CALC_FOUND_ROWS a.o_id, priceSystemName FROM '
+            $query = 'SELECT SQL_CALC_FOUND_ROWS a.id, priceSystemName FROM '
                 . $this->model->getCurrentTenantConfig()->getTablename() . ' a '
                 . $this->model->getCurrentTenantConfig()->getJoins()
                 . $condition . $orderBy . ' ' . $limit;
@@ -97,7 +85,7 @@ class Dao
         return $result;
     }
 
-    public function loadGroupByValues($fieldname, $condition, $countValues = false)
+    public function loadGroupByValues($fieldname, $condition, $countValues = false): array
     {
         if ($condition) {
             $condition = 'WHERE ' . $condition;
@@ -105,7 +93,7 @@ class Dao
 
         if ($countValues) {
             if ($this->model->getVariantMode() == ProductListInterface::VARIANT_MODE_INCLUDE_PARENT_OBJECT) {
-                $query = "SELECT TRIM(`$fieldname`) as `value`, count(DISTINCT o_virtualProductId) as `count` FROM "
+                $query = "SELECT TRIM(`$fieldname`) as `value`, count(DISTINCT virtualProductId) as `count` FROM "
                     . $this->model->getCurrentTenantConfig()->getTablename() . ' a '
                     . $this->model->getCurrentTenantConfig()->getJoins()
                     . $condition . ' GROUP BY TRIM(`' . $fieldname . '`)';
@@ -135,7 +123,7 @@ class Dao
         }
     }
 
-    public function loadGroupByRelationValues($fieldname, $condition, $countValues = false)
+    public function loadGroupByRelationValues($fieldname, $condition, $countValues = false): array
     {
         if ($condition) {
             $condition = 'WHERE ' . $condition;
@@ -152,7 +140,7 @@ class Dao
                     . 'WHERE fieldname = ' . $this->quote($fieldname);
             }
 
-            $subquery = 'SELECT a.o_id FROM '
+            $subquery = 'SELECT a.id FROM '
                 . $this->model->getCurrentTenantConfig()->getTablename() . ' a '
                 . $this->model->getCurrentTenantConfig()->getJoins()
                 . $condition;
@@ -168,7 +156,7 @@ class Dao
             $query = 'SELECT dest FROM ' . $this->model->getCurrentTenantConfig()->getRelationTablename() . ' a '
                 . 'WHERE fieldname = ' . $this->quote($fieldname);
 
-            $subquery = 'SELECT a.o_id FROM '
+            $subquery = 'SELECT a.id FROM '
                 . $this->model->getCurrentTenantConfig()->getTablename() . ' a '
                 . $this->model->getCurrentTenantConfig()->getJoins()
                 . $condition;
@@ -183,7 +171,7 @@ class Dao
         }
     }
 
-    public function getCount($condition, $orderBy = null, $limit = null, $offset = null)
+    public function getCount($condition, $orderBy = null, $limit = null, $offset = null): int
     {
         if ($condition) {
             $condition = 'WHERE ' . $condition;
@@ -202,7 +190,7 @@ class Dao
         }
 
         if ($this->model->getVariantMode() == ProductListInterface::VARIANT_MODE_INCLUDE_PARENT_OBJECT) {
-            $query = 'SELECT count(DISTINCT o_virtualProductId) FROM '
+            $query = 'SELECT count(DISTINCT virtualProductId) FROM '
                 . $this->model->getCurrentTenantConfig()->getTablename() . ' a '
                 . $this->model->getCurrentTenantConfig()->getJoins()
                 . $condition . $orderBy . ' ' . $limit;
@@ -217,7 +205,7 @@ class Dao
         $result = $this->db->fetchOne($query);
         $this->logger->info('Query done.');
 
-        return $result;
+        return is_int($result) ? $result : 0;
     }
 
     public function quote($value)
@@ -233,7 +221,7 @@ class Dao
      *
      * @return string
      */
-    public function buildSimularityOrderBy($fields, $objectId)
+    public function buildSimularityOrderBy(array $fields, int $objectId): string
     {
         try {
             $fieldString = '';
@@ -247,7 +235,7 @@ class Dao
                 $maxFieldString .= 'MAX(' . $this->db->quoteIdentifier($f->getField()) . ') as ' . $this->db->quoteIdentifier($f->getField());
             }
 
-            $query = 'SELECT ' . $fieldString . ' FROM ' . $this->model->getCurrentTenantConfig()->getTablename() . ' a WHERE a.o_id = ?;';
+            $query = 'SELECT ' . $fieldString . ' FROM ' . $this->model->getCurrentTenantConfig()->getTablename() . ' a WHERE a.id = ?;';
 
             $this->logger->info('Query: ' . $query);
             $objectValues = $this->db->fetchAssociative($query, [$objectId]);
@@ -292,7 +280,7 @@ class Dao
      *
      * @return string
      */
-    public function buildFulltextSearchWhere($fields, $searchstring)
+    public function buildFulltextSearchWhere(array $fields, string $searchstring): string
     {
         $columnNames = [];
         foreach ($fields as $c) {
@@ -307,7 +295,7 @@ class Dao
      *
      * @return int
      */
-    public function getLastRecordCount()
+    public function getLastRecordCount(): int
     {
         return $this->lastRecordCount;
     }

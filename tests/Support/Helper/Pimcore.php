@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -34,10 +35,8 @@ use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\KernelInterface;
 
-class Pimcore extends Module
+class Pimcore extends Module\Symfony
 {
-    protected static ?ContainerInterface $testServiceContainer = null;
-
     protected array $groups = [];
 
     public function __construct(ModuleContainer $moduleContainer, $config = null)
@@ -78,20 +77,6 @@ class Pimcore extends Module
     public function getContainer(): ContainerInterface
     {
         return $this->kernel->getContainer();
-    }
-
-    /**
-     *
-     * @throws \Exception
-     */
-    public function grabService(string $serviceId): ?object
-    {
-        if (empty(self::$testServiceContainer)) {
-            $container = $this->getContainer();
-            self::$testServiceContainer = $container->has('test.service_container') ? $container->get('test.service_container') : $container;
-        }
-
-        return self::$testServiceContainer->get($serviceId);
     }
 
     public function _initialize(): void
@@ -247,7 +232,7 @@ class Pimcore extends Module
         // use a dedicated setup connection as the framework connection is bound to the DB and will
         // fail if the DB doesn't exist
         $setupConnection = DriverManager::getConnection($params, $config);
-        $schemaManager = $setupConnection->getSchemaManager();
+        $schemaManager = $setupConnection->createSchemaManager();
 
         $databases = $schemaManager->listDatabases();
         if (in_array($dbName, $databases)) {
@@ -295,6 +280,10 @@ class Pimcore extends Module
 
     public function _before(TestInterface $test): void
     {
+        //need to load initialize that service first, before module/symfony does its magic
+        //related to https://github.com/pimcore/pimcore/pull/10331
+        $this->grabService(\Pimcore\Helper\LongRunningHelper::class);
+
         parent::_before($test);
 
         $this->groups = $test->getMetadata()->getGroups();
@@ -327,7 +316,7 @@ class Pimcore extends Module
         DataObject\Localizedfield::setGetFallbackValues(true);
     }
 
-    public function makeHtmlSnapshot($name = null)
+    public function makeHtmlSnapshot(?string $name = null): void
     {
         // TODO: Implement makeHtmlSnapshot() method.
     }
@@ -337,3 +326,5 @@ class Pimcore extends Module
         return $this->groups;
     }
 }
+
+@class_alias(Pimcore::class, 'Pimcore\Tests\Support\Helper\Pimcore');

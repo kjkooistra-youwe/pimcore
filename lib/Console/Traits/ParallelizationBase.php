@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -37,7 +38,7 @@ if (trait_exists('\Webmozarts\Console\Parallelization\Parallelization')) {
         {
             $this->runBeforeFirstCommand($input, $output);
 
-            $items = $this->fetchItems($input);
+            $items = $this->fetchItems($input, $output);
 
             //Method executed before executing all the items
             if (method_exists($this, 'runBeforeBatch')) {
@@ -45,7 +46,7 @@ if (trait_exists('\Webmozarts\Console\Parallelization\Parallelization')) {
             }
 
             foreach ($items as $item) {
-                $this->runSingleCommand(trim($item), $input, $output);
+                $this->runSingleCommand(trim((string)$item), $input, $output);
             }
 
             //Method executed after executing all the items

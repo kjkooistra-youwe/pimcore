@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -109,6 +110,7 @@ class ClassBuilder implements ClassBuilderInterface
         $useParts = [];
 
         $cd .= ClassDefinition\Service::buildUseTraitsCode($useParts, $classDefinition->getUseTraits());
+        $cd .= ClassDefinition\Service::buildFieldConstantsCode(...$classDefinition->getFieldDefinitions());
 
         $cd .= $this->propertiesBuilder->buildProperties($classDefinition);
         $cd .= "\n\n";

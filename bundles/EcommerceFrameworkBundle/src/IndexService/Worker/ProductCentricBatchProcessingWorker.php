@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -39,7 +40,7 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
      *
      * @return string
      */
-    abstract protected function getStoreTableName();
+    abstract protected function getStoreTableName(): string;
 
     public function getBatchProcessingStoreTableName(): string
     {
@@ -51,7 +52,7 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
      * @param array|null $data
      * @param array|null $metadata
      */
-    abstract protected function doUpdateIndex($objectId, $data = null, $metadata = null);
+    abstract protected function doUpdateIndex(int $objectId, array $data = null, array $metadata = null);
 
     public function updateItemInIndex($objectId): void
     {
@@ -72,8 +73,8 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
         $idColumnType = $this->tenantConfig->getIdColumnType(false);
 
         $this->db->executeQuery('CREATE TABLE IF NOT EXISTS `' . $this->getBatchProcessingStoreTableName() . "` (
-          `o_id` $primaryIdColumnType,
-          `o_virtualProductId` $idColumnType,
+          `id` $primaryIdColumnType,
+          `virtualProductId` $idColumnType,
           `tenant` varchar(50) NOT NULL DEFAULT '',
           `data` longtext CHARACTER SET latin1,
           `crc_current` bigint(11) DEFAULT NULL,
@@ -85,7 +86,7 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
           `preparation_error` VARCHAR(255) NULL DEFAULT NULL,
           `trigger_info` VARCHAR(255) NULL DEFAULT NULL,
           `metadata` text,
-          PRIMARY KEY (`o_id`,`tenant`),
+          PRIMARY KEY (`id`,`tenant`),
           KEY `update_worker_index` (`tenant`,`crc_current`,`crc_index`),
           KEY `preparation_status_index` (`tenant`,`preparation_status`),
           KEY `in_preparation_queue_index` (`tenant`,`in_preparation_queue`)
@@ -98,24 +99,24 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
      * @param array $data
      * @param int $subObjectId
      */
-    protected function insertDataToIndex($data, $subObjectId)
+    protected function insertDataToIndex(array $data, int $subObjectId)
     {
-        $currentEntry = $this->db->fetchAssociative('SELECT crc_current, in_preparation_queue FROM ' . $this->getStoreTableName() . ' WHERE o_id = ? AND tenant = ?', [$subObjectId, $this->name]);
+        $currentEntry = $this->db->fetchAssociative('SELECT crc_current, in_preparation_queue FROM ' . $this->getStoreTableName() . ' WHERE id = ? AND tenant = ?', [$subObjectId, $this->name]);
         if (!$currentEntry) {
             $this->db->insert($this->getStoreTableName(), $data);
         } elseif ($currentEntry['crc_current'] != $data['crc_current']) {
             $this->executeTransactionalQuery(function () use ($data, $subObjectId) {
-                $this->db->update($this->getStoreTableName(), $data, ['o_id' => (string)$subObjectId, 'tenant' => $this->name]);
+                $this->db->update($this->getStoreTableName(), $data, ['id' => (string)$subObjectId, 'tenant' => $this->name]);
             });
         } elseif ($currentEntry['in_preparation_queue']) {
             //since no data has changed, just update flags, not data
             $this->executeTransactionalQuery(function () use ($subObjectId) {
-                $this->db->executeQuery('UPDATE ' . $this->getStoreTableName() . ' SET in_preparation_queue = 0 WHERE o_id = ? AND tenant = ?', [$subObjectId, $this->name]);
+                $this->db->executeQuery('UPDATE ' . $this->getStoreTableName() . ' SET in_preparation_queue = 0 WHERE id = ? AND tenant = ?', [$subObjectId, $this->name]);
             });
         }
     }
 
-    protected function getWorkerTimeout()
+    protected function getWorkerTimeout(): int
     {
         return 300;
     }
@@ -125,9 +126,9 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
      *
      * @param int $objectId
      */
-    protected function deleteFromStoreTable($objectId)
+    protected function deleteFromStoreTable(int $objectId)
     {
-        $this->db->delete($this->getStoreTableName(), ['o_id' => (string)$objectId, 'tenant' => $this->name]);
+        $this->db->delete($this->getStoreTableName(), ['id' => (string)$objectId, 'tenant' => $this->name]);
     }
 
     /**
@@ -141,10 +142,10 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
     {
         if ($object instanceof Concrete) {
             //need check, if there are sub objects because update on empty result set is too slow
-            $objects = $this->db->fetchFirstColumn('SELECT o_id FROM objects WHERE o_path LIKE ?', [Helper::escapeLike($object->getFullPath()) . '/%']);
+            $objects = $this->db->fetchFirstColumn('SELECT id FROM objects WHERE `path` like ?', [Helper::escapeLike($object->getFullPath()) . '/%']);
             if ($objects) {
                 $this->executeTransactionalQuery(function () use ($objects) {
-                    $updateStatement = 'UPDATE ' . $this->getStoreTableName() . ' SET in_preparation_queue = 1 WHERE tenant = ? AND o_id IN ('.implode(',', $objects).')';
+                    $updateStatement = 'UPDATE ' . $this->getStoreTableName() . ' SET in_preparation_queue = 1 WHERE tenant = ? AND id IN ('.implode(',', $objects).')';
                     $this->db->executeQuery($updateStatement, [$this->name]);
                 });
             }
@@ -159,7 +160,7 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
      *
      * @return array
      */
-    protected function getDefaultDataForIndex(IndexableInterface $object, $subObjectId)
+    protected function getDefaultDataForIndex(IndexableInterface $object, int $subObjectId): array
     {
         $categories = $this->tenantConfig->getCategories($object, $subObjectId);
         $categoryIds = [];
@@ -215,12 +216,12 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
         }
 
         $data = [
-            'o_id' => $subObjectId,
-            'o_classId' => $object->getClassId(),
-            'o_virtualProductId' => $virtualProductId,
-            'o_virtualProductActive' => $virtualProductActive,
-            'o_parentId' => $object->getOSParentId(),
-            'o_type' => $object->getOSIndexType(),
+            'id' => $subObjectId,
+            'classId' => $object->getClassId(),
+            'virtualProductId' => $virtualProductId,
+            'virtualProductActive' => $virtualProductActive,
+            'parentId' => $object->getOSParentId(),
+            'type' => $object->getOSIndexType(),
             'categoryIds' => ',' . implode(',', $categoryIds) . ',',
             'parentCategoryIds' => ',' . implode(',', $parentCategoryIds) . ',',
             'categoryPaths' => (array)$categoryIdPaths,
@@ -236,7 +237,7 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
     /**
      * {@inheritdoc}
      */
-    public function prepareDataForIndex(IndexableInterface $object)
+    public function prepareDataForIndex(IndexableInterface $object): array
     {
         $subObjectIds = $this->tenantConfig->createSubIdsForObject($object);
         $processedSubObjects = [];
@@ -271,7 +272,7 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
                                 foreach ($value as $v) {
                                     $relData = [];
                                     $relData['src'] = $subObjectId;
-                                    $relData['src_virtualProductId'] = $data['o_virtualProductId'];
+                                    $relData['src_virtualProductId'] = $data['virtualProductId'];
                                     $relData['dest'] = $v['dest'];
                                     $relData['fieldname'] = $attribute->getName();
                                     $relData['type'] = $v['type'];
@@ -357,8 +358,8 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
                 }
 
                 $insertData = [
-                    'o_id' => $subObjectId,
-                    'o_virtualProductId' => $data['o_virtualProductId'],
+                    'id' => $subObjectId,
+                    'virtualProductId' => $data['virtualProductId'],
                     'tenant' => $this->name,
                     'data' => $jsonData,
                     'crc_current' => $crc,
@@ -390,7 +391,7 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
     /**
      * {@inheritdoc}
      */
-    public function resetPreparationQueue()
+    public function resetPreparationQueue(): void
     {
         Logger::info('Index-Actions - Resetting preparation queue');
         $className = (new \ReflectionClass($this))->getShortName();
@@ -408,7 +409,7 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
     /**
      * {@inheritdoc}
      */
-    public function resetIndexingQueue()
+    public function resetIndexingQueue(): void
     {
         Logger::info('Index-Actions - Resetting index queue');
         $className = (new \ReflectionClass($this))->getShortName();
@@ -430,7 +431,7 @@ abstract class ProductCentricBatchProcessingWorker extends AbstractWorker implem
      *
      * @throws \Exception
      */
-    protected function executeTransactionalQuery(\Closure $fn, int $maxTries = 3, float $sleep = .5)
+    protected function executeTransactionalQuery(\Closure $fn, int $maxTries = 3, float $sleep = .5): bool
     {
         for ($i = 1; $i <= $maxTries; $i++) {
             $this->db->beginTransaction();

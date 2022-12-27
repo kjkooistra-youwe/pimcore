@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -18,6 +19,7 @@ namespace Pimcore;
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
 use Doctrine\Bundle\MigrationsBundle\DoctrineMigrationsBundle;
 use FOS\JsRoutingBundle\FOSJsRoutingBundle;
+use Knp\Bundle\PaginatorBundle\KnpPaginatorBundle;
 use League\FlysystemBundle\FlysystemBundle;
 use Pimcore\Bundle\AdminBundle\PimcoreAdminBundle;
 use Pimcore\Bundle\CoreBundle\PimcoreCoreBundle;
@@ -43,6 +45,7 @@ use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\HttpKernel\Bundle\BundleInterface;
 use Symfony\Component\HttpKernel\Kernel as SymfonyKernel;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
+use Twig\Extra\TwigExtraBundle\TwigExtraBundle;
 
 abstract class Kernel extends SymfonyKernel
 {
@@ -52,10 +55,7 @@ abstract class Kernel extends SymfonyKernel
         registerBundles as microKernelRegisterBundles;
     }
 
-    /**
-     * @var BundleCollection
-     */
-    private $bundleCollection;
+    private BundleCollection $bundleCollection;
 
     /**
      * {@inheritdoc}
@@ -91,9 +91,6 @@ abstract class Kernel extends SymfonyKernel
         return PIMCORE_LOG_DIRECTORY;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     protected function configureContainer(ContainerConfigurator $container): void
     {
         $projectDir = realpath($this->getProjectDir());
@@ -109,9 +106,6 @@ abstract class Kernel extends SymfonyKernel
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
     protected function configureRoutes(RoutingConfigurator $routes): void
     {
         $projectDir = realpath($this->getProjectDir());
@@ -270,10 +264,10 @@ abstract class Kernel extends SymfonyKernel
     {
         $collection = $this->createBundleCollection();
 
-        if (is_file($this->getProjectDir().'/config/bundles.php')) {
-            $flexBundles = [];
-            array_push($flexBundles, ...$this->microKernelRegisterBundles());
-            $collection->addBundles($flexBundles);
+        if (is_file($this->getBundlesPath())) {
+            foreach ($this->microKernelRegisterBundles() as $flexBundle) {
+                $collection->addBundle($flexBundle);
+            }
         }
 
         // core bundles (Symfony, Pimcore)
@@ -322,6 +316,7 @@ abstract class Kernel extends SymfonyKernel
             new FrameworkBundle(),
             new SecurityBundle(),
             new TwigBundle(),
+            new TwigExtraBundle(),
             new MonologBundle(),
             new DoctrineBundle(),
             new DoctrineMigrationsBundle(),
@@ -331,6 +326,7 @@ abstract class Kernel extends SymfonyKernel
             new SchebTwoFactorBundle(),
             new FOSJsRoutingBundle(),
             new FlysystemBundle(),
+            new KnpPaginatorBundle(),
         ], 100);
 
         // pimcore bundles

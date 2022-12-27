@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Inheritance: yes
@@ -18,13 +19,9 @@ use Pimcore\Model\DataObject\PreGetValueHookInterface;
 
 class Customer extends Concrete
 {
-protected $o_classId = "CU";
-protected $o_className = "Customer";
+protected $classId = "CU";
+protected $className = "Customer";
 
-/**
-* @param array $values
-* @return static
-*/
 public static function create(array $values = []): static
 {
 	$object = new static();

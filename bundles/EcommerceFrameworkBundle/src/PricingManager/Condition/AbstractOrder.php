@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -29,14 +30,8 @@ abstract class AbstractOrder implements ConditionInterface
      *
      * @var array
      */
-    private static $cache = [];
+    private static array $cache = [];
 
-    /**
-     * @param RuleInterface $rule
-     * @param string $field
-     *
-     * @return mixed
-     */
     private function getData(RuleInterface $rule, string $field): mixed
     {
         if (!array_key_exists($rule->getId(), self::$cache)) {
@@ -44,7 +39,7 @@ abstract class AbstractOrder implements ConditionInterface
 SELECT 1
 
     , priceRule.ruleId
-	, count(priceRule.o_id) as "soldCount"
+	, count(priceRule.id) as "soldCount"
 	, sum(orderItem.totalPrice) as "salesAmount"
 
 	-- DEBUG INFOS
@@ -63,13 +58,13 @@ FROM object_query_%2$s as `order`
 	-- order item
 	JOIN object_%1$s as orderItem
 		ON ( 1
-    	    AND orderItem.o_id = orderItems.dest_id
+    	    AND orderItem.id = orderItems.dest_id
 		)
 
 	-- add active price rules
 	JOIN object_collection_PricingRule_%1$s as priceRule
 		ON( 1
-			AND priceRule.o_id = orderItem.oo_id
+			AND priceRule.id = orderItem.oo_id
 			AND priceRule.fieldname = "PricingRules"
 			AND priceRule.ruleId = %3$s
 		)
@@ -93,21 +88,11 @@ SQL;
         return self::$cache[$rule->getId()][$field];
     }
 
-    /**
-     * @param RuleInterface $rule
-     *
-     * @return int
-     */
-    protected function getSoldCount(RuleInterface $rule)
+    protected function getSoldCount(RuleInterface $rule): int
     {
         return (int)$this->getData($rule, 'soldCount');
     }
 
-    /**
-     * @param RuleInterface $rule
-     *
-     * @return Decimal
-     */
     protected function getSalesAmount(RuleInterface $rule): Decimal
     {
         return Decimal::create($this->getData($rule, 'salesAmount'));

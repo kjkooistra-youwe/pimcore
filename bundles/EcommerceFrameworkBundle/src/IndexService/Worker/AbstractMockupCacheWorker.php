@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -31,7 +32,7 @@ abstract class AbstractMockupCacheWorker extends ProductCentricBatchProcessingWo
      *
      * @return string
      */
-    abstract protected function getMockupCachePrefix();
+    abstract protected function getMockupCachePrefix(): string;
 
     /**
      * creates mockup cache key
@@ -40,7 +41,7 @@ abstract class AbstractMockupCacheWorker extends ProductCentricBatchProcessingWo
      *
      * @return string
      */
-    protected function createMockupCacheKey($objectId)
+    protected function createMockupCacheKey(int $objectId): string
     {
         return $this->getMockupCachePrefix() . '_' . $this->name . '_' . $objectId;
     }
@@ -50,7 +51,7 @@ abstract class AbstractMockupCacheWorker extends ProductCentricBatchProcessingWo
      *
      * @param int $objectId
      */
-    protected function deleteFromMockupCache($objectId)
+    protected function deleteFromMockupCache(int $objectId)
     {
         $key = $this->getMockupCachePrefix() . '_' . $this->name . '_' . $objectId;
         Cache::remove($key);
@@ -66,10 +67,10 @@ abstract class AbstractMockupCacheWorker extends ProductCentricBatchProcessingWo
      *
      * @throws InvalidConfigException
      */
-    public function saveToMockupCache($objectId, $data = null)
+    public function saveToMockupCache(int $objectId, array $data = null): DefaultMockup
     {
         if (empty($data)) {
-            $data = $this->db->fetchOne('SELECT data FROM ' . $this->getStoreTableName() . ' WHERE o_id = ? AND tenant = ?', [$objectId, $this->name]);
+            $data = $this->db->fetchOne('SELECT data FROM ' . $this->getStoreTableName() . ' WHERE id = ? AND tenant = ?', [$objectId, $this->name]);
             $data = json_decode($data, true);
         }
 
@@ -92,7 +93,7 @@ abstract class AbstractMockupCacheWorker extends ProductCentricBatchProcessingWo
 
         if ($success && $result) {
             $this->executeTransactionalQuery(function () use ($objectId) {
-                $this->db->executeQuery('UPDATE ' . $this->getStoreTableName() . ' SET crc_index = crc_current WHERE o_id = ? and tenant = ?', [$objectId, $this->name]);
+                $this->db->executeQuery('UPDATE ' . $this->getStoreTableName() . ' SET crc_index = crc_current WHERE id = ? and tenant = ?', [$objectId, $this->name]);
             });
         } else {
             Logger::err("Element with ID $objectId could not be added to mockup-cache");
@@ -112,7 +113,7 @@ abstract class AbstractMockupCacheWorker extends ProductCentricBatchProcessingWo
      *
      * @return DefaultMockup
      */
-    public function getMockupFromCache($objectId)
+    public function getMockupFromCache(int $objectId): DefaultMockup
     {
         $key = $this->createMockupCacheKey($objectId);
         $cachedItem = Cache::load($key);

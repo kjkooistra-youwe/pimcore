@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -13,18 +14,30 @@
  *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
-namespace Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\Worker\ElasticSearch;
+namespace Pimcore\Model\DataObject\Traits;
 
 /**
- *  Use this for ES Version >= 7
+ * @internal
  */
-class DefaultElasticSearch7 extends AbstractElasticSearch
+trait DataWidthTrait
 {
     /**
-     * @return \Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\ProductList\ElasticSearch\DefaultElasticSearch7
+     * @internal
      */
-    public function getProductList()
+    public string|int|null $width = null;
+
+    public function getWidth(): int|string|null
     {
-        return new \Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\ProductList\ElasticSearch\DefaultElasticSearch7($this->tenantConfig);
+        return $this->width;
+    }
+
+    public function setWidth(int|string|null $width): static
+    {
+        if (is_numeric($width)) {
+            $width = (int)$width;
+        }
+        $this->width = $width;
+
+        return $this;
     }
 }

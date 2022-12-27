@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -16,7 +17,7 @@
 namespace Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\Config;
 
 use Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\SynonymProvider\SynonymProviderInterface;
-use Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\Worker\ElasticSearch\AbstractElasticSearch;
+use Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\Worker\WorkerInterface;
 
 /**
  * Interface for IndexService Tenant Configurations using elastic search as index
@@ -24,25 +25,18 @@ use Pimcore\Bundle\EcommerceFrameworkBundle\IndexService\Worker\ElasticSearch\Ab
 interface ElasticSearchConfigInterface extends ConfigInterface
 {
     /**
-     * returns elastic search client parameters defined in the tenant config
-     *
-     * @return array
-     */
-    public function getElasticSearchClientParams();
-
-    /**
      * returns condition for current subtenant
      *
      * @return array
      */
-    public function getSubTenantCondition();
+    public function getSubTenantCondition(): array;
 
     /**
      * creates and returns tenant worker suitable for this tenant configuration
      *
-     * @return AbstractElasticSearch
+     * @return WorkerInterface
      */
-    public function getTenantWorker();
+    public function getTenantWorker(): WorkerInterface;
 
     /**
      * Get an associative array of configured synonym providers.
@@ -54,11 +48,11 @@ interface ElasticSearchConfigInterface extends ConfigInterface
     public function getSynonymProviders(): array;
 
     /**
-     * @param string $property
+     * @param string|null $property
      *
-     * @return array|string
+     * @return array|string|null
      */
-    public function getClientConfig($property = null);
+    public function getClientConfig(string $property = null): array|string|null;
 
     /**
      * returns the full field name
@@ -68,7 +62,7 @@ interface ElasticSearchConfigInterface extends ConfigInterface
      *
      * @return string
      */
-    public function getFieldNameMapped($fieldName, $considerSubFieldNames = false);
+    public function getFieldNameMapped(string $fieldName, bool $considerSubFieldNames = false): string;
 
     /**
      * returns short field name based on full field name
@@ -78,5 +72,5 @@ interface ElasticSearchConfigInterface extends ConfigInterface
      *
      * @return false|int|string
      */
-    public function getReverseMappedFieldName($fullFieldName);
+    public function getReverseMappedFieldName(string $fullFieldName): bool|int|string;
 }

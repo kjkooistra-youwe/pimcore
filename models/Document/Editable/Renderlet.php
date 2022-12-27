@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -36,16 +37,14 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
      *
      * @var int|null
      */
-    protected $id;
+    protected ?int $id = null;
 
     /**
      * Contains the object
      *
      * @internal
-     *
-     * @var Document|Asset|DataObject|null
      */
-    protected $o;
+    protected Document|Asset|null|DataObject|Element\ElementDescriptor $o = null;
 
     /**
      * Contains the type
@@ -54,7 +53,7 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
      *
      * @var string|null
      */
-    protected $type;
+    protected ?string $type = null;
 
     /**
      * Contains the subtype
@@ -63,12 +62,12 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
      *
      * @var string|null
      */
-    protected $subtype;
+    protected ?string $subtype = null;
 
     /**
      * {@inheritdoc}
      */
-    public function getType()
+    public function getType(): string
     {
         return 'renderlet';
     }
@@ -76,7 +75,7 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
     /**
      * {@inheritdoc}
      */
-    public function getData()
+    public function getData(): mixed
     {
         return [
             'id' => $this->id,
@@ -167,12 +166,12 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
     /**
      * {@inheritdoc}
      */
-    public function setDataFromResource($data)
+    public function setDataFromResource(mixed $data): static
     {
         $data = \Pimcore\Tool\Serialize::unserialize($data);
 
         $this->id = $data['id'];
-        $this->type = $data['type'];
+        $this->type = (string) $data['type'];
         $this->subtype = $data['subtype'];
 
         $this->setElement();
@@ -183,7 +182,7 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
     /**
      * {@inheritdoc}
      */
-    public function setDataFromEditmode($data)
+    public function setDataFromEditmode(mixed $data): static
     {
         if (is_array($data) && isset($data['id'])) {
             $this->id = $data['id'];
@@ -201,9 +200,11 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
      *
      * @return $this
      */
-    public function setElement()
+    public function setElement(): static
     {
-        $this->o = Element\Service::getElementById($this->type, $this->id);
+        if ($this->type && $this->id) {
+            $this->o = Element\Service::getElementById($this->type, $this->id);
+        }
 
         return $this;
     }
@@ -211,7 +212,7 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
     /**
      * {@inheritdoc}
      */
-    public function resolveDependencies()
+    public function resolveDependencies(): array
     {
         $this->load();
 
@@ -247,10 +248,7 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
         return null;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function isEmpty()
+    public function isEmpty(): bool
     {
         $this->load();
 
@@ -261,10 +259,7 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
         return true;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function checkValidity()
+    public function checkValidity(): bool
     {
         $sane = true;
         if ($this->id) {
@@ -309,62 +304,38 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
         }
     }
 
-    /**
-     * @param int $id
-     *
-     * @return Document\Editable\Renderlet
-     */
-    public function setId($id)
+    public function setId(int $id): static
     {
         $this->id = $id;
 
         return $this;
     }
 
-    /**
-     * @return int
-     */
-    public function getId()
+    public function getId(): int
     {
         return (int) $this->id;
     }
 
-    /**
-     * @param Asset|Document|DataObject|null $o
-     *
-     * @return Document\Editable\Renderlet
-     */
-    public function setO($o)
+    public function setO(DataObject|Asset|Document|null $o): static
     {
         $this->o = $o;
 
         return $this;
     }
 
-    /**
-     * @return Asset|Document|DataObject|null
-     */
-    public function getO()
+    public function getO(): DataObject|Asset|Document|null
     {
         return $this->o;
     }
 
-    /**
-     * @param string $subtype
-     *
-     * @return Document\Editable\Renderlet
-     */
-    public function setSubtype($subtype)
+    public function setSubtype(string $subtype): static
     {
         $this->subtype = $subtype;
 
         return $this;
     }
 
-    /**
-     * @return string
-     */
-    public function getSubtype()
+    public function getSubtype(): ?string
     {
         return $this->subtype;
     }

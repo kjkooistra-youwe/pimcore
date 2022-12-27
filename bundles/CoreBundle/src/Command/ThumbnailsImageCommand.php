@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -125,7 +126,7 @@ class ThumbnailsImageCommand extends AbstractCommand
         }
 
         if ($regex = $input->getOption('pathPattern')) {
-            $conditions[] = 'CONCAT(path, filename) REGEXP ?';
+            $conditions[] = 'CONCAT(`path`, filename) REGEXP ?';
             $conditionVariables[] = $regex;
         }
 

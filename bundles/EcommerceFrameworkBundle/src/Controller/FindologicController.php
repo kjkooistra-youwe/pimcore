@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -31,7 +32,7 @@ class FindologicController extends FrontendController
     /**
      * create xml output for findologic
      */
-    public function exportAction(Request $request)
+    public function exportAction(Request $request): Response
     {
         // init
         $start = (int)$request->get('start');
@@ -41,12 +42,12 @@ class FindologicController extends FrontendController
         $db = \Pimcore\Db::getConnection();
 
         if ($request->get('id')) {
-            $query = "SELECT SQL_CALC_FOUND_ROWS id, data FROM {$this->getExportTableName()} WHERE shop_key = :shop_key and id = :o_id LIMIT {$start}, {$count}";
-            $items = $db->fetchAllAssociative($query, ['shop_key' => $shopKey, 'o_id' => $request->get('id')]);
+            $query = "SELECT SQL_CALC_FOUND_ROWS id, data FROM {$this->getExportTableName()} WHERE shop_key = :shop_key and id = :id LIMIT {$start}, {$count}";
+            $items = $db->fetchAllAssociative($query, ['shop_key' => $shopKey, 'id' => $request->get('id')]);
         }
         // load export items
         elseif ($request->get('type')) {
-            $query = "SELECT SQL_CALC_FOUND_ROWS id, data FROM {$this->getExportTableName()} WHERE shop_key = :shop_key and type = :type LIMIT {$start}, {$count}";
+            $query = "SELECT SQL_CALC_FOUND_ROWS id, data FROM {$this->getExportTableName()} WHERE shop_key = :shop_key and `type` = :type LIMIT {$start}, {$count}";
             $items = $db->fetchAllAssociative($query, ['shop_key' => $shopKey, 'type' => $request->get('type')]);
         } else {
             $query = "SELECT SQL_CALC_FOUND_ROWS id, data FROM {$this->getExportTableName()} WHERE shop_key = :shop_key LIMIT {$start}, {$count}";
@@ -102,10 +103,7 @@ XML;
         return $response;
     }
 
-    /**
-     * @return string
-     */
-    protected function getExportTableName()
+    protected function getExportTableName(): string
     {
         return 'ecommerceframework_productindex_export_findologic';
     }

@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -17,6 +18,7 @@ namespace Pimcore\Tests\Model\Element;
 
 use Codeception\Stub;
 use Pimcore\Bundle\AdminBundle\Helper\GridHelperService;
+use Pimcore\Bundle\AdminBundle\HttpFoundation\JsonResponse;
 use Pimcore\Model\Document;
 use Pimcore\Model\Document\Page;
 use Pimcore\Model\Search;
@@ -58,81 +60,35 @@ class ModelDocumentPermissionsTest extends ModelTestCase
      * /manyElements/manyelement X --> allowed
      *
      */
+    protected Document\Folder $permissionfoo;
 
-    /**
-     * @var Document\Folder
-     */
-    protected $permissionfoo;
+    protected Document\Folder $permissionbar;
 
-    /**
-     * @var Document\Folder
-     */
-    protected $permissionbar;
+    protected Document\Folder $foo;
 
-    /**
-     * @var Document\Folder
-     */
-    protected $foo;
+    protected Document\Folder $bar;
 
-    /**
-     * @var Document\Folder
-     */
-    protected $bar;
+    protected Document\Folder $bars;
 
-    /**
-     * @var Document\Folder
-     */
-    protected $bars;
+    protected Document\Folder $userfolder;
 
-    /**
-     * @var Document\Folder
-     */
-    protected $userfolder;
+    protected Document\Folder $groupfolder;
 
-    /**
-     * @var Document\Folder
-     */
-    protected $groupfolder;
+    protected Document $hiddenobject;
 
-    /**
-     * @var Document
-     */
-    protected $hiddenobject;
+    protected Document $hugo;
 
-    /**
-     * @var Document
-     */
-    protected $hugo;
+    protected Document $usertestobject;
 
-    /**
-     * @var Document
-     */
-    protected $usertestobject;
+    protected Document $grouptestobject;
 
-    /**
-     * @var Document
-     */
-    protected $grouptestobject;
+    protected Document\Folder $a;
 
-    /**
-     * @var Document\Folder
-     */
-    protected $a;
+    protected Document\Folder $b;
 
-    /**
-     * @var Document\Folder
-     */
-    protected $b;
+    protected Document $c;
 
-    /**
-     * @var Document
-     */
-    protected $c;
-
-    /**
-     * @var Document
-     */
-    protected $abcdefghjkl;
+    protected Document $abcdefghjkl;
 
     protected function prepareObjectTree()
     {
@@ -463,7 +419,7 @@ class ModelDocumentPermissionsTest extends ModelTestCase
                 return $user;
             },
             'adminJson' => function ($data) {
-                return $data;
+                return new JsonResponse($data);
             },
         ]);
 
@@ -486,6 +442,7 @@ class ModelDocumentPermissionsTest extends ModelTestCase
             $eventDispatcher
         );
 
+        $responseData = json_decode($responseData->getContent(), true);
         $responsePaths = [];
         foreach ($responseData['nodes'] as $node) {
             $responsePaths[] = $node['path'];
@@ -648,6 +605,7 @@ class ModelDocumentPermissionsTest extends ModelTestCase
             new GridHelperService()
         );
 
+        $responseData = json_decode($responseData->getContent(), true);
         $responsePaths = [];
         foreach ($responseData['data'] as $node) {
             $responsePaths[] = $node['fullpath'];

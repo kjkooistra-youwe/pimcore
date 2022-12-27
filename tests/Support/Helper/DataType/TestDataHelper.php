@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -21,6 +22,7 @@ use Pimcore\Cache\RuntimeCache;
 use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\AbstractObject;
+use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\Document;
 use Pimcore\Model\Element\ElementInterface;
@@ -90,11 +92,33 @@ class TestDataHelper extends AbstractTestDataHelper
         $this->assertEquals($expected, $value);
     }
 
+    public function getFieldDefinition(Concrete $object, string $field): ?Data
+    {
+        $cd = $object->getClass();
+        $fd = $cd->getFieldDefinition($field);
+        if (!$fd) {
+            $localizedFields = $cd->getFieldDefinition('localizedfields');
+            if ($localizedFields instanceof DataObject\ClassDefinition\Data\Localizedfields) {
+                $fd = $localizedFields->getFieldDefinition($field);
+            }
+        }
+
+        return $fd;
+    }
+
     public function assertIsEqual(Concrete $object, string $field, mixed $expected, mixed $value): void
     {
-        $fd = $object->getClass()->getFieldDefinition($field);
+        $fd = $this->getFieldDefinition($object, $field);
         if ($fd instanceof DataObject\ClassDefinition\Data\EqualComparisonInterface) {
             $this->assertTrue($fd->isEqual($expected, $value), sprintf('Expected isEqual() returns true for data type: %s', ucfirst($field)));
+        }
+    }
+
+    public function assertIsNotEqual(Concrete $object, string $field, mixed $expected, mixed $value): void
+    {
+        $fd = $this->getFieldDefinition($object, $field);
+        if ($fd instanceof DataObject\ClassDefinition\Data\EqualComparisonInterface) {
+            $this->assertFalse($fd->isEqual($expected, $value), sprintf('Expected isEqual() returns false for data type: %s', ucfirst($field)));
         }
     }
 
@@ -119,7 +143,7 @@ class TestDataHelper extends AbstractTestDataHelper
 
         //set time for datetime isEqual comparison
         if ($field == 'datetime') {
-            $expected->setTime($value->format('H'), $value->format('i'), $value->format('s'));
+            $expected->setTime((int)$value->format('H'), (int)$value->format('i'), (int)$value->format('s'));
         }
 
         $this->assertIsEqual($object, $field, $expected, $value);
@@ -431,7 +455,6 @@ class TestDataHelper extends AbstractTestDataHelper
         /** @var DataObject\Data\ImageGallery $value */
         $value = $object->$getter();
         $this->assertInstanceOf(DataObject\Data\ImageGallery::class, $value);
-        /** @var DataObject\Data\Hotspotimage[] $items */
         $items = $value->getItems();
 
         $this->assertCount(2, $items);
@@ -493,7 +516,7 @@ class TestDataHelper extends AbstractTestDataHelper
         $this->assertNotNull($link);
         $this->assertInstanceOf(DataObject\Data\Link::class, $link);
 
-        $document = Document::getByPath($link->getElement());
+        $document = Document::getByPath((string)$link->getElement());
         $expected = Document::getByPath('/' . static::DOCUMENT . $seed);
 
         foreach (['expected' => $expected, 'value' => $document] as $desc => $item) {
@@ -578,7 +601,7 @@ class TestDataHelper extends AbstractTestDataHelper
     {
         $getter = 'get' . ucfirst($field);
 
-        $objects = $this->getObjectList("o_type = 'object'");
+        $objects = $this->getObjectList("`type` = 'object'");
 
         if ($language) {
             if ($language === 'de') {
@@ -648,7 +671,7 @@ class TestDataHelper extends AbstractTestDataHelper
      */
     public function getObjectsWithMetadataFixture(string $field, int $seed): array
     {
-        $objects = $this->getObjectList("o_type = 'object' AND o_className = 'unittest'");
+        $objects = $this->getObjectList("`type` = 'object' AND className = 'unittest'");
         $objects = array_slice($objects, 0, 4);
 
         $metaobjects = [];
@@ -1224,7 +1247,7 @@ class TestDataHelper extends AbstractTestDataHelper
         }
 
         $link = new DataObject\Data\Link();
-        $link->setPath($doc);
+        $link->setPath((string)$doc);
 
         $object->$setter($link);
     }
@@ -1287,7 +1310,7 @@ class TestDataHelper extends AbstractTestDataHelper
     public function fillObjects(Concrete|DataObject\Fieldcollection\Data\AbstractData|DataObject\Objectbrick\Data\AbstractData $object, string $field, int $seed = 1, ?string $language = null): void
     {
         $setter = 'set' . ucfirst($field);
-        $objects = $this->getObjectList("o_type = 'object'");
+        $objects = $this->getObjectList("`type` = 'object'");
 
         if ($language) {
             if ($language == 'de') {
@@ -1347,7 +1370,7 @@ class TestDataHelper extends AbstractTestDataHelper
     public function fillSelect(Concrete $object, string $field, int $seed = 1): void
     {
         $setter = 'set' . ucfirst($field);
-        $object->$setter(1 + ($seed % 2));
+        $object->$setter((string)(1 + ($seed % 2)));
     }
 
     public function fillIndexFieldSelectionCombo(Concrete $object, string $field, int $seed = 1): void
@@ -1365,7 +1388,7 @@ class TestDataHelper extends AbstractTestDataHelper
     public function fillIndexFieldSelection(Concrete $object, string $field, int $seed = 1): void
     {
         $setter = 'set' . ucfirst($field);
-        $value = new IndexFieldSelection(null, 'carClass', null);
+        $value = new IndexFieldSelection('', 'carClass', '');
         $object->$setter($value);
     }
 
@@ -1424,7 +1447,7 @@ class TestDataHelper extends AbstractTestDataHelper
             $user->save();
         }
 
-        $object->$setter($user->getId());
+        $object->$setter((string)$user->getId());
     }
 
     public function fillVideo(Concrete $object, string $field, int $seed = 1, array &$returnData = []): void
@@ -1461,3 +1484,5 @@ class TestDataHelper extends AbstractTestDataHelper
         $object->$setter('sometext<br>' . $seed);
     }
 }
+
+@class_alias(TestDataHelper::class, 'Pimcore\Tests\Support\Helper\DataType\TestDataHelper');

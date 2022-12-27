@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -25,32 +26,21 @@ use Pimcore\Model\DataObject\OnlineShopOrderItem;
 
 class Listing extends AbstractOrderList implements OrderListInterface
 {
-    /**
-     * @var DoctrineQueryBuilder|null
-     */
-    protected $queryBuilder;
+    protected ?DoctrineQueryBuilder $queryBuilder = null;
 
     /**
      * @var OrderListFilterInterface[]
      */
-    protected $filter = [];
+    protected array $filter = [];
 
-    /**
-     * @var bool
-     */
-    protected $useSubItems = false;
+    protected bool $useSubItems = false;
 
     /**
      * @var null|string[]
      */
-    protected $availableFilterValues = null;
+    protected ?array $availableFilterValues = null;
 
-    /**
-     * @param string $type
-     *
-     * @return OrderListInterface
-     */
-    public function setListType($type)
+    public function setListType(string $type): OrderListInterface
     {
         $this->listType = $type;
 
@@ -102,11 +92,10 @@ class Listing extends AbstractOrderList implements OrderListInterface
     }
 
     /**
-     * @param int $limit
      *
      * @return $this
      */
-    public function setLimit($limit, $offset = 0)
+    public function setLimit(int $limit, int $offset = 0): static
     {
         parent::setLimit($limit, $offset);
 
@@ -117,22 +106,14 @@ class Listing extends AbstractOrderList implements OrderListInterface
         return $this;
     }
 
-    /**
-     * @param array|string $order
-     *
-     * @return $this
-     */
-    public function setOrder($order)
+    public function setOrder(string $order): static
     {
         $this->getQueryBuilder()->add('orderBy', $order, false);
 
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function joinPricingRule()
+    public function joinPricingRule(): static
     {
         $queryBuilder = $this->getQueryBuilder();
         $joins = $queryBuilder->getQueryPart('from');
@@ -142,18 +123,14 @@ class Listing extends AbstractOrderList implements OrderListInterface
                 'orderItem',
                 'object_collection_PricingRule_' . OnlineShopOrderItem::classId(),
                 'pricingRule',
-                'pricingRule.o_id = orderItem.o_id AND pricingRule.fieldname = "pricingRules"'
+                'pricingRule.id = orderItem.id AND pricingRule.fieldname = "pricingRules"'
             );
         }
 
         return $this;
     }
 
-    /**
-     * @return $this
-     *
-     */
-    public function joinPriceModifications()
+    public function joinPriceModifications(): static
     {
         $queryBuilder = $this->getQueryBuilder();
 
@@ -164,17 +141,14 @@ class Listing extends AbstractOrderList implements OrderListInterface
                 '`order`',
                 'object_collection_OrderPriceModifications_' . OnlineShopOrder::classId(),
                 'OrderPriceModifications',
-                'OrderPriceModifications.o_id = order.oo_id AND OrderPriceModifications.fieldname = "priceModifications"'
+                'OrderPriceModifications.id = order.oo_id AND OrderPriceModifications.fieldname = "priceModifications"'
             );
         }
 
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function joinPaymentInfo()
+    public function joinPaymentInfo(): static
     {
         $queryBuilder = $this->getQueryBuilder();
 
@@ -184,21 +158,18 @@ class Listing extends AbstractOrderList implements OrderListInterface
             // create sub select
             $paymentQueryBuilder = Db::getConnection()->createQueryBuilder();
 
-            $paymentQueryBuilder->select('GROUP_CONCAT(",", _paymentInfo.paymentReference, "," SEPARATOR ",") AS paymentReference', '_order.o_id AS o_id')
+            $paymentQueryBuilder->select('GROUP_CONCAT(",", _paymentInfo.paymentReference, "," SEPARATOR ",") AS paymentReference', '_order.id AS id')
                 ->from('object_collection_PaymentInfo_' . OnlineShopOrder::classId(), '_paymentInfo')
-                ->join('_paymentInfo', 'object_' . OnlineShopOrder::classId(), '_order', '_order.oo_id = _paymentInfo.o_id');
+                ->join('_paymentInfo', 'object_' . OnlineShopOrder::classId(), '_order', '_order.oo_id = _paymentInfo.id');
 
             // join
-            $queryBuilder->leftJoin('`order`', (string) $paymentQueryBuilder, 'paymentInfo', 'paymentInfo.o_id = `order`.oo_id');
+            $queryBuilder->leftJoin('`order`', (string) $paymentQueryBuilder, 'paymentInfo', 'paymentInfo.id = `order`.oo_id');
         }
 
         return $this;
     }
 
-    /**
-     * @return $this
-     */
-    public function joinOrderItemObjects()
+    public function joinOrderItemObjects(): static
     {
         $queryBuilder = $this->getQueryBuilder();
 
@@ -206,18 +177,13 @@ class Listing extends AbstractOrderList implements OrderListInterface
 
         if (!array_key_exists('orderItemObjects', $joins)) {
             $queryBuilder->join('orderItem', 'objects', 'orderItemObjects',
-                'orderItemObjects.o_id = orderItem.product__id');
+                'orderItemObjects.id = orderItem.product__id');
         }
 
         return $this;
     }
 
-    /**
-     * @param string $classId
-     *
-     * @return $this
-     */
-    public function joinProduct($classId)
+    public function joinProduct(string $classId): static
     {
         $queryBuilder = $this->getQueryBuilder();
 
@@ -242,7 +208,7 @@ class Listing extends AbstractOrderList implements OrderListInterface
      *
      * @throws \Exception
      */
-    public function joinCustomer($classId)
+    public function joinCustomer(string $classId): static
     {
         $queryBuilder = $this->getQueryBuilder();
 
@@ -250,7 +216,7 @@ class Listing extends AbstractOrderList implements OrderListInterface
 
         if (!array_key_exists('customer', $joins)) {
             $queryBuilder->join('`order`', 'object_' . $classId, 'customer',
-                'customer.o_id = order.customer__id'
+                'customer.id = order.customer__id'
             );
         }
 
@@ -264,7 +230,7 @@ class Listing extends AbstractOrderList implements OrderListInterface
      *
      * @return $this
      */
-    protected function joinItemsAndSubItems($select)
+    protected function joinItemsAndSubItems(DoctrineQueryBuilder $select): static
     {
         if (!$this->useSubItems()) {
             // just order items
@@ -283,29 +249,19 @@ class Listing extends AbstractOrderList implements OrderListInterface
         // join related order item
         $select->addSelect('orderItem.oo_id AS OrderItemId');
         $select->join('_orderItems', 'object_' . OnlineShopOrderItem::classId(), 'orderItem',
-            'orderItem.o_id = _orderItems.dest_id');
+            'orderItem.id = _orderItems.dest_id');
 
         return $this;
     }
 
-    /**
-     * @param string $field
-     *
-     * @return $this
-     */
-    public function addSelectField($field)
+    public function addSelectField(string $field): static
     {
         $this->getQueryBuilder()->addSelect($field);
 
         return $this;
     }
 
-    /**
-     * @param OrderListFilterInterface $filter
-     *
-     * @return $this
-     */
-    public function addFilter(OrderListFilterInterface $filter)
+    public function addFilter(OrderListFilterInterface $filter): static
     {
         $this->filter[] = $filter;
         $filter->apply($this);
@@ -315,11 +271,11 @@ class Listing extends AbstractOrderList implements OrderListInterface
 
     /**
      * @param string $condition
-     * @param mixed $value
+     * @param string|null $value
      *
      * @return $this
      */
-    public function addCondition($condition, $value = null)
+    public function addCondition(string $condition, string $value = null): static
     {
         if (null === $value) {
             $value = [];
@@ -334,20 +290,12 @@ class Listing extends AbstractOrderList implements OrderListInterface
         return $this;
     }
 
-    /**
-     * @return bool
-     */
-    public function useSubItems()
+    public function useSubItems(): bool
     {
         return $this->useSubItems;
     }
 
-    /**
-     * @param bool $useSubItems
-     *
-     * @return $this
-     */
-    public function setUseSubItems($useSubItems)
+    public function setUseSubItems(bool $useSubItems): static
     {
         $this->useSubItems = (bool)$useSubItems;
 

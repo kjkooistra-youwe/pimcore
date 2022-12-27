@@ -21,6 +21,7 @@ use Pimcore\Bundle\EcommerceFrameworkBundle\CartManager\CartInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CheckoutManager\V7\CheckoutManager;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CheckoutManager\V7\CheckoutManagerInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\CheckoutManager\V7\HandlePendingPayments\CancelPaymentOrRecreateOrderStrategy;
+use Pimcore\Bundle\EcommerceFrameworkBundle\CheckoutManager\V7\HandlePendingPayments\HandlePendingPaymentsStrategyInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\EnvironmentInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\OrderManager\OrderManagerLocatorInterface;
 use Pimcore\Bundle\EcommerceFrameworkBundle\PaymentManager\V7\Payment\PaymentInterface;
@@ -30,54 +31,33 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class CheckoutManagerFactory implements CheckoutManagerFactoryInterface
 {
-    /**
-     * @var EnvironmentInterface
-     */
-    protected $environment;
+    protected EnvironmentInterface $environment;
 
-    /**
-     * @var OrderManagerLocatorInterface
-     */
-    protected $orderManagers;
+    protected OrderManagerLocatorInterface $orderManagers;
 
-    /**
-     * @var CommitOrderProcessorLocatorInterface
-     */
-    protected $commitOrderProcessors;
+    protected CommitOrderProcessorLocatorInterface $commitOrderProcessors;
 
     /**
      * Array of checkout step definitions
      *
      * @var array
      */
-    protected $checkoutStepDefinitions = [];
+    protected array $checkoutStepDefinitions = [];
 
-    /**
-     * @var PaymentInterface
-     */
-    protected $paymentProvider;
+    protected ?PaymentInterface $paymentProvider = null;
 
     /**
      * @var CheckoutManagerInterface[]
      */
-    protected $checkoutManagers = [];
+    protected array $checkoutManagers = [];
 
-    /**
-     * @var ServiceLocator|null
-     */
-    protected $handlePendingPaymentStrategyLocator;
+    protected ?ServiceLocator $handlePendingPaymentStrategyLocator = null;
 
-    /**
-     * @var string
-     */
-    protected $className = CheckoutManager::class;
+    protected string $className = CheckoutManager::class;
 
-    protected $handlePendingPaymentStrategy = null;
+    protected ?HandlePendingPaymentsStrategyInterface $handlePendingPaymentStrategy = null;
 
-    /**
-     * @var EventDispatcherInterface
-     */
-    protected $eventDispatcher = null;
+    protected ?EventDispatcherInterface $eventDispatcher = null;
 
     public function __construct(
         EnvironmentInterface $environment,

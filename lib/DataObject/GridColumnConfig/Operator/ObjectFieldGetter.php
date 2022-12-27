@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 /**
  * Pimcore
@@ -23,19 +24,10 @@ use Pimcore\Model\Element\ElementInterface;
  */
 final class ObjectFieldGetter extends AbstractOperator
 {
-    /**
-     * @var string
-     */
-    private $attribute;
+    private string $attribute;
 
-    /**
-     * @var string
-     */
-    private $forwardAttribute;
+    private string $forwardAttribute;
 
-    /**
-     * {@inheritdoc}
-     */
     public function __construct(\stdClass $config, $context = null)
     {
         parent::__construct($config, $context);
@@ -47,7 +39,7 @@ final class ObjectFieldGetter extends AbstractOperator
     /**
      * {@inheritdoc}
      */
-    public function getLabeledValue($element)
+    public function getLabeledValue(array|ElementInterface $element): \Pimcore\DataObject\GridColumnConfig\ResultContainer|\stdClass|null
     {
         $result = new \stdClass();
         $result->label = $this->label;
