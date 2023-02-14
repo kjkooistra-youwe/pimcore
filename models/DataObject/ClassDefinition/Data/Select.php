@@ -197,12 +197,11 @@ class Select extends Data implements
      * @param null|DataObject\Concrete $object
      * @param array $params
      *
-     * @return string|null
+     * @return  null|string|int
      *
-     *@see ResourcePersistenceAwareInterface::getDataForResource
-     *
+     * @see ResourcePersistenceAwareInterface::getDataForResource
      */
-    public function getDataForResource(mixed $data, DataObject\Concrete $object = null, array $params = []): ?string
+    public function getDataForResource(mixed $data, DataObject\Concrete $object = null, array $params = []): null|string|int
     {
         $data = $this->handleDefaultValue($data, $object, $params);
 
@@ -214,12 +213,11 @@ class Select extends Data implements
      * @param null|DataObject\Concrete $object
      * @param array $params
      *
-     * @return string|null
+     * @return  null|string|int
      *
-     *@see ResourcePersistenceAwareInterface::getDataFromResource
-     *
+     * @see ResourcePersistenceAwareInterface::getDataFromResource
      */
-    public function getDataFromResource(mixed $data, Concrete $object = null, array $params = []): ?string
+    public function getDataFromResource(mixed $data, Concrete $object = null, array $params = []): null|string|int
     {
         return $data;
     }
@@ -231,8 +229,7 @@ class Select extends Data implements
      *
      * @return string|null
      *
-     *@see QueryResourcePersistenceAwareInterface::getDataForQueryResource
-     *
+     * @see QueryResourcePersistenceAwareInterface::getDataForQueryResource
      */
     public function getDataForQueryResource(mixed $data, DataObject\Concrete $object = null, array $params = []): ?string
     {
@@ -244,12 +241,12 @@ class Select extends Data implements
      * @param null|DataObject\Concrete $object
      * @param array $params
      *
-     * @return string|null
+     * @return  null|string|int
      *
      * @see Data::getDataForEditmode
      *
      */
-    public function getDataForEditmode(mixed $data, DataObject\Concrete $object = null, array $params = []): ?string
+    public function getDataForEditmode(mixed $data, DataObject\Concrete $object = null, array $params = []): null|string|int
     {
         return $this->getDataForResource($data, $object, $params);
     }
@@ -259,12 +256,12 @@ class Select extends Data implements
      * @param null|DataObject\Concrete $object
      * @param array $params
      *
-     * @return string|null
+     * @return  null|string|int
      *
      * @see Data::getDataFromEditmode
      *
      */
-    public function getDataFromEditmode(mixed $data, DataObject\Concrete $object = null, array $params = []): ?string
+    public function getDataFromEditmode(mixed $data, DataObject\Concrete $object = null, array $params = []): null|string|int
     {
         return $this->getDataFromResource($data, $object, $params);
     }
@@ -330,7 +327,7 @@ class Select extends Data implements
     /**
      * {@inheritdoc}
      */
-    public function checkValidity(mixed $data, bool $omitMandatoryCheck = false, array $params = [])
+    public function checkValidity(mixed $data, bool $omitMandatoryCheck = false, array $params = []): void
     {
         if (!$omitMandatoryCheck && $this->getMandatory() && $this->isEmpty($data)) {
             throw new Model\Element\ValidationException('Empty mandatory field [ ' . $this->getName() . ' ]');
@@ -349,7 +346,7 @@ class Select extends Data implements
     /**
      * @param DataObject\ClassDefinition\Data\Select $masterDefinition
      */
-    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition)
+    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition): void
     {
         $this->options = $masterDefinition->options;
         $this->columnLength = $masterDefinition->columnLength;
@@ -363,7 +360,7 @@ class Select extends Data implements
         return $this->defaultValue;
     }
 
-    public function setDefaultValue(?string $defaultValue)
+    public function setDefaultValue(?string $defaultValue): void
     {
         $this->defaultValue = $defaultValue;
     }
@@ -373,7 +370,7 @@ class Select extends Data implements
         return $this->optionsProviderClass;
     }
 
-    public function setOptionsProviderClass(?string $optionsProviderClass)
+    public function setOptionsProviderClass(?string $optionsProviderClass): void
     {
         $this->optionsProviderClass = $optionsProviderClass;
     }
@@ -383,7 +380,7 @@ class Select extends Data implements
         return $this->optionsProviderData;
     }
 
-    public function setOptionsProviderData(?string $optionsProviderData)
+    public function setOptionsProviderData(?string $optionsProviderData): void
     {
         $this->optionsProviderData = $optionsProviderData;
     }
@@ -550,13 +547,7 @@ class Select extends Data implements
         return 'string|null';
     }
 
-    /**
-     * @param mixed $oldValue
-     * @param mixed $newValue
-     *
-     * @return bool
-     */
-    public function isEqual($oldValue, $newValue): bool
+    public function isEqual(mixed $oldValue, mixed $newValue): bool
     {
         return $oldValue == $newValue;
     }
