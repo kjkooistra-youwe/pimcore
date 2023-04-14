@@ -17,8 +17,9 @@ declare(strict_types=1);
 
 namespace Pimcore\Extension\Bundle;
 
+use Pimcore\Bundle\AdminBundle\Event\BundleManagerEvents;
+use Pimcore\Bundle\AdminBundle\Support\PimcoreBundleAdminSupportInterface;
 use Pimcore\Event\BundleManager\PathsEvent;
-use Pimcore\Event\BundleManagerEvents;
 use Pimcore\Extension\Bundle\Exception\BundleNotFoundException;
 use Pimcore\Extension\Bundle\Installer\Exception\InstallationException;
 use Pimcore\HttpKernel\BundleCollection\ItemInterface;
@@ -489,17 +490,19 @@ class PimcoreBundleManager
 
         $result = [];
         foreach ($this->getActiveBundles() as $bundle) {
-            $paths = $bundle->$getter();
+            if ($bundle instanceof PimcoreBundleAdminSupportInterface) {
+                $paths = $bundle->$getter();
 
-            foreach ($paths as $path) {
-                if ($path instanceof RouteReferenceInterface) {
-                    $result[] = $this->router->generate(
-                        $path->getRoute(),
-                        $path->getParameters(),
-                        $path->getType()
-                    );
-                } else {
-                    $result[] = $path;
+                foreach ($paths as $path) {
+                    if ($path instanceof RouteReferenceInterface) {
+                        $result[] = $this->router->generate(
+                            $path->getRoute(),
+                            $path->getParameters(),
+                            $path->getType()
+                        );
+                    } else {
+                        $result[] = $path;
+                    }
                 }
             }
         }

@@ -21,43 +21,16 @@ use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Normalizer\NormalizerInterface;
+use Symfony\Component\PasswordHasher\Hasher\CheckPasswordLengthTrait;
 
 class Password extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface, TypeDeclarationSupportInterface, EqualComparisonInterface, VarExporterInterface, NormalizerInterface
 {
+    use CheckPasswordLengthTrait;
     use DataObject\Traits\SimpleComparisonTrait;
     use DataObject\Traits\DataWidthTrait;
     use DataObject\Traits\SimpleNormalizerTrait;
-    use Extension\ColumnType;
-    use Extension\QueryColumnType;
 
     const HASH_FUNCTION_PASSWORD_HASH = 'password_hash';
-
-    /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'password';
-
-    /**
-     * Type for the column to query
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $queryColumnType = 'varchar(255)';
-
-    /**
-     * Type for the column
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $columnType = 'varchar(255)';
 
     /**
      * @internal
@@ -191,16 +164,17 @@ class Password extends Data implements ResourcePersistenceAwareInterface, QueryR
      */
     public function calculateHash(string $data): string
     {
-        $hash = null;
         if ($this->algorithm === static::HASH_FUNCTION_PASSWORD_HASH) {
-            $hash = password_hash($data, PASSWORD_DEFAULT);
+            $config = \Pimcore::getContainer()->getParameter('pimcore.config')['security']['password'];
+
+            $hash = password_hash($data, $config['algorithm'], $config['options']);
         } else {
             if (!empty($this->salt)) {
-                if ($this->saltlocation == 'back') {
-                    $data = $data . $this->salt;
-                } elseif ($this->saltlocation == 'front') {
-                    $data = $this->salt . $data;
-                }
+                $data = match ($this->saltlocation) {
+                    'back' => $data . $this->salt,
+                    'front' => $this->salt . $data,
+                    default => $data,
+                };
             }
 
             $hash = hash($this->algorithm, $data);
@@ -230,16 +204,17 @@ class Password extends Data implements ResourcePersistenceAwareInterface, QueryR
         $setter = 'set' . ucfirst($this->getName());
 
         $objectHash = $object->$getter();
-        if (null === $objectHash || empty($objectHash)) {
+        if (empty($objectHash)) {
             return false;
         }
 
         if ($this->getAlgorithm() === static::HASH_FUNCTION_PASSWORD_HASH) {
-            $result = (true === password_verify($password, $objectHash));
+            $result = password_verify($password, $objectHash);
 
             if ($result && $updateHash) {
-                // password needs rehash (e.g PASSWORD_DEFAULT changed to a stronger algorithm)
-                if (true === password_needs_rehash($objectHash, PASSWORD_DEFAULT)) {
+                $config = \Pimcore::getContainer()->getParameter('pimcore.config')['security']['password'];
+
+                if (password_needs_rehash($objectHash, $config['algorithm'], $config['options'])) {
                     $newHash = $this->calculateHash($password);
 
                     $object->$setter($newHash);
@@ -282,16 +257,6 @@ class Password extends Data implements ResourcePersistenceAwareInterface, QueryR
         return $this->getDataForResource($data, $object, $params);
     }
 
-    /**
-     * @param mixed $data
-     * @param null|DataObject\Concrete $object
-     * @param array $params
-     *
-     * @return string
-     *
-     * @see Data::getDataForEditmode
-     *
-     */
     public function getDataForEditmode(mixed $data, DataObject\Concrete $object = null, array $params = []): ?string
     {
         return $data;
@@ -385,13 +350,13 @@ class Password extends Data implements ResourcePersistenceAwareInterface, QueryR
     }
 
     /**
-     * @param DataObject\ClassDefinition\Data\Password $masterDefinition
+     * @param DataObject\ClassDefinition\Data\Password $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition): void
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition): void
     {
-        $this->algorithm = $masterDefinition->algorithm;
-        $this->salt = $masterDefinition->salt;
-        $this->saltlocation = $masterDefinition->saltlocation;
+        $this->algorithm = $mainDefinition->algorithm;
+        $this->salt = $mainDefinition->salt;
+        $this->saltlocation = $mainDefinition->saltlocation;
     }
 
     public function getParameterTypeDeclaration(): ?string
@@ -423,10 +388,29 @@ class Password extends Data implements ResourcePersistenceAwareInterface, QueryR
      */
     public function checkValidity(mixed $data, bool $omitMandatoryCheck = false, array $params = []): void
     {
+        if (is_string($data) && $this->isPasswordTooLong($data)) {
+            throw new Model\Element\ValidationException('Value in field [ ' . $this->getName() . ' ] is too long');
+        }
+
         if (!$omitMandatoryCheck && ($this->getMinimumLength() && is_string($data) && strlen($data) < $this->getMinimumLength())) {
             throw new Model\Element\ValidationException('Value in field [ ' . $this->getName() . ' ] is not at least ' . $this->getMinimumLength() . ' characters');
         }
 
         parent::checkValidity($data, $omitMandatoryCheck, $params);
+    }
+
+    public function getColumnType(): string
+    {
+        return 'varchar(255)';
+    }
+
+    public function getQueryColumnType(): string
+    {
+        return $this->getColumnType();
+    }
+
+    public function getFieldType(): string
+    {
+        return 'password';
     }
 }

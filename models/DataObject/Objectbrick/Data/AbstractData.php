@@ -82,7 +82,7 @@ abstract class AbstractData extends Model\AbstractModel implements Model\DataObj
     public function setDoDelete(bool $doDelete): static
     {
         $this->flushContainer();
-        $this->doDelete = (bool)$doDelete;
+        $this->doDelete = $doDelete;
 
         return $this;
     }
@@ -154,13 +154,7 @@ abstract class AbstractData extends Model\AbstractModel implements Model\DataObj
         $this->object = $object;
 
         if (property_exists($this, 'localizedfields') && $this->localizedfields instanceof Localizedfield) {
-            $dirtyLanguages = $this->localizedfields->getDirtyLanguages();
-            $this->localizedfields->setObject($object);
-            if (is_array($dirtyLanguages)) {
-                $this->localizedfields->markLanguagesAsDirty($dirtyLanguages);
-            } else {
-                $this->localizedfields->resetLanguageDirtyMap();
-            }
+            $this->localizedfields->setObjectOmitDirty($object);
         }
 
         return $this;
@@ -168,10 +162,6 @@ abstract class AbstractData extends Model\AbstractModel implements Model\DataObj
 
     public function getObject(): ?Concrete
     {
-        if ($this->objectId && !$this->object) {
-            $this->setObject(Concrete::getById($this->objectId));
-        }
-
         return $this->object;
     }
 
@@ -240,9 +230,6 @@ abstract class AbstractData extends Model\AbstractModel implements Model\DataObj
         return true;
     }
 
-    /**
-     * @return array
-     */
     public function __sleep(): array
     {
         $parentVars = parent::__sleep();

@@ -26,6 +26,7 @@ env:
     APP_ENV: test
     PIMCORE_TEST: 1
     PIMCORE_STORAGE: 'local'
+    COMPOSER_ROOT_VERSION: "11.x-dev"
 
 permissions:
   contents: read
@@ -38,9 +39,11 @@ jobs:
         strategy:
             matrix:
                 include:
+                    - { php-version: "8.2", dependencies: "lowest", experimental: false, symfony: "", composer-options: "" }
+                    - { php-version: "8.2", dependencies: "highest", experimental: false, symfony: "", composer-options: "" }
+                    - { php-version: "8.2", dependencies: "highest", experimental: true, symfony: "6.3.x-dev", composer-options: "" }
                     - { php-version: "8.1", dependencies: "lowest", experimental: false, symfony: "", composer-options: "" }
                     - { php-version: "8.1", dependencies: "highest", experimental: false, symfony: "", composer-options: "" }
-                    - { php-version: "8.1", dependencies: "highest", experimental: true, symfony: "6.3.x-dev", composer-options: "" }
 
         steps:
             - name: "Checkout code"
@@ -55,9 +58,6 @@ jobs:
             - name: "Setup Pimcore environment"
               run: |
                   .github/ci/scripts/setup-pimcore-environment.sh
-
-            - name: "Copy models"
-              run: "cp -rv .github/ci/files/var ."
 
             - name: "Set Symfony version constraint in composer.json"
               env:

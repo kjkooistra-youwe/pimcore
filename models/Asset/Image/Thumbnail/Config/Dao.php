@@ -25,15 +25,18 @@ use Pimcore\Model;
  */
 class Dao extends Model\Dao\PimcoreLocationAwareConfigDao
 {
+    private const CONFIG_KEY = 'image_thumbnails';
+
     public function configure(): void
     {
         $config = \Pimcore::getContainer()->getParameter('pimcore.config');
 
+        $storageConfig = $config['config_location'][self::CONFIG_KEY];
+
         parent::configure([
             'containerConfig' => $config['assets']['image']['thumbnails']['definitions'],
             'settingsStoreScope' => 'pimcore_image_thumbnails',
-            'storageDirectory' => $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_IMAGE_THUMBNAILS'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/image-thumbnails',
-            'writeTargetEnvVariableName' => 'PIMCORE_WRITE_TARGET_IMAGE_THUMBNAILS',
+            'storageConfig' => $storageConfig,
         ]);
     }
 

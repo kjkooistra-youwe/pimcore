@@ -1,4 +1,3 @@
-
 SET NAMES utf8mb4;
 
 DROP TABLE IF EXISTS `assets`;
@@ -74,7 +73,7 @@ DROP TABLE IF EXISTS `documents` ;
 CREATE TABLE `documents` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
   `parentId` int(11) unsigned DEFAULT NULL,
-  `type` enum('page','link','snippet','folder','hardlink','email','newsletter','printpage','printcontainer') DEFAULT NULL,
+  `type` enum('page','link','snippet','folder','hardlink','email') DEFAULT NULL,
   `key` varchar(255) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT '',
   `path` varchar(765) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL, /* path in utf8 (3-byte) using the full key length of 3072 bytes */
   `index` int(11) unsigned DEFAULT '0',
@@ -118,24 +117,6 @@ CREATE TABLE `documents_email` (
   CONSTRAINT `fk_documents_email_documents` FOREIGN KEY (`id`) REFERENCES `documents` (`id`) ON UPDATE NO ACTION ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8mb4;
 
-DROP TABLE IF EXISTS `documents_newsletter`;
-CREATE TABLE `documents_newsletter` (
-  `id` int(11) unsigned NOT NULL DEFAULT '0',
-  `controller` varchar(500) DEFAULT NULL,
-  `template` varchar(255) DEFAULT NULL,
-  `from` varchar(255) DEFAULT NULL,
-  `subject` varchar(255) DEFAULT NULL,
-  `trackingParameterSource` varchar(255) DEFAULT NULL,
-  `trackingParameterMedium` varchar(255) DEFAULT NULL,
-  `trackingParameterName` varchar(255) DEFAULT NULL,
-  `enableTrackingParameters` tinyint(1) unsigned DEFAULT NULL,
-  `sendingMode` varchar(20) DEFAULT NULL,
-  `plaintext` LONGTEXT NULL DEFAULT NULL,
-  `missingRequiredEditable` tinyint(1) unsigned DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  CONSTRAINT `fk_documents_newsletter_documents` FOREIGN KEY (`id`) REFERENCES `documents` (`id`) ON UPDATE NO ACTION ON DELETE CASCADE
-) DEFAULT CHARSET=utf8mb4;
-
 DROP TABLE IF EXISTS `documents_hardlink`;
 CREATE TABLE `documents_hardlink` (
   `id` int(11) unsigned NOT NULL default '0',
@@ -165,9 +146,8 @@ CREATE TABLE `documents_page` (
   `template` varchar(255) DEFAULT NULL,
   `title` varchar(255) DEFAULT NULL,
   `description` varchar(383) DEFAULT NULL,
-  `metaData` text,
   `prettyUrl` varchar(255) DEFAULT NULL,
-  `contentMasterDocumentId` int(11) DEFAULT NULL,
+  `contentMainDocumentId` int(11) DEFAULT NULL,
   `targetGroupIds` varchar(255) NOT NULL DEFAULT '',
   `missingRequiredEditable` tinyint(1) unsigned DEFAULT NULL,
   `staticGeneratorEnabled` tinyint(1) unsigned DEFAULT NULL,
@@ -182,7 +162,7 @@ CREATE TABLE `documents_snippet` (
   `id` int(11) unsigned NOT NULL DEFAULT '0',
   `controller` varchar(500) DEFAULT NULL,
   `template` varchar(255) DEFAULT NULL,
-  `contentMasterDocumentId` int(11) DEFAULT NULL,
+  `contentMainDocumentId` int(11) DEFAULT NULL,
   `missingRequiredEditable` tinyint(1) unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_documents_snippet_documents` FOREIGN KEY (`id`) REFERENCES `documents` (`id`) ON UPDATE NO ACTION ON DELETE CASCADE
@@ -197,19 +177,6 @@ CREATE TABLE `documents_translations` (
   KEY `id` (`id`),
   KEY `language` (`language`),
   CONSTRAINT `fk_documents_translations_documents` FOREIGN KEY (`id`) REFERENCES `documents` (`id`) ON UPDATE NO ACTION ON DELETE CASCADE
-) DEFAULT CHARSET=utf8mb4;
-
-DROP TABLE IF EXISTS `documents_printpage`;
-CREATE TABLE `documents_printpage` (
-  `id` int(11) unsigned NOT NULL DEFAULT '0',
-  `controller` varchar(500) DEFAULT NULL,
-  `template` varchar(255) DEFAULT NULL,
-  `lastGenerated` int(11) DEFAULT NULL,
-  `lastGenerateMessage` text,
-  `contentMasterDocumentId` int(11) DEFAULT NULL,
-  `missingRequiredEditable` tinyint(1) unsigned DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  CONSTRAINT `fk_documents_printpage_documents` FOREIGN KEY (`id`) REFERENCES `documents` (`id`) ON UPDATE NO ACTION ON DELETE CASCADE
 ) DEFAULT CHARSET=utf8mb4;
 
 
@@ -227,8 +194,8 @@ CREATE TABLE `edit_lock` (
 ) DEFAULT CHARSET=utf8mb4;
 
 
-DROP TABLE IF EXISTS `email_blacklist`;
-CREATE TABLE `email_blacklist` (
+DROP TABLE IF EXISTS `email_blocklist`;
+CREATE TABLE `email_blocklist` (
   `address` varchar(190) NOT NULL DEFAULT '',
   `creationDate` int(11) unsigned DEFAULT NULL,
   `modificationDate` int(11) unsigned DEFAULT NULL,
@@ -348,30 +315,6 @@ CREATE TABLE `recyclebin` (
   INDEX `recyclebin_date` (`date`)
 ) DEFAULT CHARSET=utf8mb4;
 
-DROP TABLE IF EXISTS `redirects`;
-CREATE TABLE `redirects` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `type` ENUM('entire_uri','path_query','path','auto_create') NOT NULL,
-  `source` varchar(255) DEFAULT NULL,
-  `sourceSite` int(11) DEFAULT NULL,
-  `target` varchar(255) DEFAULT NULL,
-  `targetSite` int(11) DEFAULT NULL,
-  `statusCode` varchar(3) DEFAULT NULL,
-  `priority` int(2) DEFAULT '0',
-  `regex` tinyint(1) DEFAULT NULL,
-  `passThroughParameters` tinyint(1) DEFAULT NULL,
-  `active` tinyint(1) DEFAULT NULL,
-  `expiry` int(11) unsigned DEFAULT NULL,
-  `creationDate` int(11) unsigned DEFAULT '0',
-  `modificationDate` int(11) unsigned DEFAULT '0',
-  `userOwner` int(11) unsigned DEFAULT NULL,
-  `userModification` int(11) unsigned DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `priority` (`priority`),
-  INDEX `routing_lookup` (`active`, `regex`, `sourceSite`, `source`, `type`, `expiry`, `priority`)
-) DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC;
-
-
 DROP TABLE IF EXISTS `schedule_tasks`;
 CREATE TABLE `schedule_tasks` (
   `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
@@ -453,42 +396,6 @@ CREATE TABLE `tags_assignment` (
   PRIMARY KEY (`tagid`,`cid`,`ctype`),
   KEY `ctype` (`ctype`),
   KEY `ctype_cid` (`cid`,`ctype`)
-) DEFAULT CHARSET=utf8mb4;
-
-DROP TABLE IF EXISTS `targeting_rules`;
-CREATE TABLE `targeting_rules` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL DEFAULT '',
-  `description` text,
-  `scope` varchar(50) DEFAULT NULL,
-  `active` tinyint(1) DEFAULT NULL,
-  `prio` smallint(5) unsigned NOT NULL DEFAULT '0',
-  `conditions` longtext,
-  `actions` longtext,
-  PRIMARY KEY (`id`)
-) DEFAULT CHARSET=utf8mb4;
-
-DROP TABLE IF EXISTS `targeting_storage`;
-CREATE TABLE `targeting_storage` (
-  `visitorId` varchar(100) NOT NULL,
-  `scope` varchar(50) NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `value` json,
-  `creationDate` datetime DEFAULT NULL,
-  `modificationDate` datetime DEFAULT NULL,
-  PRIMARY KEY (`visitorId`,`scope`,`name`),
-  KEY `targeting_storage_scope_index` (`scope`),
-  KEY `targeting_storage_name_index` (`name`)
-) DEFAULT CHARSET=utf8mb4;
-
-DROP TABLE IF EXISTS `targeting_target_groups`;
-CREATE TABLE `targeting_target_groups` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL DEFAULT '',
-  `description` text,
-  `threshold` int(11) DEFAULT NULL,
-  `active` tinyint(1) DEFAULT NULL,
-  PRIMARY KEY (`id`)
 ) DEFAULT CHARSET=utf8mb4;
 
 DROP TABLE IF EXISTS `tmp_store`;
@@ -576,6 +483,7 @@ CREATE TABLE `users` (
   `docTypes` text DEFAULT NULL,
   `classes` text DEFAULT NULL,
   `twoFactorAuthentication` varchar(255) DEFAULT NULL,
+  `provider` varchar(255) DEFAULT NULL,
 	`activePerspective` VARCHAR(255) NULL DEFAULT NULL,
 	`perspectives` LONGTEXT NULL DEFAULT NULL,
 	`websiteTranslationLanguagesEdit` LONGTEXT NULL DEFAULT NULL,

@@ -25,20 +25,9 @@ use Pimcore\Normalizer\NormalizerInterface;
 class Slider extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface, TypeDeclarationSupportInterface, EqualComparisonInterface, VarExporterInterface, NormalizerInterface
 {
     use Model\DataObject\Traits\SimpleComparisonTrait;
-    use Extension\ColumnType;
-    use Extension\QueryColumnType;
     use DataObject\Traits\SimpleNormalizerTrait;
     use DataObject\Traits\DataHeightTrait;
     use DataObject\Traits\DataWidthTrait;
-
-    /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'slider';
 
     /**
      * @internal
@@ -73,24 +62,6 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
      */
     public ?int $decimalPrecision = null;
 
-    /**
-     * Type for the column to query
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $queryColumnType = 'double';
-
-    /**
-     * Type for the column
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $columnType = 'double';
-
     public function getMinValue(): ?float
     {
         return $this->minValue;
@@ -122,7 +93,7 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
 
     public function setVertical(bool $vertical): static
     {
-        $this->vertical = (bool) $vertical;
+        $this->vertical = $vertical;
 
         return $this;
     }
@@ -281,15 +252,15 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
     }
 
     /**
-     * @param DataObject\ClassDefinition\Data\Slider $masterDefinition
+     * @param DataObject\ClassDefinition\Data\Slider $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition): void
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition): void
     {
-        $this->minValue = $masterDefinition->minValue;
-        $this->maxValue = $masterDefinition->maxValue;
-        $this->vertical = $masterDefinition->vertical;
-        $this->increment = $masterDefinition->increment;
-        $this->decimalPrecision = $masterDefinition->decimalPrecision;
+        $this->minValue = $mainDefinition->minValue;
+        $this->maxValue = $mainDefinition->maxValue;
+        $this->vertical = $mainDefinition->vertical;
+        $this->increment = $mainDefinition->increment;
+        $this->decimalPrecision = $mainDefinition->decimalPrecision;
     }
 
     /**
@@ -334,5 +305,20 @@ class Slider extends Data implements ResourcePersistenceAwareInterface, QueryRes
     public function getPhpdocReturnType(): ?string
     {
         return 'float|null';
+    }
+
+    public function getColumnType(): string
+    {
+        return 'double';
+    }
+
+    public function getQueryColumnType(): string
+    {
+        return $this->getColumnType();
+    }
+
+    public function getFieldType(): string
+    {
+        return 'slider';
     }
 }

@@ -228,12 +228,14 @@ class Block extends Model\Document\Editable implements BlockInterface
         $attributeString = HtmlUtils::assembleAttributeString($attributes);
 
         $this->outputEditmode('<div ' . $attributeString . '>');
+
+        return $this;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function end(bool $return = false)
+    public function end(bool $return = false): void
     {
         $this->current = 0;
 
@@ -267,11 +269,6 @@ class Block extends Model\Document\Editable implements BlockInterface
         }
     }
 
-    /**
-     * @param bool $showControls
-     * @param bool $return
-     * @param string $additionalClass
-     */
     public function blockStart(bool $showControls = true, bool $return = false, string $additionalClass = '')
     {
         $attr = $this->getBlockAttributes();
@@ -328,9 +325,6 @@ EOT;
         $this->outputEditmode($html);
     }
 
-    /**
-     * @param bool $return
-     */
     public function blockEnd(bool $return = false)
     {
         // close outer element

@@ -25,15 +25,18 @@ use Pimcore\Model;
  */
 class Dao extends Model\Dao\PimcoreLocationAwareConfigDao
 {
+    private const CONFIG_KEY = 'video_thumbnails';
+
     public function configure(): void
     {
         $config = \Pimcore::getContainer()->getParameter('pimcore.config');
 
+        $storageConfig = $config['config_location'][self::CONFIG_KEY];
+
         parent::configure([
             'containerConfig' => $config['assets']['video']['thumbnails']['definitions'],
             'settingsStoreScope' => 'pimcore_video_thumbnails',
-            'storageDirectory' => $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_VIDEO_THUMBNAILS'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/video-thumbnails',
-            'writeTargetEnvVariableName' => 'PIMCORE_WRITE_TARGET_VIDEO_THUMBNAILS',
+            'storageConfig' => $storageConfig,
         ]);
     }
 

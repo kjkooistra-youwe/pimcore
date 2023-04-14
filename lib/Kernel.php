@@ -21,13 +21,13 @@ use Doctrine\Bundle\MigrationsBundle\DoctrineMigrationsBundle;
 use FOS\JsRoutingBundle\FOSJsRoutingBundle;
 use Knp\Bundle\PaginatorBundle\KnpPaginatorBundle;
 use League\FlysystemBundle\FlysystemBundle;
-use Pimcore\Bundle\AdminBundle\PimcoreAdminBundle;
+use Pimcore\Bundle\CoreBundle\DependencyInjection\ConfigurationHelper;
 use Pimcore\Bundle\CoreBundle\PimcoreCoreBundle;
 use Pimcore\Cache\RuntimeCache;
 use Pimcore\Config\BundleConfigLocator;
+use Pimcore\Config\LocationAwareConfigRepository;
 use Pimcore\Event\SystemEvents;
 use Pimcore\HttpKernel\BundleCollection\BundleCollection;
-use Presta\SitemapBundle\PrestaSitemapBundle;
 use Scheb\TwoFactorBundle\SchebTwoFactorBundle;
 use Symfony\Bundle\DebugBundle\DebugBundle;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
@@ -38,21 +38,23 @@ use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Bundle\WebProfilerBundle\WebProfilerBundle;
 use Symfony\Cmf\Bundle\RoutingBundle\CmfRoutingBundle;
 use Symfony\Component\Config\Loader\LoaderInterface;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\HttpKernel\Bundle\BundleInterface;
 use Symfony\Component\HttpKernel\Kernel as SymfonyKernel;
-use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 use Twig\Extra\TwigExtraBundle\TwigExtraBundle;
 
 abstract class Kernel extends SymfonyKernel
 {
     use MicroKernelTrait {
         registerContainerConfiguration as microKernelRegisterContainerConfiguration;
-
         registerBundles as microKernelRegisterBundles;
+        configureContainer as protected;
+        configureRoutes as protected;
     }
+
+    private const CONFIG_LOCATION = 'config_location';
 
     private BundleCollection $bundleCollection;
 
@@ -73,11 +75,7 @@ abstract class Kernel extends SymfonyKernel
      */
     public function getCacheDir(): string
     {
-        if (isset($_SERVER['APP_CACHE_DIR'])) {
-            return $_SERVER['APP_CACHE_DIR'].'/'.$this->environment;
-        }
-
-        return PIMCORE_SYMFONY_CACHE_DIRECTORY . '/' . $this->environment;
+        return ($_SERVER['APP_CACHE_DIR'] ?? PIMCORE_SYMFONY_CACHE_DIRECTORY) . '/' . $this->environment;
     }
 
     /**
@@ -88,35 +86,6 @@ abstract class Kernel extends SymfonyKernel
     public function getLogDir(): string
     {
         return PIMCORE_LOG_DIRECTORY;
-    }
-
-    protected function configureContainer(ContainerConfigurator $container): void
-    {
-        $projectDir = realpath($this->getProjectDir());
-
-        $container->import($projectDir . '/config/{packages}/*.yaml');
-        $container->import($projectDir . '/config/{packages}/'.$this->environment.'/*.yaml');
-
-        if (is_file($projectDir . '/config/services.yaml')) {
-            $container->import($projectDir . '/config/services.yaml');
-            $container->import($projectDir . '/config/{services}_'.$this->environment.'.yaml');
-        } elseif (is_file($path = $projectDir . '/config/services.php')) {
-            (require $path)($container->withPath($path), $this);
-        }
-    }
-
-    protected function configureRoutes(RoutingConfigurator $routes): void
-    {
-        $projectDir = realpath($this->getProjectDir());
-
-        $routes->import($projectDir . '/config/{routes}/'.$this->environment.'/*.yaml');
-        $routes->import($projectDir . '/config/{routes}/*.yaml');
-
-        if (is_file($projectDir . '/config/routes.yaml')) {
-            $routes->import($projectDir . '/config/routes.yaml');
-        } elseif (is_file($path = $projectDir . '/config/routes.php')) {
-            (require $path)($routes->withPath($path), $this);
-        }
     }
 
     /**
@@ -131,67 +100,48 @@ abstract class Kernel extends SymfonyKernel
 
         $this->microKernelRegisterContainerConfiguration($loader);
 
-        //load system configuration
-        $systemConfigFile = Config::locateConfigFile('system.yaml');
-        if (file_exists($systemConfigFile)) {
-            $loader->load($systemConfigFile);
-        }
-
-        $configArray = [
-            [
-                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_IMAGE_THUMBNAILS',
-                'defaultStorageDirectoryName' => 'image-thumbnails',
-            ],
-            [
-                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_VIDEO_THUMBNAILS',
-                'defaultStorageDirectoryName' => 'video-thumbnails',
-            ],
-            [
-                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_CUSTOM_REPORTS',
-                'defaultStorageDirectoryName' => 'custom-reports',
-            ],
-            [
-                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_DOCUMENT_TYPES',
-                'defaultStorageDirectoryName' => 'document-types',
-            ],
-            [
-                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_WEB_TO_PRINT',
-                'defaultStorageDirectoryName' => 'web-to-print',
-            ],
-            [
-                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_PREDEFINED_PROPERTIES',
-                'defaultStorageDirectoryName' => 'predefined-properties',
-            ],
-            [
-                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_PREDEFINED_ASSET_METADATA',
-                'defaultStorageDirectoryName' => 'predefined-asset-metadata',
-            ],
-            [
-                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_STATICROUTES',
-                'defaultStorageDirectoryName' => 'staticroutes',
-            ],
-            [
-                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_PERSPECTIVES',
-                'defaultStorageDirectoryName' => 'perspectives',
-            ],
-            [
-                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_CUSTOM_VIEWS',
-                'defaultStorageDirectoryName' => 'custom-views',
-            ],
-            [
-                'storageDirectoryEnvVariableName' => 'PIMCORE_CONFIG_STORAGE_DIR_OBJECT_CUSTOM_LAYOUTS',
-                'defaultStorageDirectoryName' => 'custom-layouts',
-            ],
+        $configKeysArray = [
+            'image_thumbnails',
+            'video_thumbnails',
+            'document_types',
+            'predefined_properties',
+            'predefined_asset_metadata',
+            'perspectives',
+            'custom_views',
+            'object_custom_layouts',
+            'system_settings',
         ];
 
-        foreach ($configArray as $config) {
-            $configDir = rtrim($_SERVER[$config['storageDirectoryEnvVariableName']] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/' . $config['defaultStorageDirectoryName'], '/\\');
-            $configDir = "$configDir/";
-            if (is_dir($configDir)) {
-                // @phpstan-ignore-next-line
-                $loader->import($configDir);
+        $loader->load(function (ContainerBuilder $container) use ($loader, $configKeysArray) {
+            $containerConfig = ConfigurationHelper::getConfigNodeFromSymfonyTree($container, 'pimcore');
+
+            foreach ($configKeysArray as $configKey) {
+                $writeTargetConf = $containerConfig[self::CONFIG_LOCATION][$configKey]['write_target'];
+                $readTargetConf = $containerConfig[self::CONFIG_LOCATION][$configKey]['read_target'] ?? null;
+
+                $configDir = null;
+                if($readTargetConf !== null) {
+                    if ($readTargetConf['type'] === LocationAwareConfigRepository::LOCATION_SETTINGS_STORE ||
+                        ($readTargetConf['type'] !== LocationAwareConfigRepository::LOCATION_SYMFONY_CONFIG && $writeTargetConf['type'] !== LocationAwareConfigRepository::LOCATION_SYMFONY_CONFIG)
+                    ) {
+                        continue;
+                    }
+
+                    if ($readTargetConf['type'] === LocationAwareConfigRepository::LOCATION_SYMFONY_CONFIG && $readTargetConf['options']['directory'] !== null) {
+                        $configDir = rtrim($readTargetConf['options']['directory'], '/\\');
+                    }
+                }
+
+                if($configDir === null) {
+                    $configDir = rtrim($writeTargetConf['options']['directory'], '/\\');
+                }
+                $configDir = "$configDir/";
+                if (is_dir($configDir)) {
+                    // @phpstan-ignore-next-line
+                    $loader->import($configDir);
+                }
             }
-        }
+        });
     }
 
     /**
@@ -320,7 +270,6 @@ abstract class Kernel extends SymfonyKernel
             new DoctrineBundle(),
             new DoctrineMigrationsBundle(),
             new CmfRoutingBundle(),
-            new PrestaSitemapBundle(),
             new SchebTwoFactorBundle(),
             new FOSJsRoutingBundle(),
             new FlysystemBundle(),
@@ -330,7 +279,6 @@ abstract class Kernel extends SymfonyKernel
         // pimcore bundles
         $collection->addBundles([
             new PimcoreCoreBundle(),
-            new PimcoreAdminBundle(),
         ], 60);
 
         // load development bundles only in matching environments
@@ -367,15 +315,6 @@ abstract class Kernel extends SymfonyKernel
      */
     protected function setSystemRequirements(): void
     {
-        // try to set system-internal variables
-        $maxExecutionTime = 240;
-        if (php_sapi_name() === 'cli') {
-            $maxExecutionTime = 0;
-        }
-
-        //@ini_set("memory_limit", "1024M");
-        @ini_set('max_execution_time', (string) $maxExecutionTime);
-        @set_time_limit($maxExecutionTime);
         ini_set('default_charset', 'UTF-8');
 
         // set internal character encoding to UTF-8

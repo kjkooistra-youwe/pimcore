@@ -25,15 +25,18 @@ use Symfony\Component\Uid\Uuid as Uid;
  */
 class Dao extends Model\Dao\PimcoreLocationAwareConfigDao
 {
+    private const CONFIG_KEY = 'document_types';
+
     public function configure(): void
     {
         $config = \Pimcore::getContainer()->getParameter('pimcore.config');
 
+        $storageConfig = $config['config_location'][self::CONFIG_KEY];
+
         parent::configure([
             'containerConfig' => $config['documents']['doc_types']['definitions'],
             'settingsStoreScope' => 'pimcore_document_types',
-            'storageDirectory' => $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_DOCUMENT_TYPES'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/document-types',
-            'writeTargetEnvVariableName' => 'PIMCORE_WRITE_TARGET_DOCUMENT_TYPES',
+            'storageConfig' => $storageConfig,
         ]);
     }
 

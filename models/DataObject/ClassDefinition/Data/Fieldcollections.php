@@ -30,15 +30,6 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
     use DataObject\Traits\ClassSavedTrait;
 
     /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'fieldcollections';
-
-    /**
      * @internal
      *
      * @var array
@@ -89,7 +80,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
 
     public function setLazyLoading(bool $lazyLoading): static
     {
-        $this->lazyLoading = (bool) $lazyLoading;
+        $this->lazyLoading = $lazyLoading;
 
         return $this;
     }
@@ -509,9 +500,9 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
         // TODO else part should not be needed at all as preGetData is always there
         // if ($this instanceof PreGetDataInterface) {
         $code .= "\t" . '$data = $this->getClass()->getFieldDefinition("' . $key . '")->preGetData($this);' . "\n";
-//        } else {
-//            $code .= "\t" . '$data = $this->' . $key . ";\n";
-//        }
+        //        } else {
+        //            $code .= "\t" . '$data = $this->' . $key . ";\n";
+        //        }
 
         $code .= "\t" . 'return $data;' . "\n";
         $code .= "}\n\n";
@@ -611,13 +602,13 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
     }
 
     /**
-     * @param DataObject\ClassDefinition\Data\Fieldcollections $masterDefinition
+     * @param DataObject\ClassDefinition\Data\Fieldcollections $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition): void
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition): void
     {
-        $this->allowedTypes = $masterDefinition->allowedTypes;
-        $this->lazyLoading = $masterDefinition->lazyLoading;
-        $this->maxItems = $masterDefinition->maxItems;
+        $this->allowedTypes = $mainDefinition->allowedTypes;
+        $this->lazyLoading = $mainDefinition->lazyLoading;
+        $this->maxItems = $mainDefinition->maxItems;
     }
 
     /**
@@ -652,7 +643,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
 
     public function setDisallowAddRemove(bool $disallowAddRemove): void
     {
-        $this->disallowAddRemove = (bool) $disallowAddRemove;
+        $this->disallowAddRemove = $disallowAddRemove;
     }
 
     public function getDisallowAddRemove(): bool
@@ -662,7 +653,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
 
     public function setDisallowReorder(bool $disallowReorder): void
     {
-        $this->disallowReorder = (bool) $disallowReorder;
+        $this->disallowReorder = $disallowReorder;
     }
 
     public function getDisallowReorder(): bool
@@ -687,7 +678,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
 
     public function setCollapsed(bool $collapsed): void
     {
-        $this->collapsed = (bool) $collapsed;
+        $this->collapsed = $collapsed;
     }
 
     public function isCollapsible(): bool
@@ -697,7 +688,7 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
 
     public function setCollapsible(bool $collapsible): void
     {
-        $this->collapsible = (bool) $collapsible;
+        $this->collapsible = $collapsible;
     }
 
     /**
@@ -815,5 +806,10 @@ class Fieldcollections extends Data implements CustomResourcePersistingInterface
         }
 
         return null;
+    }
+
+    public function getFieldType(): string
+    {
+        return 'fieldcollections';
     }
 }

@@ -30,17 +30,6 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     use DataObject\Traits\SimpleNormalizerTrait;
     use DataObject\Traits\DataHeightTrait;
     use DataObject\Traits\DataWidthTrait;
-    use Extension\ColumnType;
-    use Extension\QueryColumnType;
-
-    /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'table';
 
     /**
      * @internal
@@ -87,24 +76,6 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
      */
     public array $columnConfig = [];
 
-    /**
-     * Type for the column to query
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $queryColumnType = 'longtext';
-
-    /**
-     * Type for the column
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $columnType = 'longtext';
-
     public function getCols(): ?int
     {
         return $this->cols;
@@ -136,7 +107,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
 
     public function setRowsFixed(bool $rowsFixed): static
     {
-        $this->rowsFixed = (bool)$rowsFixed;
+        $this->rowsFixed = $rowsFixed;
 
         return $this;
     }
@@ -148,7 +119,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
 
     public function setColsFixed(bool $colsFixed): static
     {
-        $this->colsFixed = (bool)$colsFixed;
+        $this->colsFixed = $colsFixed;
 
         return $this;
     }
@@ -402,7 +373,7 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     {
         $data = $this->getDataFromObjectParam($object, $params);
         if (is_array($data)) {
-            return base64_encode(Serialize::serialize($data));
+            return json_encode($data);
         }
 
         return '';
@@ -489,15 +460,15 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
     }
 
     /**
-     * @param DataObject\ClassDefinition\Data\Table $masterDefinition
+     * @param DataObject\ClassDefinition\Data\Table $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition): void
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition): void
     {
-        $this->cols = $masterDefinition->cols;
-        $this->colsFixed = $masterDefinition->colsFixed;
-        $this->rows = $masterDefinition->rows;
-        $this->rowsFixed = $masterDefinition->rowsFixed;
-        $this->data = $masterDefinition->data;
+        $this->cols = $mainDefinition->cols;
+        $this->colsFixed = $mainDefinition->colsFixed;
+        $this->rows = $mainDefinition->rows;
+        $this->rowsFixed = $mainDefinition->rowsFixed;
+        $this->data = $mainDefinition->data;
     }
 
     public function isEqual(mixed $oldValue, mixed $newValue): bool
@@ -697,5 +668,20 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
         $code .= "}\n\n";
 
         return $code;
+    }
+
+    public function getColumnType(): string
+    {
+        return 'longtext';
+    }
+
+    public function getQueryColumnType(): string
+    {
+        return $this->getColumnType();
+    }
+
+    public function getFieldType(): string
+    {
+        return 'table';
     }
 }

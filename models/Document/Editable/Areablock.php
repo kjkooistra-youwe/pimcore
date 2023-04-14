@@ -88,7 +88,7 @@ class Areablock extends Model\Document\Editable implements BlockInterface
     /**
      * {@inheritdoc}
      */
-    public function admin()
+    public function admin(): void
     {
         $this->frontend();
     }
@@ -96,7 +96,7 @@ class Areablock extends Model\Document\Editable implements BlockInterface
     /**
      * {@inheritdoc}
      */
-    public function frontend()
+    public function frontend(): void
     {
         if (!is_array($this->indices)) {
             $this->indices = [];
@@ -353,9 +353,6 @@ class Areablock extends Model\Document\Editable implements BlockInterface
         return $attributes;
     }
 
-    /**
-     * @param bool $return
-     */
     public function start(bool $return = false)
     {
         if (($this->config['manual'] ?? false) === true) {
@@ -381,11 +378,10 @@ class Areablock extends Model\Document\Editable implements BlockInterface
         }
 
         $this->outputEditmode($html);
+
+        return $this;
     }
 
-    /**
-     * @param bool $return
-     */
     public function end(bool $return = false)
     {
         $this->current = 0;
@@ -402,9 +398,6 @@ class Areablock extends Model\Document\Editable implements BlockInterface
         $this->outputEditmode($html);
     }
 
-    /**
-     * @param Document\Editable\Area\Info $info
-     */
     public function blockStart(Area\Info $info = null): array
     {
         $this->blockStarted = true;
@@ -500,7 +493,7 @@ class Areablock extends Model\Document\Editable implements BlockInterface
     /**
      * {@inheritdoc}
      */
-    public function blockEnd()
+    public function blockEnd(): void
     {
         $this->blockStarted = false;
     }

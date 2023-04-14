@@ -18,7 +18,6 @@ namespace Pimcore\Model\Document;
 
 use Pimcore\Model;
 use Pimcore\Model\Document;
-use Pimcore\Model\Redirect;
 
 /**
  * @method \Pimcore\Model\Document\Hardlink\Dao getDao()
@@ -97,7 +96,7 @@ class Hardlink extends Document
 
     public function setChildrenFromSource(bool $childrenFromSource): static
     {
-        $this->childrenFromSource = (bool) $childrenFromSource;
+        $this->childrenFromSource = $childrenFromSource;
 
         return $this;
     }
@@ -109,7 +108,7 @@ class Hardlink extends Document
 
     public function setSourceId(int $sourceId): static
     {
-        $this->sourceId = (int) $sourceId;
+        $this->sourceId = $sourceId;
 
         return $this;
     }
@@ -121,7 +120,7 @@ class Hardlink extends Document
 
     public function setPropertiesFromSource(bool $propertiesFromSource): static
     {
-        $this->propertiesFromSource = (bool) $propertiesFromSource;
+        $this->propertiesFromSource = $propertiesFromSource;
 
         return $this;
     }
@@ -194,23 +193,6 @@ class Hardlink extends Document
     public function hasChildren(?bool $includingUnpublished = null): bool
     {
         return count($this->getChildren((bool)$includingUnpublished)) > 0;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    protected function doDelete(): void
-    {
-        // check for redirects pointing to this document, and delete them too
-        $redirects = new Redirect\Listing();
-        $redirects->setCondition('target = ?', $this->getId());
-        $redirects->load();
-
-        foreach ($redirects->getRedirects() as $redirect) {
-            $redirect->delete();
-        }
-
-        parent::doDelete();
     }
 
     /**

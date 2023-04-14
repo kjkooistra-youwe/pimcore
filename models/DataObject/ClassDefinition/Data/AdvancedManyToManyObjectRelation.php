@@ -62,15 +62,6 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     public array $columnKeys = [];
 
     /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'advancedManyToManyObjectRelation';
-
-    /**
      * @internal
      */
     public bool $enableBatchEdit = false;
@@ -230,7 +221,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
 
         $visibleFieldsArray = $this->getVisibleFields() ? explode(',', $this->getVisibleFields()) : [];
 
-        $gridFields = (array)$visibleFieldsArray;
+        $gridFields = $visibleFieldsArray;
 
         // add data
         if (is_array($data) && count($data) > 0) {
@@ -693,7 +684,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
 
     public function setEnableBatchEdit(bool $enableBatchEdit): void
     {
-        $this->enableBatchEdit = (bool) $enableBatchEdit;
+        $this->enableBatchEdit = $enableBatchEdit;
     }
 
     public function classSaved(DataObject\ClassDefinition $class, array $params = []): void
@@ -735,12 +726,12 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     /**
      * {@inheritdoc}
      */
-    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition): void
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition): void
     {
-        if ($masterDefinition instanceof self) {
-            $this->allowedClassId = $masterDefinition->getAllowedClassId();
-            $this->visibleFields = $masterDefinition->getVisibleFields();
-            $this->columns = $masterDefinition->getColumns();
+        if ($mainDefinition instanceof self) {
+            $this->allowedClassId = $mainDefinition->getAllowedClassId();
+            $this->visibleFields = $mainDefinition->getVisibleFields();
+            $this->columns = $mainDefinition->getColumns();
         }
     }
 
@@ -884,13 +875,6 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
 
     /**
      * @internal
-     *
-     * @param mixed $originalData
-     * @param mixed $data
-     * @param Concrete $object
-     * @param array $params
-     *
-     * @return array
      */
     protected function processDiffDataForEditMode(mixed $originalData, mixed $data, DataObject\Concrete $object = null, array $params = []): array
     {
@@ -955,7 +939,7 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
 
     public function setAllowMultipleAssignments(bool $allowMultipleAssignments): static
     {
-        $this->allowMultipleAssignments = (bool) $allowMultipleAssignments;
+        $this->allowMultipleAssignments = $allowMultipleAssignments;
 
         return $this;
     }
@@ -983,5 +967,10 @@ class AdvancedManyToManyObjectRelation extends ManyToManyObjectRelation implemen
     public function getPhpdocReturnType(): ?string
     {
         return '\\'.DataObject\Data\ObjectMetadata::class.'[]';
+    }
+
+    public function getFieldType(): string
+    {
+        return 'advancedManyToManyObjectRelation';
     }
 }

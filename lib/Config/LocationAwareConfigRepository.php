@@ -16,10 +16,14 @@ declare(strict_types=1);
 
 namespace Pimcore\Config;
 
+use Pimcore\Bundle\CoreBundle\DependencyInjection\ConfigurationHelper;
 use Pimcore\Config;
-use Pimcore\File;
 use Pimcore\Helper\StopMessengerWorkersTrait;
 use Pimcore\Model\Tool\SettingsStore;
+use Symfony\Component\Config\FileLocator;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Yaml\Yaml;
 
 class LocationAwareConfigRepository
@@ -36,36 +40,38 @@ class LocationAwareConfigRepository
 
     protected ?string $settingsStoreScope = null;
 
-    protected ?string $storageDirectory = null;
-
-    protected ?string $writeTargetEnvVariableName = null;
-
-    protected ?string $defaultWriteLocation = self::LOCATION_SYMFONY_CONFIG;
+    protected ?array $storageConfig = null;
 
     public function __construct(
         array $containerConfig,
         ?string $settingsStoreScope,
-        ?string $storageDirectory,
-        ?string $writeTargetEnvVariableName,
-        ?string $defaultWriteLocation = null
+        array $storageConfig,
     ) {
         $this->containerConfig = $containerConfig;
         $this->settingsStoreScope = $settingsStoreScope;
-        $this->storageDirectory = rtrim($storageDirectory, '/\\');
-        $this->writeTargetEnvVariableName = $writeTargetEnvVariableName;
-        $this->defaultWriteLocation = $defaultWriteLocation ?: self::LOCATION_SYMFONY_CONFIG;
+        $this->storageConfig = $storageConfig;
     }
 
     public function loadConfigByKey(string $key): array
     {
+        $data = null;
         $dataSource = null;
 
-        // try to load from container config
-        $data = $this->getDataFromContainerConfig($key, $dataSource);
+        $loadType= $this->storageConfig['read_target']['type'] ?? null;
+        if($loadType === null) {
+            // try to load from container config
+            $data = $this->getDataFromContainerConfig($key, $dataSource);
 
-        // try to load from SettingsStore
-        if (!$data) {
-            $data = $this->getDataFromSettingsStore($key, $dataSource);
+            // try to load from SettingsStore
+            if (!$data) {
+                $data = $this->getDataFromSettingsStore($key, $dataSource);
+            }
+        } else {
+            if($loadType === self::LOCATION_SYMFONY_CONFIG) {
+                $data = $this->getDataFromContainerConfig($key, $dataSource);
+            } elseif ($loadType === self::LOCATION_SETTINGS_STORE) {
+                $data = $this->getDataFromSettingsStore($key, $dataSource);
+            }
         }
 
         return [
@@ -114,6 +120,8 @@ class LocationAwareConfigRepository
             return false;
         } elseif ($dataSource === self::LOCATION_SYMFONY_CONFIG && !file_exists($this->getVarConfigFile($key))) {
             return false;
+        } elseif ($dataSource && $dataSource !== $writeTarget) {
+            return false;
         }
 
         return true;
@@ -126,18 +134,28 @@ class LocationAwareConfigRepository
      */
     public function getWriteTarget(): string
     {
-        $env = $this->writeTargetEnvVariableName ? $_SERVER[$this->writeTargetEnvVariableName] ?? null : null;
-        if ($env) {
-            $writeLocation = $env;
-        } else {
-            $writeLocation = $this->defaultWriteLocation;
-        }
+        $writeLocation = $this->storageConfig['write_target']['type'];
 
         if (!in_array($writeLocation, [self::LOCATION_SETTINGS_STORE, self::LOCATION_SYMFONY_CONFIG, self::LOCATION_DISABLED])) {
             throw new \Exception(sprintf('Invalid write location: %s', $writeLocation));
         }
 
         return $writeLocation;
+    }
+
+    public function getReadTargets(): array
+    {
+        if (!isset($this->storageConfig['read_target'])) {
+            return [];
+        }
+
+        $readLocation = $this->storageConfig['read_target']['type'];
+
+        if ($readLocation && !in_array($readLocation, [self::LOCATION_SETTINGS_STORE, self::LOCATION_SYMFONY_CONFIG, self::LOCATION_DISABLED])) {
+            throw new \Exception(sprintf('Invalid read location: %s', $readLocation));
+        }
+
+        return $readLocation ? [$readLocation] : [];
     }
 
     /**
@@ -159,7 +177,7 @@ class LocationAwareConfigRepository
             $this->writeYaml($key, $data);
         } elseif ($writeLocation === self::LOCATION_SETTINGS_STORE) {
             $settingsStoreData = json_encode($data);
-            SettingsStore::set($key, $settingsStoreData, 'string', $this->settingsStoreScope);
+            SettingsStore::set($key, $settingsStoreData, SettingsStore::TYPE_STRING, $this->settingsStoreScope);
         }
 
         $this->stopMessengerWorkers();
@@ -171,7 +189,8 @@ class LocationAwareConfigRepository
 
         $this->searchAndReplaceMissingParameters($data);
 
-        File::put($yamlFilename, Yaml::dump($data, 50));
+        $filesystem = new Filesystem();
+        $filesystem->dumpFile($yamlFilename, Yaml::dump($data, 50));
 
         $this->invalidateConfigCache();
     }
@@ -207,7 +226,9 @@ class LocationAwareConfigRepository
 
     private function getVarConfigFile(string $key): string
     {
-        return $this->storageDirectory . '/' . $key . '.yaml';
+        $directory = rtrim($this->storageConfig['write_target']['options']['directory'], '/\\');
+
+        return $directory . '/' . $key . '.yaml';
     }
 
     /**
@@ -246,6 +267,40 @@ class LocationAwareConfigRepository
         $systemConfigFile = Config::locateConfigFile('system.yaml');
         if ($systemConfigFile) {
             touch($systemConfigFile);
+        }
+    }
+
+    public static function loadSymfonyConfigFiles(ContainerBuilder $container, string $containerKey, string $configKey): void
+    {
+        $containerConfig = ConfigurationHelper::getConfigNodeFromSymfonyTree($container, $containerKey);
+
+        $readTargetConf = $containerConfig['config_location'][$configKey]['read_target'] ?? null;
+        $writeTargetConf = $containerConfig['config_location'][$configKey]['write_target'];
+
+        $configDir = null;
+        if($readTargetConf !== null) {
+            if ($readTargetConf['type'] === LocationAwareConfigRepository::LOCATION_SETTINGS_STORE ||
+                ($readTargetConf['type'] !== LocationAwareConfigRepository::LOCATION_SYMFONY_CONFIG && $writeTargetConf['type'] !== LocationAwareConfigRepository::LOCATION_SYMFONY_CONFIG)
+            ) {
+                return;
+            }
+
+            $configDir = $readTargetConf['options']['directory'];
+        }
+
+        if ($configDir === null) {
+            $configDir = $writeTargetConf['options']['directory'];
+        }
+
+        $configLoader = new YamlFileLoader(
+            $container,
+            new FileLocator($configDir)
+        );
+
+        //load configs
+        $configs = ConfigurationHelper::getSymfonyConfigFiles($configDir);
+        foreach ($configs as $config) {
+            $configLoader->load($config);
         }
     }
 }

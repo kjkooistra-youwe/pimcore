@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 namespace Pimcore\Model;
 
+use Pimcore\Bundle\AdminBundle\Perspective\Config;
 use Pimcore\File;
 use Pimcore\Helper\TemporaryFileHelperTrait;
 use Pimcore\Model\User\Role;
@@ -86,6 +87,11 @@ final class User extends User\UserRole
      * @var array<string, mixed>|null
      */
     protected ?array $twoFactorAuthentication = null;
+
+    /**
+     * OIDC Provider from pimcore/openid-connect
+     */
+    protected ?string $provider = null;
 
     public function getPassword(): ?string
     {
@@ -329,7 +335,7 @@ final class User extends User\UserRole
      */
     public function setWelcomescreen(bool $welcomescreen): static
     {
-        $this->welcomescreen = (bool)$welcomescreen;
+        $this->welcomescreen = $welcomescreen;
 
         return $this;
     }
@@ -448,7 +454,6 @@ final class User extends User\UserRole
                 $image->save($targetFile, 'png');
 
                 $storage->write($this->getThumbnailImageStoragePath(), file_get_contents($targetFile));
-                unlink($targetFile);
             }
 
             return $storage->readStream($this->getThumbnailImageStoragePath());
@@ -511,9 +516,7 @@ final class User extends User\UserRole
             $this->mergedPerspectives = array_values($this->mergedPerspectives);
             if (!$this->mergedPerspectives) {
                 // $perspectives = \Pimcore\Config::getAvailablePerspectives($this);
-                $allPerspectives = \Pimcore\Perspective\Config::get();
-                $this->mergedPerspectives = [];
-
+                $allPerspectives = Config::get();
                 $this->mergedPerspectives = array_keys($allPerspectives);
             }
         }
@@ -533,7 +536,7 @@ final class User extends User\UserRole
             return $perspectives[0];
         } else {
             // all perspectives are allowed
-            $perspectives = \Pimcore\Perspective\Config::getAvailablePerspectives($this);
+            $perspectives = Config::getAvailablePerspectives($this);
 
             return $perspectives[0]['name'];
         }
@@ -877,9 +880,6 @@ final class User extends User\UserRole
         return $bindings;
     }
 
-    /**
-     * @param string $keyBindings
-     */
     public function setKeyBindings(string $keyBindings): void
     {
         $this->keyBindings = $keyBindings;
@@ -923,6 +923,16 @@ final class User extends User\UserRole
 
             $this->twoFactorAuthentication[$key] = $value;
         }
+    }
+
+    public function getProvider(): ?string
+    {
+        return $this->provider;
+    }
+
+    public function setProvider(?string $provider): void
+    {
+        $this->provider = $provider;
     }
 
     public function hasImage(): bool

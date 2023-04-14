@@ -24,15 +24,6 @@ use Pimcore\Model\DataObject\Concrete;
 class User extends Model\DataObject\ClassDefinition\Data\Select
 {
     /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'user';
-
-    /**
      * @internal
      */
     public bool $unique = false;
@@ -175,13 +166,13 @@ class User extends Model\DataObject\ClassDefinition\Data\Select
         $this->init();
     }
 
-    public function jsonSerialize(): static
+    public function jsonSerialize(): mixed
     {
         if (Service::doRemoveDynamicOptions()) {
             $this->options = null;
         }
 
-        return $this;
+        return parent::jsonSerialize();
     }
 
     /**
@@ -202,6 +193,11 @@ class User extends Model\DataObject\ClassDefinition\Data\Select
 
     public function setUnique(bool $unique): void
     {
-        $this->unique = (bool) $unique;
+        $this->unique = $unique;
+    }
+
+    public function getFieldType(): string
+    {
+        return 'user';
     }
 }

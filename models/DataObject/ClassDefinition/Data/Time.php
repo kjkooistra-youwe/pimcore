@@ -23,15 +23,6 @@ use Pimcore\Model\DataObject\Concrete;
 class Time extends Model\DataObject\ClassDefinition\Data\Input
 {
     /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'time';
-
-    /**
      * Column length
      *
      * @internal
@@ -208,6 +199,11 @@ class Time extends Model\DataObject\ClassDefinition\Data\Input
 
     public function setIncrement(int $increment): void
     {
-        $this->increment = (int) $increment;
+        $this->increment = $increment;
+    }
+
+    public function getFieldType(): string
+    {
+        return 'time';
     }
 }

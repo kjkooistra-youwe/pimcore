@@ -27,15 +27,19 @@ use Symfony\Component\Uid\Uuid as Uid;
  */
 class Dao extends Model\Dao\PimcoreLocationAwareConfigDao
 {
+    private const CONFIG_KEY = 'staticroutes';
+
     public function configure(): void
     {
+        $config = \Pimcore::getContainer()->getParameter('pimcore_static_routes.config_location');
         $definitions = \Pimcore::getContainer()->getParameter('pimcore_static_routes.definitions');
+
+        $storageConfig = $config[self::CONFIG_KEY];
 
         parent::configure([
             'containerConfig' => $definitions,
             'settingsStoreScope' => 'pimcore_staticroutes',
-            'storageDirectory' => $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_STATICROUTES'] ?? PIMCORE_CONFIGURATION_DIRECTORY . '/staticroutes',
-            'writeTargetEnvVariableName' => 'PIMCORE_WRITE_TARGET_STATICROUTES',
+            'storageConfig' => $storageConfig,
         ]);
     }
 

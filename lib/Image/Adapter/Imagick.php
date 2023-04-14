@@ -18,10 +18,10 @@ namespace Pimcore\Image\Adapter;
 
 use Pimcore\Cache;
 use Pimcore\Config;
-use Pimcore\File;
 use Pimcore\Image\Adapter;
 use Pimcore\Logger;
 use Pimcore\Model\Asset;
+use Symfony\Component\Filesystem\Filesystem;
 
 class Imagick extends Adapter
 {
@@ -36,6 +36,9 @@ class Imagick extends Adapter
 
     protected string $imagePath;
 
+    /**
+     * @var array<string, bool>
+     */
     protected static array $supportedFormatsCache = [];
 
     private ?array $initalOptions = null;
@@ -43,7 +46,7 @@ class Imagick extends Adapter
     /**
      * {@inheritdoc}
      */
-    public function load(string $imagePath, array $options = []): bool|static
+    public function load(string $imagePath, array $options = []): static|false
     {
         $this->initalOptions ??= $options;
 
@@ -235,8 +238,8 @@ class Imagick extends Adapter
         }
 
         if ($quality && !$this->isPreserveColor()) {
-            $i->setCompressionQuality((int) $quality);
-            $i->setImageCompressionQuality((int) $quality);
+            $i->setCompressionQuality($quality);
+            $i->setImageCompressionQuality($quality);
         }
 
         if ($format == 'tiff') {
@@ -257,12 +260,14 @@ class Imagick extends Adapter
         $realTargetPath = null;
         if (!stream_is_local($path)) {
             $realTargetPath = $path;
-            $path = PIMCORE_SYSTEM_TEMP_DIRECTORY . '/imagick-tmp-' . uniqid() . '.' . File::getFileExtension($path);
+            $path = PIMCORE_SYSTEM_TEMP_DIRECTORY . '/imagick-tmp-' . uniqid() . '.' . pathinfo($path, PATHINFO_EXTENSION);
         }
 
+        $filesystem = new Filesystem();
         if (!stream_is_local($path)) {
             $i->setImageFormat($format);
-            $success = File::put($path, $i->getImageBlob());
+            $filesystem->dumpFile($path, $i->getImageBlob());
+            $success = file_exists($path);
         } else {
             if ($this->checkPreserveAnimation($format, $i)) {
                 $success = $i->writeImages('GIF:' . $path, true);
@@ -276,7 +281,7 @@ class Imagick extends Adapter
         }
 
         if ($realTargetPath) {
-            File::rename($path, $realTargetPath);
+            $filesystem->rename($path, $realTargetPath, true);
         }
 
         return $this;
@@ -516,9 +521,6 @@ class Imagick extends Adapter
                 $this->setColorspaceToRGB();
             }
         }
-
-        $width = (int)$width;
-        $height = (int)$height;
 
         if ($this->getWidth() !== $width || $this->getHeight() !== $height) {
             if ($this->checkPreserveAnimation()) {
@@ -975,7 +977,7 @@ class Imagick extends Adapter
     /**
      * {@inheritdoc}
      */
-    public function supportsFormat(string $format, bool $force = false): mixed
+    public function supportsFormat(string $format, bool $force = false): bool
     {
         if ($force) {
             return $this->checkFormatSupport($format);

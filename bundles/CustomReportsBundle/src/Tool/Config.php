@@ -218,7 +218,7 @@ class Config extends Model\AbstractModel implements \JsonSerializable
 
     public function setMenuShortcut(bool $menuShortcut): void
     {
-        $this->menuShortcut = (bool) $menuShortcut;
+        $this->menuShortcut = $menuShortcut;
     }
 
     public function getMenuShortcut(): bool
@@ -414,7 +414,7 @@ class Config extends Model\AbstractModel implements \JsonSerializable
         return $data;
     }
 
-    public function __clone()
+    public function __clone(): void
     {
         if ($this->dao) {
             $this->dao = clone $this->dao;

@@ -23,15 +23,6 @@ use Pimcore\Tool;
 class Languagemultiselect extends Model\DataObject\ClassDefinition\Data\Multiselect
 {
     /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'languagemultiselect';
-
-    /**
      * @internal
      */
     public bool $onlySystemLanguages = false;
@@ -43,7 +34,7 @@ class Languagemultiselect extends Model\DataObject\ClassDefinition\Data\Multisel
      */
     public function configureOptions(): void
     {
-        $validLanguages = (array) Tool::getValidLanguages();
+        $validLanguages = Tool::getValidLanguages();
         $locales = Tool::getSupportedLocales();
         $options = [];
 
@@ -83,13 +74,13 @@ class Languagemultiselect extends Model\DataObject\ClassDefinition\Data\Multisel
         return $obj;
     }
 
-    public function jsonSerialize(): static
+    public function jsonSerialize(): mixed
     {
         if (Service::doRemoveDynamicOptions()) {
             $this->options = null;
         }
 
-        return $this;
+        return parent::jsonSerialize();
     }
 
     /**
@@ -101,5 +92,10 @@ class Languagemultiselect extends Model\DataObject\ClassDefinition\Data\Multisel
         $blockedVars[] = 'options';
 
         return $blockedVars;
+    }
+
+    public function getFieldType(): string
+    {
+        return 'languagemultiselect';
     }
 }

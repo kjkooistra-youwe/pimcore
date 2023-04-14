@@ -30,21 +30,12 @@ use Pimcore\Normalizer\NormalizerInterface;
 
 class ManyToOneRelation extends AbstractRelations implements QueryResourcePersistenceAwareInterface, VarExporterInterface, NormalizerInterface, PreGetDataInterface, PreSetDataInterface
 {
-    use Extension\QueryColumnType;
+    use Model\DataObject\ClassDefinition\Data\Extension\Relation;
     use DataObject\ClassDefinition\Data\Relations\AllowObjectRelationTrait;
     use DataObject\ClassDefinition\Data\Relations\AllowAssetRelationTrait;
     use DataObject\ClassDefinition\Data\Relations\AllowDocumentRelationTrait;
     use DataObject\ClassDefinition\Data\Extension\RelationFilterConditionParser;
     use DataObject\Traits\DataWidthTrait;
-
-    /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'manyToOneRelation';
 
     /**
      * @internal
@@ -67,18 +58,6 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
      * @internal
      */
     public bool $relationType = true;
-
-    /**
-     * Type for the column to query
-     *
-     * @internal
-     *
-     * @var array
-     */
-    public $queryColumnType = [
-        'id' => 'int(11)',
-        'type' => "enum('document','asset','object')",
-    ];
 
     /**
      * @internal
@@ -484,12 +463,12 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
     }
 
     /**
-     * @param DataObject\ClassDefinition\Data\ManyToOneRelation $masterDefinition
+     * @param DataObject\ClassDefinition\Data\ManyToOneRelation $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition): void
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition): void
     {
-        $this->assetUploadPath = $masterDefinition->assetUploadPath;
-        $this->relationType = $masterDefinition->relationType;
+        $this->assetUploadPath = $mainDefinition->assetUploadPath;
+        $this->relationType = $mainDefinition->relationType;
     }
 
     /**
@@ -622,5 +601,18 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
     public function getVisibleFields(): ?string
     {
         return 'fullpath';
+    }
+
+    public function getQueryColumnType(): array
+    {
+        return [
+            'id' => 'int(11)',
+            'type' => "enum('document','asset','object')",
+        ];
+    }
+
+    public function getFieldType(): string
+    {
+        return 'manyToOneRelation';
     }
 }

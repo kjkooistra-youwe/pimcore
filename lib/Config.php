@@ -93,7 +93,7 @@ final class Config implements ArrayAccess
             // check for environment configuration
             $env = self::getEnvironment();
             if ($env) {
-                $fileExt = File::getFileExtension($name);
+                $fileExt = pathinfo($name, PATHINFO_EXTENSION);
                 $pureName = str_replace('.' . $fileExt, '', $name);
                 foreach ($pathsToCheck as $path) {
                     $tmpFile = $path . '/' . $pureName . '_' . $env . '.' . $fileExt;
@@ -199,7 +199,7 @@ final class Config implements ArrayAccess
                 $siteId = Model\Site::getCurrentSite()->getId();
             } elseif (Tool::isFrontendRequestByAdmin()) {
                 // this is necessary to set the correct settings in editmode/preview (using the main domain)
-                // we cannot use the document resolver service here, because we need the document on the master request
+                // we cannot use the document resolver service here, because we need the document on the main request
                 $originDocument = Pimcore::getContainer()->get('request_stack')->getMainRequest()->get(DynamicRouter::CONTENT_KEY);
                 if ($originDocument) {
                     $site = Tool\Frontend::getSiteForDocument($originDocument);
@@ -215,6 +215,7 @@ final class Config implements ArrayAccess
 
             $config = Cache::load($cacheKey);
             if (!$config) {
+                $config = [];
                 $cacheTags = ['website_config', 'system', 'config', 'output'];
 
                 $list = new Model\WebsiteSetting\Listing();
@@ -358,33 +359,6 @@ final class Config implements ArrayAccess
     public static function setReportConfig(array $config): void
     {
         RuntimeCache::set('pimcore_config_report', $config);
-    }
-
-    /**
-     * @return array<string, mixed>
-     *
-     * @internal
-     */
-    public static function getWeb2PrintConfig(): array
-    {
-        if (RuntimeCache::isRegistered('pimcore_config_web2print')) {
-            $config = RuntimeCache::get('pimcore_config_web2print');
-        } else {
-            $config = Web2Print\Config::get();
-            self::setWeb2PrintConfig($config);
-        }
-
-        return $config;
-    }
-
-    /**
-     * @param array<string, mixed> $config
-     *
-     * @internal
-     */
-    public static function setWeb2PrintConfig(array $config): void
-    {
-        RuntimeCache::set('pimcore_config_web2print', $config);
     }
 
     /**

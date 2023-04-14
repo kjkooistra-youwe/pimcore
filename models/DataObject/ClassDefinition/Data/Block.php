@@ -32,18 +32,8 @@ use Pimcore\Tool\Serialize;
 
 class Block extends Data implements CustomResourcePersistingInterface, ResourcePersistenceAwareInterface, LazyLoadingSupportInterface, TypeDeclarationSupportInterface, VarExporterInterface, NormalizerInterface, DataContainerAwareInterface, PreGetDataInterface, PreSetDataInterface, FieldDefinitionEnrichmentModelInterface
 {
-    use Extension\ColumnType;
     use DataObject\Traits\ClassSavedTrait;
     use DataObject\Traits\FieldDefinitionEnrichmentDataTrait;
-
-    /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'block';
 
     /**
      * @internal
@@ -76,15 +66,6 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      * @var int|null
      */
     public ?int $maxItems = null;
-
-    /**
-     * Type for the column
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $columnType = 'longtext';
 
     /**
      * @internal
@@ -284,7 +265,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      */
     public function getDataForEditmode(mixed $data, DataObject\Concrete $object = null, array $params = []): array
     {
-        $params = (array)$params;
+
         $result = [];
         $idx = -1;
 
@@ -534,21 +515,16 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
     }
 
     /**
-     * @param Model\DataObject\ClassDefinition\Data\Block $masterDefinition
+     * @param Model\DataObject\ClassDefinition\Data\Block $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(Model\DataObject\ClassDefinition\Data $masterDefinition): void
+    public function synchronizeWithMainDefinition(Model\DataObject\ClassDefinition\Data $mainDefinition): void
     {
-        $this->disallowAddRemove = $masterDefinition->disallowAddRemove;
-        $this->disallowReorder = $masterDefinition->disallowReorder;
-        $this->collapsible = $masterDefinition->collapsible;
-        $this->collapsed = $masterDefinition->collapsed;
+        $this->disallowAddRemove = $mainDefinition->disallowAddRemove;
+        $this->disallowReorder = $mainDefinition->disallowReorder;
+        $this->collapsible = $mainDefinition->collapsible;
+        $this->collapsed = $mainDefinition->collapsed;
     }
 
-    /**
-     * @param mixed $data
-     *
-     * @return bool
-     */
     public function isEmpty(mixed $data): bool
     {
         return is_null($data) || count($data) === 0;
@@ -644,9 +620,6 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
         ];
     }
 
-    /**
-     * @return array
-     */
     public function __sleep(): array
     {
         $vars = get_object_vars($this);
@@ -720,7 +693,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
 
     public function setCollapsed(bool $collapsed): void
     {
-        $this->collapsed = (bool) $collapsed;
+        $this->collapsed = $collapsed;
     }
 
     public function isCollapsible(): bool
@@ -730,7 +703,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
 
     public function setCollapsible(bool $collapsible): void
     {
-        $this->collapsible = (bool) $collapsible;
+        $this->collapsible = $collapsible;
     }
 
     public function getStyleElement(): string
@@ -758,7 +731,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
      */
     public function setLazyLoading(bool $lazyLoading): static
     {
-        $this->lazyLoading = (bool) $lazyLoading;
+        $this->lazyLoading = $lazyLoading;
 
         return $this;
     }
@@ -902,7 +875,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
 
     public function setDisallowAddRemove(bool $disallowAddRemove): void
     {
-        $this->disallowAddRemove = (bool) $disallowAddRemove;
+        $this->disallowAddRemove = $disallowAddRemove;
     }
 
     public function isDisallowReorder(): bool
@@ -912,7 +885,7 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
 
     public function setDisallowReorder(bool $disallowReorder): void
     {
-        $this->disallowReorder = (bool) $disallowReorder;
+        $this->disallowReorder = $disallowReorder;
     }
 
     /**
@@ -1120,5 +1093,15 @@ class Block extends Data implements CustomResourcePersistingInterface, ResourceP
         $obj->setValues($data);
 
         return $obj;
+    }
+
+    public function getColumnType(): string
+    {
+        return 'longtext';
+    }
+
+    public function getFieldType(): string
+    {
+        return 'block';
     }
 }

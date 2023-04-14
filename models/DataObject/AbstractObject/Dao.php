@@ -120,7 +120,7 @@ class Dao extends Model\Element\Dao
             }
         }
 
-        Helper::insertOrUpdate($this->db, 'objects', $data);
+        Helper::upsert($this->db, 'objects', $data, $this->getPrimaryKey('objects'));
 
         // tree_locks
         $this->db->delete('tree_locks', ['id' => $this->model->getId(), 'type' => 'object']);
@@ -163,7 +163,7 @@ class Dao extends Model\Element\Dao
      */
     public function updateChildPaths(string $oldPath): ?array
     {
-        if ($this->hasChildren(DataObject::$types)) {
+        if ($this->hasChildren(DataObject::$types, true)) {
             //get objects to empty their cache
             $objects = $this->db->fetchFirstColumn('SELECT id FROM objects WHERE `path` like ?', [Helper::escapeLike($oldPath) . '%']);
 
@@ -657,7 +657,7 @@ class Dao extends Model\Element\Dao
     public function saveIndex(int $index): void
     {
         $this->db->update('objects', [
-            'index' => $index,
+            $this->db->quoteIdentifier('index') => $index,
         ], [
             'id' => $this->model->getId(),
         ]);

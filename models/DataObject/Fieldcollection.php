@@ -150,9 +150,6 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
         return count($this->getItems()) < 1;
     }
 
-    /**
-     * @param TItem $item
-     */
     public function add(Fieldcollection\Data\AbstractData $item): void
     {
         $this->items[] = $item;
@@ -322,7 +319,7 @@ class Fieldcollection extends Model\AbstractModel implements \Iterator, DirtyInd
         }
     }
 
-    public function __wakeup()
+    public function __wakeup(): void
     {
         if (is_array($this->items)) {
             foreach ($this->items as $key => $item) {

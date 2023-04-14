@@ -32,40 +32,13 @@ class Input extends Data implements
     use DataObject\ClassDefinition\Data\Extension\Text;
     use DataObject\Traits\DataWidthTrait;
     use DataObject\Traits\SimpleComparisonTrait;
-    use Extension\ColumnType;
-    use Extension\QueryColumnType;
     use Model\DataObject\Traits\DefaultValueTrait;
     use Model\DataObject\Traits\SimpleNormalizerTrait;
-
-    /**
-     * Static type of this element
-     *
-     * @internal
-     */
-    public string $fieldtype = 'input';
 
     /**
      * @internal
      */
     public ?string $defaultValue = null;
-
-    /**
-     * Type for the column to query
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $queryColumnType = 'varchar';
-
-    /**
-     * Type for the column
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $columnType = 'varchar';
 
     /**
      * Column length
@@ -218,7 +191,7 @@ class Input extends Data implements
 
     public function setUnique(bool $unique): void
     {
-        $this->unique = (bool) $unique;
+        $this->unique = $unique;
     }
 
     public function getShowCharCount(): bool
@@ -228,23 +201,17 @@ class Input extends Data implements
 
     public function setShowCharCount(bool $showCharCount): void
     {
-        $this->showCharCount = (bool) $showCharCount;
+        $this->showCharCount = $showCharCount;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getColumnType(): array|string|null
+    public function getColumnType(): string
     {
-        return $this->columnType . '(' . $this->getColumnLength() . ')';
+        return 'varchar(' . $this->getColumnLength() . ')';
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getQueryColumnType(): array|string|null
+    public function getQueryColumnType(): string
     {
-        return $this->queryColumnType . '(' . $this->getColumnLength() . ')';
+        return $this->getColumnType();
     }
 
     /**
@@ -253,7 +220,19 @@ class Input extends Data implements
     public function checkValidity(mixed $data, bool $omitMandatoryCheck = false, array $params = []): void
     {
         if (!$omitMandatoryCheck && $this->getRegex() && is_string($data) && strlen($data) > 0) {
-            if (!preg_match('#' . $this->getRegex() . '#' . implode('', $this->getRegexFlags()), $data)) {
+            $throwException = false;
+            if (in_array('g', $this->getRegexFlags())) {
+                $flags = str_replace('g', '', implode('', $this->getRegexFlags()));
+                if (!preg_match_all('#' . $this->getRegex() . '#' . $flags, $data)) {
+                    $throwException = true;
+                }
+            } else {
+                if (!preg_match('#' . $this->getRegex() . '#' . implode('', $this->getRegexFlags()), $data)) {
+                    $throwException = true;
+                }
+            }
+
+            if ($throwException) {
                 throw new Model\Element\ValidationException('Value in field [ ' . $this->getName() . " ] doesn't match input validation '" . $this->getRegex() . "'");
             }
         }
@@ -262,11 +241,11 @@ class Input extends Data implements
     }
 
     /**
-     * @param Model\DataObject\ClassDefinition\Data\Input $masterDefinition
+     * @param Model\DataObject\ClassDefinition\Data\Input $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(Model\DataObject\ClassDefinition\Data $masterDefinition): void
+    public function synchronizeWithMainDefinition(Model\DataObject\ClassDefinition\Data $mainDefinition): void
     {
-        $this->columnLength = $masterDefinition->columnLength;
+        $this->columnLength = $mainDefinition->columnLength;
     }
 
     /**
@@ -289,7 +268,7 @@ class Input extends Data implements
 
     public function setDefaultValue(string $defaultValue): static
     {
-        if ((string)$defaultValue !== '') {
+        if ($defaultValue !== '') {
             $this->defaultValue = $defaultValue;
         }
 
@@ -314,5 +293,10 @@ class Input extends Data implements
     public function getPhpdocReturnType(): ?string
     {
         return 'string|null';
+    }
+
+    public function getFieldType(): string
+    {
+        return 'input';
     }
 }

@@ -28,15 +28,6 @@ class StructuredTable extends Data implements ResourcePersistenceAwareInterface,
     use DataObject\Traits\SimpleComparisonTrait;
     use DataObject\Traits\DataHeightTrait;
     use DataObject\Traits\DataWidthTrait;
-    use Extension\ColumnType;
-    use Extension\QueryColumnType;
-
-    /**
-     * Static type of this element
-     *
-     * @var string
-     */
-    public string $fieldtype = 'structuredTable';
 
     /**
      * @internal
@@ -73,7 +64,7 @@ class StructuredTable extends Data implements ResourcePersistenceAwareInterface,
 
     public function setLabelWidth(int $labelWidth): static
     {
-        $this->labelWidth = (int)$labelWidth;
+        $this->labelWidth = $labelWidth;
 
         return $this;
     }
@@ -347,10 +338,7 @@ class StructuredTable extends Data implements ResourcePersistenceAwareInterface,
         return $string;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getColumnType(): array|string|null
+    public function getColumnType(): array
     {
         $columns = [];
         foreach ($this->calculateDbColumns() as $c) {
@@ -360,17 +348,9 @@ class StructuredTable extends Data implements ResourcePersistenceAwareInterface,
         return $columns;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getQueryColumnType(): array|string|null
+    public function getQueryColumnType(): array
     {
-        $columns = [];
-        foreach ($this->calculateDbColumns() as $c) {
-            $columns[$c->name] = $c->type;
-        }
-
-        return $columns;
+        return $this->getColumnType();
     }
 
     protected function calculateDbColumns(): array
@@ -452,14 +432,14 @@ class StructuredTable extends Data implements ResourcePersistenceAwareInterface,
     }
 
     /**
-     * @param DataObject\ClassDefinition\Data\StructuredTable $masterDefinition
+     * @param DataObject\ClassDefinition\Data\StructuredTable $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition): void
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition): void
     {
-        $this->labelWidth = $masterDefinition->labelWidth;
-        $this->labelFirstCell = $masterDefinition->labelFirstCell;
-        $this->cols = $masterDefinition->cols;
-        $this->rows = $masterDefinition->rows;
+        $this->labelWidth = $mainDefinition->labelWidth;
+        $this->labelFirstCell = $mainDefinition->labelFirstCell;
+        $this->cols = $mainDefinition->cols;
+        $this->rows = $mainDefinition->rows;
     }
 
     public function isEqual(mixed $oldValue, mixed $newValue): bool
@@ -511,5 +491,10 @@ class StructuredTable extends Data implements ResourcePersistenceAwareInterface,
         }
 
         return null;
+    }
+
+    public function getFieldType(): string
+    {
+        return 'structuredTable';
     }
 }

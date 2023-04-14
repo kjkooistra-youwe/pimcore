@@ -20,10 +20,8 @@ use Pimcore\Event\FrontendEvents;
 use Pimcore\File;
 use Pimcore\Model;
 use Pimcore\Tool;
-use Pimcore\Tool\Console;
 use Pimcore\Tool\Storage;
 use Symfony\Component\EventDispatcher\GenericEvent;
-use Symfony\Component\Process\Process;
 
 /**
  * @method \Pimcore\Model\Asset\Dao getDao()
@@ -56,102 +54,6 @@ class Image extends Model\Asset
         }
 
         parent::update($params);
-    }
-
-    /**
-     * @internal
-     */
-    public function detectFocalPoint(): bool
-    {
-        if ($this->getCustomSetting('focalPointX') && $this->getCustomSetting('focalPointY')) {
-            return false;
-        }
-
-        if ($faceCordintates = $this->getCustomSetting('faceCoordinates')) {
-            $xPoints = [];
-            $yPoints = [];
-
-            foreach ($faceCordintates as $fc) {
-                // focal point calculation
-                $xPoints[] = ($fc['x'] + $fc['x'] + $fc['width']) / 2;
-                $yPoints[] = ($fc['y'] + $fc['y'] + $fc['height']) / 2;
-            }
-
-            $focalPointX = array_sum($xPoints) / count($xPoints);
-            $focalPointY = array_sum($yPoints) / count($yPoints);
-
-            $this->setCustomSetting('focalPointX', $focalPointX);
-            $this->setCustomSetting('focalPointY', $focalPointY);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @internal
-     */
-    public function detectFaces(): bool
-    {
-        if ($this->getCustomSetting('faceCoordinates')) {
-            return false;
-        }
-
-        $config = \Pimcore::getContainer()->getParameter('pimcore.config')['assets']['image']['focal_point_detection'];
-
-        if (!$config['enabled']) {
-            return false;
-        }
-
-        $facedetectBin = \Pimcore\Tool\Console::getExecutable('facedetect');
-        if ($facedetectBin) {
-            $faceCoordinates = [];
-            $thumbnail = $this->getThumbnail(Image\Thumbnail\Config::getPreviewConfig());
-            $reference = $thumbnail->getPathReference();
-            if (in_array($reference['type'], ['asset', 'thumbnail'])) {
-                $image = $thumbnail->getLocalFile();
-
-                if (null === $image) {
-                    return false;
-                }
-
-                $imageWidth = $thumbnail->getWidth();
-                $imageHeight = $thumbnail->getHeight();
-
-                $command = [$facedetectBin, $image];
-                Console::addLowProcessPriority($command);
-                $process = new Process($command);
-                $process->run();
-                $result = $process->getOutput();
-                if (strpos($result, "\n")) {
-                    $faces = explode("\n", trim($result));
-
-                    foreach ($faces as $coordinates) {
-                        list($x, $y, $width, $height) = explode(' ', $coordinates);
-
-                        // percentages
-                        $Px = (int) $x / $imageWidth * 100;
-                        $Py = (int) $y / $imageHeight * 100;
-                        $Pw = (int) $width / $imageWidth * 100;
-                        $Ph = (int) $height / $imageHeight * 100;
-
-                        $faceCoordinates[] = [
-                            'x' => $Px,
-                            'y' => $Py,
-                            'width' => $Pw,
-                            'height' => $Ph,
-                        ];
-                    }
-
-                    $this->setCustomSetting('faceCoordinates', $faceCoordinates);
-
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     private function isLowQualityPreviewEnabled(): bool
@@ -195,7 +97,6 @@ class Image extends Model\Asset
             $imagick->writeImage($tmpFile);
             $imageBase64 = base64_encode(file_get_contents($tmpFile));
             $imagick->destroy();
-            unlink($tmpFile);
 
             $svg = <<<EOT
 <?xml version="1.0" encoding="utf-8"?>
@@ -280,11 +181,6 @@ EOT;
 
     /**
      * Returns a path to a given thumbnail or a thumbnail configuration.
-     *
-     * @param null|string|array|Image\Thumbnail\Config|null $config
-     * @param bool $deferred
-     *
-     * @return Image\Thumbnail
      */
     public function getThumbnail(array|string|Image\Thumbnail\Config|null $config = null, bool $deferred = true): Image\Thumbnail
     {

@@ -30,7 +30,7 @@ class GD extends Adapter
     /**
      * {@inheritdoc}
      */
-    public function load(string $imagePath, array $options = []): bool|static
+    public function load(string $imagePath, array $options = []): static|false
     {
         $this->path = $imagePath;
         if (!$this->resource = @imagecreatefromstring(file_get_contents($this->path))) {
@@ -43,10 +43,10 @@ class GD extends Adapter
         $this->setHeight($height);
 
         if (!$this->sourceImageFormat) {
-            $this->sourceImageFormat = \Pimcore\File::getFileExtension($imagePath);
+            $this->sourceImageFormat = pathinfo($imagePath, PATHINFO_EXTENSION);
         }
 
-        if (in_array(\Pimcore\File::getFileExtension($imagePath), ['png', 'gif'])) {
+        if (in_array(pathinfo($imagePath, PATHINFO_EXTENSION), ['png', 'gif'])) {
             // in GD only gif and PNG can have an alphachannel
             $this->setIsAlphaPossible(true);
         }
@@ -359,12 +359,15 @@ class GD extends Adapter
         return $this;
     }
 
+    /**
+     * @var array<string, bool>
+     */
     protected static array $supportedFormatsCache = [];
 
     /**
      * {@inheritdoc}
      */
-    public function supportsFormat(string $format, bool $force = false): mixed
+    public function supportsFormat(string $format, bool $force = false): bool
     {
         if (!isset(self::$supportedFormatsCache[$format]) || $force) {
             $info = gd_info();

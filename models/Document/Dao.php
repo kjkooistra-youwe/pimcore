@@ -103,7 +103,13 @@ class Dao extends Model\Element\Dao
         $typeSpecificTable = null;
         $validColumnsTypeSpecific = [];
         $documentsConfig = \Pimcore\Config::getSystemConfiguration('documents');
-        $validTables = $documentsConfig['valid_tables'];
+        $validTables = [];
+        foreach ($documentsConfig['type_definitions']['map'] as $type => $config) {
+            if (isset($config['valid_table']) && $config['valid_table']) {
+                $validTables[] = $config['valid_table'];
+            }
+        }
+
         if (in_array($this->model->getType(), $validTables)) {
             $typeSpecificTable = 'documents_' . $this->model->getType();
             $validColumnsTypeSpecific = $this->getValidTableColumns($typeSpecificTable);
@@ -148,10 +154,10 @@ class Dao extends Model\Element\Dao
         $dataDocument['path'] = $this->model->getRealPath();
 
         // update the values in the database
-        Helper::insertOrUpdate($this->db, 'documents', $dataDocument);
+        Helper::upsert($this->db, 'documents', $dataDocument, $this->getPrimaryKey('documents'));
 
         if ($typeSpecificTable) {
-            Helper::insertOrUpdate($this->db, $typeSpecificTable, $dataTypeSpecific);
+            Helper::upsert($this->db, $typeSpecificTable, $dataTypeSpecific, $this->getPrimaryKey($typeSpecificTable));
         }
 
         $this->updateLocks();
@@ -562,7 +568,7 @@ class Dao extends Model\Element\Dao
     public function saveIndex(int $index): void
     {
         $this->db->update('documents', [
-            'index' => $index,
+            $this->db->quoteIdentifier('index') => $index,
         ], [
             'id' => $this->model->getId(),
         ]);

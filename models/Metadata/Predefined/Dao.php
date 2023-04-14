@@ -25,15 +25,18 @@ use Symfony\Component\Uid\Uuid as Uid;
  */
 class Dao extends Model\Dao\PimcoreLocationAwareConfigDao
 {
+    private const CONFIG_KEY = 'predefined_asset_metadata';
+
     public function configure(): void
     {
         $config = \Pimcore::getContainer()->getParameter('pimcore.config');
 
+        $storageConfig = $config['config_location'][self::CONFIG_KEY];
+
         parent::configure([
             'containerConfig' => $config['assets']['metadata']['predefined']['definitions'],
             'settingsStoreScope' => 'pimcore_predefined_asset_metadata',
-            'storageDirectory' => $_SERVER['PIMCORE_CONFIG_STORAGE_DIR_PREDEFINED_ASSET_METADATA'] ?? PIMCORE_CONFIGURATION_DIRECTORY  . '/predefined-asset-metadata',
-            'writeTargetEnvVariableName' => 'PIMCORE_WRITE_TARGET_PREDEFINED_ASSET_METADATA',
+            'storageConfig' => $storageConfig,
         ]);
     }
 

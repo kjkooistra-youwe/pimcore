@@ -32,16 +32,6 @@ class ManyToManyObjectRelation extends AbstractRelations implements QueryResourc
     use DataObject\ClassDefinition\Data\Extension\RelationFilterConditionParser;
     use DataObject\Traits\DataWidthTrait;
     use DataObject\Traits\DataHeightTrait;
-    use Extension\QueryColumnType;
-
-    /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'manyToManyObjectRelation';
 
     /**
      * @internal
@@ -49,15 +39,6 @@ class ManyToManyObjectRelation extends AbstractRelations implements QueryResourc
      * @var int|null
      */
     public ?int $maxItems = null;
-
-    /**
-     * Type for the column to query
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $queryColumnType = 'text';
 
     /**
      * @internal
@@ -205,7 +186,7 @@ class ManyToManyObjectRelation extends AbstractRelations implements QueryResourc
 
         $visibleFieldsArray = $this->getVisibleFields() ? explode(',', $this->getVisibleFields()) : [];
 
-        $gridFields = (array)$visibleFieldsArray;
+        $gridFields = $visibleFieldsArray;
 
         // add data
         if (is_array($data) && count($data) > 0) {
@@ -479,12 +460,12 @@ class ManyToManyObjectRelation extends AbstractRelations implements QueryResourc
     }
 
     /**
-     * @param DataObject\ClassDefinition\Data\ManyToManyObjectRelation $masterDefinition
+     * @param DataObject\ClassDefinition\Data\ManyToManyObjectRelation $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(DataObject\ClassDefinition\Data $masterDefinition): void
+    public function synchronizeWithMainDefinition(DataObject\ClassDefinition\Data $mainDefinition): void
     {
-        $this->maxItems = $masterDefinition->maxItems;
-        $this->relationType = $masterDefinition->relationType;
+        $this->maxItems = $mainDefinition->maxItems;
+        $this->relationType = $mainDefinition->relationType;
     }
 
     /**
@@ -634,13 +615,6 @@ class ManyToManyObjectRelation extends AbstractRelations implements QueryResourc
 
     /**
      * @internal
-     *
-     * @param mixed $originalData
-     * @param mixed $data
-     * @param Concrete $object
-     * @param array $params
-     *
-     * @return array
      */
     protected function processDiffDataForEditMode(mixed $originalData, mixed $data, DataObject\Concrete $object = null, array $params = []): array
     {
@@ -756,7 +730,7 @@ class ManyToManyObjectRelation extends AbstractRelations implements QueryResourc
 
     public function setAllowToCreateNewObject(bool $allowToCreateNewObject): void
     {
-        $this->allowToCreateNewObject = (bool)$allowToCreateNewObject;
+        $this->allowToCreateNewObject = $allowToCreateNewObject;
     }
 
     public function isAllowedToClearRelation(): bool
@@ -774,7 +748,7 @@ class ManyToManyObjectRelation extends AbstractRelations implements QueryResourc
      */
     public function isOptimizedAdminLoading(): bool
     {
-        return (bool) $this->optimizedAdminLoading;
+        return $this->optimizedAdminLoading;
     }
 
     public function setOptimizedAdminLoading(bool $optimizedAdminLoading): void
@@ -832,5 +806,15 @@ class ManyToManyObjectRelation extends AbstractRelations implements QueryResourc
         $name = $params['name'] ?: $this->name;
 
         return $this->getRelationFilterCondition($value, $operator, $name);
+    }
+
+    public function getQueryColumnType(): string
+    {
+        return 'text';
+    }
+
+    public function getFieldType(): string
+    {
+        return 'manyToManyObjectRelation';
     }
 }

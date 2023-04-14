@@ -91,7 +91,7 @@ class EditmodeListener implements EventSubscriberInterface
         $response = $event->getResponse();
 
         if (!$event->isMainRequest()) {
-            return; // only master requests inject editmode assets
+            return; // only main requests inject editmode assets
         }
 
         if (!$this->matchesPimcoreContext($request, PimcoreContextResolver::CONTEXT_DEFAULT)) {
@@ -262,7 +262,6 @@ class EditmodeListener implements EventSubscriberInterface
             '/bundles/pimcoreadmin/js/pimcore/common.js',
             '/bundles/pimcoreadmin/js/lib/class.js',
             '/bundles/pimcoreadmin/extjs/js/ext-all' . ($disableMinifyJs ? '-debug' : '') . '.js',
-            '/bundles/pimcoreadmin/js/lib/ckeditor/ckeditor.js',
         ];
     }
 

@@ -35,13 +35,6 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
     use DataObject\Traits\FieldDefinitionEnrichmentDataTrait;
 
     /**
-     * Static type of this element
-     *
-     * @internal
-     */
-    public string $fieldtype = 'localizedfields';
-
-    /**
      * @internal
      */
     public array $children = [];
@@ -444,13 +437,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
                 $object = $object->getObject();
             }
 
-            $dirtyLanguages = $localizedFields->getDirtyLanguages();
-            $localizedFields->setObject($object);
-            if (is_array($dirtyLanguages)) {
-                $localizedFields->markLanguagesAsDirty($dirtyLanguages);
-            } else {
-                $localizedFields->resetLanguageDirtyMap();
-            }
+            $localizedFields->setObjectOmitDirty($object);
 
             $context = isset($params['context']) ? $params['context'] : null;
             $localizedFields->setContext($context);
@@ -700,11 +687,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
      */
     public function checkValidity(mixed $data, bool $omitMandatoryCheck = false, array $params = []): void
     {
-        $config = \Pimcore\Config::getSystemConfiguration('general');
-        $languages = [];
-        if (isset($config['valid_languages'])) {
-            $languages = explode(',', $config['valid_languages']);
-        }
+        $languages = Tool::getValidLanguages();
 
         $dataForValidityCheck = $this->getDataForValidity($data, $languages);
         $validationExceptions = [];
@@ -917,9 +900,6 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         ];
     }
 
-    /**
-     * @return array
-     */
     public function __sleep(): array
     {
         $vars = get_object_vars($this);
@@ -978,7 +958,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
 
     public function setLabelWidth(int $labelWidth): void
     {
-        $this->labelWidth = (int)$labelWidth;
+        $this->labelWidth = $labelWidth;
     }
 
     public function getLabelWidth(): int
@@ -1013,7 +993,7 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
 
     public function setProvideSplitView(bool $provideSplitView): void
     {
-        $this->provideSplitView = (bool) $provideSplitView;
+        $this->provideSplitView = $provideSplitView;
     }
 
     public function supportsDirtyDetection(): bool
@@ -1134,5 +1114,10 @@ class Localizedfields extends Data implements CustomResourcePersistingInterface,
         $obj->setValues($data);
 
         return $obj;
+    }
+
+    public function getFieldType(): string
+    {
+        return 'localizedfields';
     }
 }

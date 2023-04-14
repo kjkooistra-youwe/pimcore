@@ -17,6 +17,7 @@ declare(strict_types=1);
 namespace Pimcore\Model;
 
 use Doctrine\DBAL\Exception\DeadlockException;
+use Pimcore\Bundle\AdminBundle\System\Config;
 use Pimcore\Cache\RuntimeCache;
 use Pimcore\Event\DocumentEvents;
 use Pimcore\Event\FrontendEvents;
@@ -24,7 +25,6 @@ use Pimcore\Event\Model\DocumentEvent;
 use Pimcore\Logger;
 use Pimcore\Model\Document\Hardlink\Wrapper\WrapperInterface;
 use Pimcore\Model\Document\Listing;
-use Pimcore\Model\Document\TypeDefinition\Loader\TypeLoader;
 use Pimcore\Model\Element\DuplicateFullPathException;
 use Pimcore\Model\Element\ElementInterface;
 use Pimcore\Model\Exception\NotFoundException;
@@ -106,6 +106,20 @@ class Document extends Element\AbstractElement
         $documentsConfig = \Pimcore\Config::getSystemConfiguration('documents');
 
         return  array_keys($documentsConfig['type_definitions']['map']);
+    }
+
+    public static function getTypesConfiguration(): array
+    {
+        $documentsConfig = \Pimcore\Config::getSystemConfiguration('documents');
+
+        // remove unused class value
+        return array_map(function ($item) {
+            if (key_exists('class', $item)) {
+                unset($item['class']);
+            }
+
+            return $item;
+        }, $documentsConfig['type_definitions']['map']);
     }
 
     /**
@@ -207,9 +221,11 @@ class Document extends Element\AbstractElement
                 return null;
             }
 
-            // Getting Typeloader from container
-            $loader = \Pimcore::getContainer()->get(TypeLoader::class);
-            $newDocument = $loader->build($document->getType());
+            // Getting classname from document resolver
+            $className = \Pimcore::getContainer()->get('pimcore.class.resolver.document')->resolve($document->getType());
+
+            /** @var Document $newDocument */
+            $newDocument = self::getModelFactory()->build($className);
 
             if (get_class($document) !== get_class($newDocument)) {
                 $document = $newDocument;
@@ -720,10 +736,10 @@ class Document extends Element\AbstractElement
         // inside the hardlink scope, but this is an ID link, so we cannot rewrite the link the usual way because in the
         // snippet / link we don't know anymore that whe a inside a hardlink wrapped document
         if (!$link && \Pimcore\Tool::isFrontend() && Site::isSiteRequest() && !FrontendTool::isDocumentInCurrentSite($this)) {
-            if ($mainRequest && ($masterDocument = $mainRequest->get(DynamicRouter::CONTENT_KEY))) {
-                if ($masterDocument instanceof WrapperInterface) {
+            if ($mainRequest && ($mainDocument = $mainRequest->get(DynamicRouter::CONTENT_KEY))) {
+                if ($mainDocument instanceof WrapperInterface) {
                     $hardlinkPath = '';
-                    $hardlink = $masterDocument->getHardLinkSource();
+                    $hardlink = $mainDocument->getHardLinkSource();
                     $hardlinkTarget = $hardlink->getSourceDocument();
 
                     if ($hardlinkTarget) {
@@ -740,7 +756,7 @@ class Document extends Element\AbstractElement
             }
 
             if (!$link) {
-                $config = \Pimcore\Config::getSystemConfiguration('general');
+                $config = Config::get()['general'];
                 $request = $requestStack->getCurrentRequest();
                 $scheme = 'http://';
                 if ($request) {
@@ -771,7 +787,7 @@ class Document extends Element\AbstractElement
         }
 
         if ($mainRequest) {
-            // caching should only be done when master request is available as it is done for performance reasons
+            // caching should only be done when main request is available as it is done for performance reasons
             // of the web frontend, without a request object there's no need to cache anything
             // for details also see https://github.com/pimcore/pimcore/issues/5707
             $this->fullPathCache = $link;
@@ -839,7 +855,7 @@ class Document extends Element\AbstractElement
 
     public function setKey(string $key): static
     {
-        $this->key = (string)$key;
+        $this->key = $key;
 
         return $this;
     }
@@ -879,7 +895,7 @@ class Document extends Element\AbstractElement
      */
     public function setIndex(int $index): static
     {
-        $this->index = (int) $index;
+        $this->index = $index;
 
         return $this;
     }
@@ -910,7 +926,7 @@ class Document extends Element\AbstractElement
 
     public function getPublished(): bool
     {
-        return (bool) $this->published;
+        return $this->published;
     }
 
     public function setPublished(bool $published): static
@@ -979,7 +995,7 @@ class Document extends Element\AbstractElement
         return 'document_list_' . ($includingUnpublished ? '1' : '0');
     }
 
-    public function __clone()
+    public function __clone(): void
     {
         parent::__clone();
         $this->parent = null;

@@ -24,18 +24,6 @@ use Pimcore\Normalizer\NormalizerInterface;
 
 class ExternalImage extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface, TypeDeclarationSupportInterface, EqualComparisonInterface, VarExporterInterface, NormalizerInterface
 {
-    use Extension\ColumnType;
-    use Extension\QueryColumnType;
-
-    /**
-     * Static type of this element
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public string $fieldtype = 'externalImage';
-
     /**
      * @internal
      *
@@ -56,24 +44,6 @@ class ExternalImage extends Data implements ResourcePersistenceAwareInterface, Q
      * @var int|null
      */
     public ?int $previewHeight = null;
-
-    /**
-     * Type for the column to query
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $queryColumnType = 'longtext';
-
-    /**
-     * Type for the column
-     *
-     * @internal
-     *
-     * @var string
-     */
-    public $columnType = 'longtext';
 
     public function getPreviewWidth(): ?int
     {
@@ -276,13 +246,13 @@ class ExternalImage extends Data implements ResourcePersistenceAwareInterface, Q
     }
 
     /**
-     * @param Model\DataObject\ClassDefinition\Data\ExternalImage $masterDefinition
+     * @param Model\DataObject\ClassDefinition\Data\ExternalImage $mainDefinition
      */
-    public function synchronizeWithMasterDefinition(Model\DataObject\ClassDefinition\Data $masterDefinition): void
+    public function synchronizeWithMainDefinition(Model\DataObject\ClassDefinition\Data $mainDefinition): void
     {
-        $this->previewHeight = $masterDefinition->previewHeight;
-        $this->previewWidth = $masterDefinition->previewWidth;
-        $this->inputWidth = $masterDefinition->inputWidth;
+        $this->previewHeight = $mainDefinition->previewHeight;
+        $this->previewWidth = $mainDefinition->previewWidth;
+        $this->inputWidth = $mainDefinition->inputWidth;
     }
 
     /**
@@ -350,5 +320,20 @@ class ExternalImage extends Data implements ResourcePersistenceAwareInterface, Q
         }
 
         return null;
+    }
+
+    public function getColumnType(): string
+    {
+        return 'longtext';
+    }
+
+    public function getQueryColumnType(): string
+    {
+        return $this->getColumnType();
+    }
+
+    public function getFieldType(): string
+    {
+        return 'externalImage';
     }
 }

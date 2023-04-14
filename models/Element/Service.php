@@ -25,9 +25,9 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Query\QueryBuilder as DoctrineQueryBuilder;
 use League\Csv\EscapeFormula;
 use Pimcore;
+use Pimcore\Bundle\AdminBundle\CustomView\Config;
 use Pimcore\Db;
 use Pimcore\Event\SystemEvents;
-use Pimcore\File;
 use Pimcore\Logger;
 use Pimcore\Model;
 use Pimcore\Model\Asset;
@@ -383,27 +383,6 @@ class Service extends Model\AbstractModel
     }
 
     /**
-     * @param string $type
-     * @param string $sourceKey
-     * @param ElementInterface $target
-     *
-     * @return string
-     *
-     * @deprecated will be removed in Pimcore 11, use getSafeCopyName() instead
-     *
-     */
-    public static function getSaveCopyName(string $type, string $sourceKey, ElementInterface $target): string
-    {
-        trigger_deprecation(
-            'pimcore/pimcore',
-            '10.0',
-            'The Service::getSaveCopyName() method is deprecated, use Service::getSafeCopyName() instead.'
-        );
-
-        return self::getSafeCopyName($sourceKey, $target);
-    }
-
-    /**
      * Returns a uniqe key for the element in the $target-Path (recursive)
      *
      * @return string
@@ -416,7 +395,7 @@ class Service extends Model\AbstractModel
         $type = self::getElementType($target);
         if (self::pathExists($target->getRealFullPath() . '/' . $sourceKey, $type)) {
             // only for assets: add the prefix _copy before the file extension (if exist) not after to that source.jpg will be source_copy.jpg and not source.jpg_copy
-            if ($type == 'asset' && $fileExtension = File::getFileExtension($sourceKey)) {
+            if ($type == 'asset' && $fileExtension = pathinfo($sourceKey, PATHINFO_EXTENSION)) {
                 $sourceKey = preg_replace('/\.' . $fileExtension . '$/i', '_copy.' . $fileExtension, $sourceKey);
             } elseif (preg_match("/_copy(|_\d*)$/", $sourceKey) === 1) {
                 // If key already ends with _copy or copy_N, append a digit to avoid _copy_copy_copy naming
@@ -767,10 +746,10 @@ class Service extends Model\AbstractModel
 
                 if ($originalElement) {
                     //do not override filename for Assets https://github.com/pimcore/pimcore/issues/8316
-//                    if ($data instanceof Asset) {
-//                        /** @var Asset $originalElement */
-//                        $data->setFilename($originalElement->getFilename());
-//                    } else
+                    //                    if ($data instanceof Asset) {
+                    //                        /** @var Asset $originalElement */
+                    //                        $data->setFilename($originalElement->getFilename());
+                    //                    } else
                     if ($data instanceof Document) {
                         /** @var Document $originalElement */
                         $data->setKey($originalElement->getKey());
@@ -1003,7 +982,7 @@ class Service extends Model\AbstractModel
      */
     public static function getCustomViewById(string $id): ?array
     {
-        $customViews = \Pimcore\CustomView\Config::get();
+        $customViews = Config::get();
         if ($customViews) {
             foreach ($customViews as $customView) {
                 if ($customView['id'] == $id) {
@@ -1392,6 +1371,8 @@ class Service extends Model\AbstractModel
      */
     public static function saveElementToSession(ElementInterface $element, string $sessionId, string $postfix = '', bool $clone = true): void
     {
+        self::loadAllFields($element);
+
         if ($clone) {
             $context = [
                 'source' => __METHOD__,
@@ -1414,6 +1395,7 @@ class Service extends Model\AbstractModel
                 );
             }
 
+            $copier->addFilter(new Model\Version\SetDumpStateFilter(true), new \DeepCopy\Matcher\PropertyMatcher(Model\Element\ElementDumpStateInterface::class, Model\Element\ElementDumpStateInterface::DUMP_STATE_PROPERTY_NAME));
             $element = $copier->copy($element);
         }
 
@@ -1421,7 +1403,6 @@ class Service extends Model\AbstractModel
         $tmpStoreKey = self::getSessionKey($elementType, $element->getId(), $sessionId, $postfix);
         $tag = $elementType . '-session' . $postfix;
 
-        self::loadAllFields($element);
         $element->setInDumpState(true);
         $serializedData = Serialize::serialize($element);
 
