@@ -1,4 +1,4 @@
-# Adding Object Layout types
+# Adding Object Layout Types
 
 > Note: This feature is available since v6.6.1 
 
@@ -40,7 +40,7 @@ Following steps are necessary to do so:
     pimcore:
         objects:
             class_definitions:
-                Layout:
+                layout:
                     map:
                       myLayoutType: \App\Model\DataObject\ClassDefinition\Layout\MyLayoutType
     ```

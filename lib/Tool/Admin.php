@@ -16,11 +16,11 @@ declare(strict_types=1);
 
 namespace Pimcore\Tool;
 
-use Pimcore\Bundle\AdminBundle\Security\User\TokenStorageUserResolver;
 use Pimcore\Event\SystemEvents;
 use Pimcore\File;
 use Pimcore\Localization\LocaleServiceInterface;
 use Pimcore\Model\User;
+use Pimcore\Security\User\TokenStorageUserResolver;
 use Pimcore\Tool\Text\Csv;
 use Symfony\Component\EventDispatcher\GenericEvent;
 
@@ -34,7 +34,6 @@ class Admin
      *
      * @static
      *
-     * @return array
      */
     public static function getLanguages(): array
     {
@@ -76,9 +75,7 @@ class Admin
     /**
      * @static
      *
-     * @param string $scriptContent
      *
-     * @return array
      */
     public static function getMinimizedScriptPath(string $scriptContent): array
     {
@@ -125,7 +122,6 @@ class Admin
     /**
      * @static
      *
-     * @return string
      */
     public static function getMaintenanceModeFile(): string
     {
@@ -138,7 +134,6 @@ class Admin
     }
 
     /**
-     * @param string|null $sessionId
      *
      * @throws \Exception
      */
@@ -174,7 +169,6 @@ class Admin
     /**
      * @static
      *
-     * @return bool
      */
     public static function isInMaintenanceMode(): bool
     {
@@ -229,7 +223,6 @@ class Admin
     /**
      * @static
      *
-     * @return \Pimcore\Model\User|null
      */
     public static function getCurrentUser(): ?User
     {

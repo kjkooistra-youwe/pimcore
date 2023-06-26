@@ -1,4 +1,4 @@
-# Working with Objects via PHP API
+# Working With Objects via PHP API
 
 Pimcore provides an object orientated PHP API to work with Objects. There are several generic functionalities
 provided by Pimcore and for each Pimcore object class Pimcore generates corresponding PHP classes for working
@@ -476,13 +476,3 @@ $list->onCreateQueryBuilder(function (\Doctrine\DBAL\Query\QueryBuilder $queryBu
     echo $queryBuilder->getSQL();
 });
 ```
-
-### PHP Type Declarations
-
-> Experimental Feature
-
-If you want to add [type declarations as described here](https://github.com/pimcore/pimcore/issues/6387) on the generated PHP code for your classes,
-please enable this feature in the class definition.
-
-If you have custom data types please implement the `Pimcore\Model\DataObject\ClassDefinition\Data\TypeDeclarationSupportInterface` interface. 
-

@@ -25,6 +25,10 @@ use Pimcore\Model\Element;
 
 class Text
 {
+    public const PIMCORE_WYSIWYG_SANITIZER_ID = 'html_sanitizer.sanitizer.pimcore.wysiwyg_sanitizer';
+
+    public const PIMCORE_TRANSLATION_SANITIZER_ID = 'html_sanitizer.sanitizer.pimcore.translation_sanitizer';
+
     public static function removeLineBreaks(string $text = ''): string
     {
         $text = str_replace(["\r\n", "\n", "\r", "\t"], ' ', $text);
@@ -229,9 +233,7 @@ class Text
     /**
      * extracts all dependencies to other elements from wysiwyg text
      *
-     * @param string|null $text
      *
-     * @return array
      */
     public static function getDependenciesOfWysiwygText(?string $text): array
     {

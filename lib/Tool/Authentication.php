@@ -18,20 +18,15 @@ namespace Pimcore\Tool;
 
 use Defuse\Crypto\Crypto;
 use Defuse\Crypto\Exception\CryptoException;
-use Pimcore\Bundle\AdminBundle\Security\User\UserProvider;
 use Pimcore\Logger;
 use Pimcore\Model\User;
+use Pimcore\Security\User\UserProvider;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Exception\UserNotFoundException;
 
 class Authentication
 {
-    /**
-     * @param Request|null $request
-     *
-     * @return User|null
-     */
     public static function authenticateSession(Request $request = null): ?User
     {
         if (null === $request) {
@@ -55,7 +50,7 @@ class Authentication
             $token = static::refreshUser($token, \Pimcore::getContainer()->get(UserProvider::class));
             $user = $token->getUser();
 
-            if ($user instanceof \Pimcore\Bundle\AdminBundle\Security\User\User && self::isValidUser($user->getUser())) {
+            if ($user instanceof \Pimcore\Security\User\User && self::isValidUser($user->getUser())) {
                 return $user->getUser();
             }
         }
@@ -123,8 +118,7 @@ class Authentication
         $timestamp = null;
 
         try {
-            $decrypted = self::tokenDecrypt($token);
-            list($timestamp, $username) = $decrypted;
+            [$timestamp, $username] = self::tokenDecrypt($token);
         } catch (CryptoException $e) {
             return null;
         }
@@ -181,10 +175,7 @@ class Authentication
     }
 
     /**
-     * @param string $username
-     * @param string $plainTextPassword
      *
-     * @return string
      *
      * @throws \Exception
      *
@@ -210,9 +201,7 @@ class Authentication
     }
 
     /**
-     * @param string $username
      *
-     * @return string
      *
      * @internal
      */

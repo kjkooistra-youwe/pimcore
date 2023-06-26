@@ -1,4 +1,4 @@
-# Add your own permissions
+# Add Your Own Permissions
 
 ## Add your permission to the database
 Choose a custom unique name and add it to the `users_permission_definitions` table in your database.
@@ -23,7 +23,7 @@ class AdminController extends PimcoreAdminController
      */
     public function myAdminAction(Request $request): Response
     {
-        /** @var \Pimcore\Bundle\AdminBundle\Security\User\User $user */
+        /** @var \Pimcore\Security\User\User $user */
         $user = $this->getUser();
         $pimcoreUser = $user->getUser();
 

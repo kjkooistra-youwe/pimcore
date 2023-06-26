@@ -54,43 +54,23 @@ abstract class Kernel extends SymfonyKernel
         configureRoutes as protected;
     }
 
-    private const CONFIG_LOCATION = 'config_location';
-
     private BundleCollection $bundleCollection;
 
-    /**
-     * {@inheritdoc}
-     *
-     * @return string
-     */
     public function getProjectDir(): string
     {
         return PIMCORE_PROJECT_ROOT;
     }
 
-    /**
-     * {@inheritdoc}
-     *
-     * @return string
-     */
     public function getCacheDir(): string
     {
         return ($_SERVER['APP_CACHE_DIR'] ?? PIMCORE_SYMFONY_CACHE_DIRECTORY) . '/' . $this->environment;
     }
 
-    /**
-     * {@inheritdoc}
-     *
-     * @return string
-     */
     public function getLogDir(): string
     {
         return PIMCORE_LOG_DIRECTORY;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function registerContainerConfiguration(LoaderInterface $loader): void
     {
         $bundleConfigLocator = new BundleConfigLocator($this);
@@ -116,24 +96,24 @@ abstract class Kernel extends SymfonyKernel
             $containerConfig = ConfigurationHelper::getConfigNodeFromSymfonyTree($container, 'pimcore');
 
             foreach ($configKeysArray as $configKey) {
-                $writeTargetConf = $containerConfig[self::CONFIG_LOCATION][$configKey]['write_target'];
-                $readTargetConf = $containerConfig[self::CONFIG_LOCATION][$configKey]['read_target'] ?? null;
+                $writeTargetConf = $containerConfig[LocationAwareConfigRepository::CONFIG_LOCATION][$configKey][LocationAwareConfigRepository::WRITE_TARGET];
+                $readTargetConf = $containerConfig[LocationAwareConfigRepository::CONFIG_LOCATION][$configKey][LocationAwareConfigRepository::READ_TARGET] ?? null;
 
                 $configDir = null;
                 if($readTargetConf !== null) {
-                    if ($readTargetConf['type'] === LocationAwareConfigRepository::LOCATION_SETTINGS_STORE ||
-                        ($readTargetConf['type'] !== LocationAwareConfigRepository::LOCATION_SYMFONY_CONFIG && $writeTargetConf['type'] !== LocationAwareConfigRepository::LOCATION_SYMFONY_CONFIG)
+                    if ($readTargetConf[LocationAwareConfigRepository::TYPE] === LocationAwareConfigRepository::LOCATION_SETTINGS_STORE ||
+                        ($readTargetConf[LocationAwareConfigRepository::TYPE] !== LocationAwareConfigRepository::LOCATION_SYMFONY_CONFIG && $writeTargetConf[LocationAwareConfigRepository::TYPE] !== LocationAwareConfigRepository::LOCATION_SYMFONY_CONFIG)
                     ) {
                         continue;
                     }
 
-                    if ($readTargetConf['type'] === LocationAwareConfigRepository::LOCATION_SYMFONY_CONFIG && $readTargetConf['options']['directory'] !== null) {
-                        $configDir = rtrim($readTargetConf['options']['directory'], '/\\');
+                    if ($readTargetConf[LocationAwareConfigRepository::TYPE] === LocationAwareConfigRepository::LOCATION_SYMFONY_CONFIG && $readTargetConf[LocationAwareConfigRepository::OPTIONS][LocationAwareConfigRepository::DIRECTORY] !== null) {
+                        $configDir = rtrim($readTargetConf[LocationAwareConfigRepository::OPTIONS][LocationAwareConfigRepository::DIRECTORY], '/\\');
                     }
                 }
 
                 if($configDir === null) {
-                    $configDir = rtrim($writeTargetConf['options']['directory'], '/\\');
+                    $configDir = rtrim($writeTargetConf[LocationAwareConfigRepository::OPTIONS][LocationAwareConfigRepository::DIRECTORY], '/\\');
                 }
                 $configDir = "$configDir/";
                 if (is_dir($configDir)) {
@@ -144,9 +124,6 @@ abstract class Kernel extends SymfonyKernel
         });
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function boot(): void
     {
         if (true === $this->booted) {
@@ -162,9 +139,6 @@ abstract class Kernel extends SymfonyKernel
         parent::boot();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function shutdown(): void
     {
         if (true === $this->booted) {
@@ -175,9 +149,6 @@ abstract class Kernel extends SymfonyKernel
         parent::shutdown();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     protected function initializeContainer(): void
     {
         parent::initializeContainer();
@@ -185,7 +156,6 @@ abstract class Kernel extends SymfonyKernel
         // initialize runtime cache (defined as synthetic service)
         RuntimeCache::getInstance();
 
-        \Pimcore::initLogger();
         \Pimcore\Cache::init();
 
         // on pimcore shutdown
@@ -236,7 +206,6 @@ abstract class Kernel extends SymfonyKernel
      * Creates bundle collection. Use this method to set bundles on the collection
      * early.
      *
-     * @return BundleCollection
      */
     protected function createBundleCollection(): BundleCollection
     {
@@ -246,7 +215,6 @@ abstract class Kernel extends SymfonyKernel
     /**
      * Returns the bundle collection which was used to build the set of used bundles
      *
-     * @return BundleCollection
      */
     public function getBundleCollection(): BundleCollection
     {
@@ -256,7 +224,6 @@ abstract class Kernel extends SymfonyKernel
     /**
      * Registers "core" bundles
      *
-     * @param BundleCollection $collection
      */
     protected function registerCoreBundlesToCollection(BundleCollection $collection): void
     {
@@ -279,7 +246,7 @@ abstract class Kernel extends SymfonyKernel
         // pimcore bundles
         $collection->addBundles([
             new PimcoreCoreBundle(),
-        ], 60);
+        ], -10);
 
         // load development bundles only in matching environments
         if (in_array($this->getEnvironment(), $this->getEnvironmentsForDevBundles(), true)) {
@@ -304,7 +271,6 @@ abstract class Kernel extends SymfonyKernel
      *
      * To be implemented in child classes
      *
-     * @param BundleCollection $collection
      */
     public function registerBundlesToCollection(BundleCollection $collection): void
     {

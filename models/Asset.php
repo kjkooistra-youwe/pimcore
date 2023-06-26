@@ -23,7 +23,6 @@ use League\Flysystem\FilesystemOperator;
 use League\Flysystem\UnableToMoveFile;
 use League\Flysystem\UnableToRetrieveMetadata;
 use Pimcore;
-use Pimcore\Bundle\AdminBundle\System\Config as SystemConfig;
 use Pimcore\Cache;
 use Pimcore\Cache\RuntimeCache;
 use Pimcore\Config;
@@ -39,6 +38,7 @@ use Pimcore\Messenger\AssetUpdateTasksMessage;
 use Pimcore\Messenger\VersionDeleteMessage;
 use Pimcore\Model\Asset\Dao;
 use Pimcore\Model\Asset\Folder;
+use Pimcore\Model\Asset\Image\Thumbnail\Config as ThumbnailConfig;
 use Pimcore\Model\Asset\Listing;
 use Pimcore\Model\Asset\MetaData\ClassDefinition\Data\Data;
 use Pimcore\Model\Asset\MetaData\ClassDefinition\Data\DataDefinitionInterface;
@@ -48,6 +48,7 @@ use Pimcore\Model\Element\Service;
 use Pimcore\Model\Element\Traits\ScheduledTasksTrait;
 use Pimcore\Model\Element\ValidationException;
 use Pimcore\Model\Exception\NotFoundException;
+use Pimcore\SystemSettingsConfig;
 use Pimcore\Tool;
 use Pimcore\Tool\Serialize;
 use Pimcore\Tool\Storage;
@@ -70,21 +71,18 @@ class Asset extends Element\AbstractElement
     /**
      * @internal
      *
-     * @var string
      */
     protected string $type = '';
 
     /**
      * @internal
      *
-     * @var string|null
      */
     protected ?string $filename = null;
 
     /**
      * @internal
      *
-     * @var string|null
      */
     protected ?string $mimetype = null;
 
@@ -98,14 +96,12 @@ class Asset extends Element\AbstractElement
     /**
      * @internal
      *
-     * @var array|null
      */
     protected ?array $versions = null;
 
     /**
      * @internal
      *
-     * @var array
      */
     protected array $metadata = [];
 
@@ -115,34 +111,27 @@ class Asset extends Element\AbstractElement
      *
      * @internal
      *
-     * @var array
      */
     protected array $customSettings = [];
 
     /**
      * @internal
      *
-     * @var bool
      */
     protected bool $hasMetaData = false;
 
     /**
      * @internal
      *
-     * @var Listing|null
      */
     protected ?Listing $siblings = null;
 
     /**
      * @internal
      *
-     * @var bool
      */
     protected bool $dataChanged = false;
 
-    /**
-     * {@inheritdoc}
-     */
     protected function getBlockedVars(): array
     {
         $blockedVars = ['scheduledTasks', 'versions', 'parent', 'stream'];
@@ -168,10 +157,7 @@ class Asset extends Element\AbstractElement
     /**
      * Static helper to get an asset by the passed path
      *
-     * @param string $path
-     * @param array $params
      *
-     * @return static|null
      */
     public static function getByPath(string $path, array $params = []): static|null
     {
@@ -194,9 +180,7 @@ class Asset extends Element\AbstractElement
     /**
      * @internal
      *
-     * @param Asset $asset
      *
-     * @return bool
      */
     protected static function typeMatch(Asset $asset): bool
     {
@@ -280,6 +264,7 @@ class Asset extends Element\AbstractElement
         // create already the real class for the asset type, this is especially for images, because a system-thumbnail
         // (tree) is generated immediately after creating an image
         $type = 'unknown';
+        $tmpFile = null;
         if (array_key_exists('filename', $data) && (array_key_exists('data', $data) || array_key_exists('sourcePath', $data) || array_key_exists('stream', $data))) {
             $mimeType = 'directory';
             $mimeTypeGuessData = null;
@@ -289,7 +274,6 @@ class Asset extends Element\AbstractElement
                 if (array_key_exists('data', $data)) {
                     $filesystem = new Filesystem();
                     $filesystem->dumpFile($tmpFile, $data['data']);
-                    unlink($tmpFile);
                 } else {
                     $streamMeta = stream_get_meta_data($data['stream']);
                     if (file_exists($streamMeta['uri'])) {
@@ -345,6 +329,10 @@ class Asset extends Element\AbstractElement
             $asset->save();
         }
 
+        if ($tmpFile) {
+            unlink($tmpFile);
+        }
+
         return $asset;
     }
 
@@ -375,9 +363,7 @@ class Asset extends Element\AbstractElement
     }
 
     /**
-     * @param array $config
      *
-     * @return Listing
      *
      * @throws Exception
      */
@@ -397,10 +383,7 @@ class Asset extends Element\AbstractElement
     }
 
     /**
-     * @param string $mimeType
-     * @param string $filename
      *
-     * @return string
      *
      * @internal
      */
@@ -435,9 +418,6 @@ class Asset extends Element\AbstractElement
         return $type;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function save(array $parameters = []): static
     {
         $isUpdate = false;
@@ -774,11 +754,7 @@ class Asset extends Element\AbstractElement
     }
 
     /**
-     * @param bool $setModificationDate
-     * @param bool $saveOnlyVersion
      * @param string|null $versionNote version note
-     *
-     * @return null|Version
      *
      * @throws Exception
      */
@@ -806,7 +782,7 @@ class Asset extends Element\AbstractElement
 
             // only create a new version if there is at least 1 allowed
             // or if saveVersion() was called directly (it's a newer version of the asset)
-            $assetsConfig = SystemConfig::get()['assets'];
+            $assetsConfig = SystemSettingsConfig::get()['assets'];
             if ((is_null($assetsConfig['versions']['days'] ?? null) && is_null($assetsConfig['versions']['steps'] ?? null))
                 || (!empty($assetsConfig['versions']['steps']))
                 || !empty($assetsConfig['versions']['days'])
@@ -849,7 +825,6 @@ class Asset extends Element\AbstractElement
     /**
      * Returns the full path of the asset (listener aware)
      *
-     * @return string
      *
      * @internal
      */
@@ -1171,9 +1146,6 @@ class Asset extends Element\AbstractElement
         return $this;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getVersions(): array
     {
         if ($this->versions === null) {
@@ -1200,8 +1172,6 @@ class Asset extends Element\AbstractElement
      *
      * @param bool $keep whether to delete this file on shutdown or not
      *
-     * @return string
-     *
      * @throws Exception
      */
     public function getTemporaryFile(bool $keep = false): string
@@ -1211,8 +1181,6 @@ class Asset extends Element\AbstractElement
 
     /**
      * @internal
-     *
-     * @return string
      *
      * @throws Exception
      */
@@ -1333,10 +1301,8 @@ class Asset extends Element\AbstractElement
     }
 
     /**
-     * @param string $name
      * @param string $type can be "asset", "checkbox", "date", "document", "input", "object", "select" or "textarea"
      * @param mixed $data
-     * @param string|null $language
      *
      * @return $this
      */
@@ -1404,7 +1370,7 @@ class Asset extends Element\AbstractElement
         return $this;
     }
 
-    public function getMetadata(?string $name = null, ?string $language = null, bool $strictMatchLanguage = false, bool $raw = false): array|string|null
+    public function getMetadata(?string $name = null, ?string $language = null, bool $strictMatchLanguage = false, bool $raw = false): mixed
     {
         $preEvent = new AssetEvent($this);
         $preEvent->setArgument('metadata', $this->metadata);
@@ -1466,7 +1432,7 @@ class Asset extends Element\AbstractElement
         return $transformedData;
     }
 
-    protected function getMetadataByName(string $name, ?string $language = null, bool $strictMatchLanguage = false, bool $raw = false): array|string|null
+    protected function getMetadataByName(string $name, ?string $language = null, bool $strictMatchLanguage = false, bool $raw = false): mixed
     {
         if ($language === null) {
             $language = Pimcore::getContainer()->get(LocaleServiceInterface::class)->findLocale();
@@ -1552,9 +1518,6 @@ class Asset extends Element\AbstractElement
         $this->closeStream();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     protected function resolveDependencies(): array
     {
         $dependencies = [parent::resolveDependencies()];
@@ -1706,5 +1669,40 @@ class Asset extends Element\AbstractElement
         }
 
         return $path;
+    }
+
+    /**
+     * @internal
+     *
+     * @throws Exception
+     */
+    public function addThumbnailFileToCache(string $localFile, string $filename, ThumbnailConfig $config): void
+    {
+        //try to get the dimensions with getimagesize because it is much faster than e.g. the Imagick-Adapter
+        if ($imageSize = @getimagesize($localFile)) {
+            $dimensions = [
+                'width' => $imageSize[0],
+                'height' => $imageSize[1],
+            ];
+        } else {
+            //fallback to Default Adapter
+            $image = \Pimcore\Image::getInstance();
+            if ($image->load($localFile)) {
+                $dimensions = [
+                    'width' => $image->getWidth(),
+                    'height' => $image->getHeight(),
+                ];
+            }
+        }
+
+        if (!empty($dimensions)) {
+            $this->getDao()->addToThumbnailCache(
+                $config->getName(),
+                $filename,
+                filesize($localFile),
+                $dimensions['width'],
+                $dimensions['height']
+            );
+        }
     }
 }

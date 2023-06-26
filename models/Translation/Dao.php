@@ -39,8 +39,6 @@ class Dao extends Model\Dao\AbstractDao
     }
 
     /**
-     * @param string $key
-     * @param array|null $languages
      *
      * @throws NotFoundResourceException
      * @throws \Doctrine\DBAL\Exception
@@ -83,6 +81,7 @@ class Dao extends Model\Dao\AbstractDao
         $this->createOrUpdateTable();
 
         $this->updateModificationInfos();
+        $sanitizer = $this->model->getTranslationSanitizer();
 
         $editableLanguages = [];
         if ($this->model->getDomain() != Model\Translation::DOMAIN_ADMIN) {
@@ -104,7 +103,7 @@ class Dao extends Model\Dao\AbstractDao
                         'key' => $this->model->getKey(),
                         'type' => $this->model->getType(),
                         'language' => $language,
-                        'text' => $text,
+                        'text' => $sanitizer->sanitize($text),
                         'modificationDate' => $this->model->getModificationDate(),
                         'creationDate' => $this->model->getCreationDate(),
                         'userOwner' => $this->model->getUserOwner(),
@@ -127,7 +126,6 @@ class Dao extends Model\Dao\AbstractDao
     /**
      * Returns a array containing all available languages
      *
-     * @return array
      */
     public function getAvailableLanguages(): array
     {
@@ -144,7 +142,6 @@ class Dao extends Model\Dao\AbstractDao
     /**
      * Returns a array containing all available domains
      *
-     * @return array
      */
     public function getAvailableDomains(): array
     {
@@ -161,9 +158,7 @@ class Dao extends Model\Dao\AbstractDao
     /**
      * Returns boolean, if the domain table exists & domain registered in config
      *
-     * @param string $domain
      *
-     * @return bool
      */
     public function isAValidDomain(string $domain): bool
     {

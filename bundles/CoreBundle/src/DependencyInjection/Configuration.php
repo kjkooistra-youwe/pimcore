@@ -17,6 +17,7 @@ declare(strict_types=1);
 namespace Pimcore\Bundle\CoreBundle\DependencyInjection;
 
 use Pimcore\Bundle\CoreBundle\DependencyInjection\Config\Processor\PlaceholderProcessor;
+use Pimcore\Config\LocationAwareConfigRepository;
 use Pimcore\Workflow\EventSubscriber\ChangePublishedStateSubscriber;
 use Pimcore\Workflow\EventSubscriber\NotificationSubscriber;
 use Pimcore\Workflow\Notification\NotificationEmailService;
@@ -40,9 +41,6 @@ final class Configuration implements ConfigurationInterface
         $this->placeholders = [];
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getConfigTreeBuilder(): TreeBuilder
     {
         $treeBuilder = new TreeBuilder('pimcore');
@@ -132,8 +130,8 @@ final class Configuration implements ConfigurationInterface
         $this->addGotenbergNode($rootNode);
         $this->addChromiumNode($rootNode);
         $storageNode = ConfigurationHelper::addConfigLocationWithWriteTargetNodes($rootNode, [
-            'image_thumbnails' => '/var/config/image-thumbnails',
-            'video_thumbnails' => '/var/config/video-thumbnails',
+            'image_thumbnails' => '/var/config/image_thumbnails',
+            'video_thumbnails' => '/var/config/video_thumbnails',
             'document_types' => '/var/config/document_types',
             'predefined_properties' => '/var/config/predefined_properties',
             'predefined_asset_metadata' => '/var/config/predefined_asset_metadata',
@@ -143,7 +141,7 @@ final class Configuration implements ConfigurationInterface
             'system_settings' => '/var/config/system_settings',
         ]);
 
-        ConfigurationHelper::addConfigLocationTargetNode($storageNode, 'system_settings', '/var/config/system_settings', ['read_target']);
+        ConfigurationHelper::addConfigLocationTargetNode($storageNode, 'system_settings', '/var/config/system_settings', [LocationAwareConfigRepository::READ_TARGET]);
 
         return $treeBuilder;
     }
@@ -565,12 +563,6 @@ final class Configuration implements ConfigurationInterface
                     ->scalarNode('icc_cmyk_profile')
                         ->info('Absolute path to default ICC CMYK profile (if no embedded profile is given)')
                         ->defaultNull()
-                    ->end()
-                    ->booleanNode('hide_edit_image')
-                        ->defaultFalse()
-                    ->end()
-                    ->booleanNode('disable_tree_preview')
-                        ->defaultTrue()
                     ->end()
                 ->end();
 
@@ -1884,7 +1876,7 @@ final class Configuration implements ConfigurationInterface
                     ->addDefaultsIfNotSet()
                     ->children()
                         ->scalarNode('base_url')
-                            ->defaultValue('gotenberg:3000')
+                            ->defaultValue('http://gotenberg:3000')
                         ->end()
                     ->end()
                 ->end()

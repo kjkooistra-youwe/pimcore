@@ -41,9 +41,6 @@ final class PimcoreCoreExtension extends ConfigurableExtension implements Prepen
         return 'pimcore';
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function loadInternal(array $config, ContainerBuilder $container): void
     {
         // on container build the shutdown handler shouldn't be called
@@ -116,6 +113,7 @@ final class PimcoreCoreExtension extends ConfigurableExtension implements Prepen
         $loader->load('marshaller.yaml');
         $loader->load('message_handler.yaml');
         $loader->load('class_builder.yaml');
+        $loader->load('serializer.yaml');
 
         $this->configureImplementationLoaders($container, $config);
         $this->configureModelFactory($container, $config);
@@ -250,8 +248,6 @@ final class PimcoreCoreExtension extends ConfigurableExtension implements Prepen
 
     /**
      * Allows us to prepend/modify configurations of different extensions
-     *
-     * {@inheritdoc}
      */
     public function prepend(ContainerBuilder $container): void
     {

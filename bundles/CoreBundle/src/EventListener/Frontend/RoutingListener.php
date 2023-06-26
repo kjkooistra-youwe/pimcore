@@ -23,6 +23,7 @@ use Pimcore\Http\Request\Resolver\SiteResolver;
 use Pimcore\Http\RequestHelper;
 use Pimcore\Model\DataObject\ClassDefinition\PreviewGeneratorInterface;
 use Pimcore\Model\Site;
+use Pimcore\SystemSettingsConfig;
 use Pimcore\Tool;
 use Psr\Log\LoggerAwareTrait;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -49,9 +50,6 @@ class RoutingListener implements EventSubscriberInterface
     ) {
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public static function getSubscribedEvents(): array
     {
         return [
@@ -100,10 +98,7 @@ class RoutingListener implements EventSubscriberInterface
     /**
      * Initialize Site
      *
-     * @param Request $request
-     * @param string $path
      *
-     * @return string
      */
     protected function resolveSite(Request $request, string $path): string
     {
@@ -151,8 +146,6 @@ class RoutingListener implements EventSubscriberInterface
     /**
      * Redirect to the main domain if specified
      *
-     * @param RequestEvent $event
-     * @param bool $adminContext
      */
     protected function handleMainDomainRedirect(RequestEvent $event, bool $adminContext = false): void
     {
@@ -194,7 +187,8 @@ class RoutingListener implements EventSubscriberInterface
     {
         $hostRedirect = null;
 
-        $gc = $this->config['general'];
+        $systemConfig = SystemSettingsConfig::get();
+        $gc = $systemConfig['general'];
         if (isset($gc['redirect_to_maindomain']) && $gc['redirect_to_maindomain'] === true && isset($gc['domain']) && $gc['domain'] !== $request->getHost()) {
             $hostRedirect = $gc['domain'];
         }
