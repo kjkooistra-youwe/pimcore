@@ -43,6 +43,20 @@ abstract class Editable extends Model\AbstractModel implements Model\Document\Ed
     protected array $config = [];
 
     /**
+     * The label rendered for the editmode dialog.
+     *
+     * @internal
+     */
+    protected ?string $label = null;
+
+    /**
+     * The description rendered for the editmode dialog.
+     *
+     * @internal
+     */
+    protected ?string $dialogDescription = null;
+
+    /**
      * @internal
      *
      */
@@ -330,6 +344,36 @@ abstract class Editable extends Model\AbstractModel implements Model\Document\Ed
         return $this;
     }
 
+    public function getLabel(): ?string
+    {
+        return $this->label;
+    }
+
+    /**
+     * @return $this
+     */
+    public function setLabel(?string $label): static
+    {
+        $this->label = $label;
+
+        return $this;
+    }
+
+    public function getDialogDescription(): ?string
+    {
+        return $this->dialogDescription;
+    }
+
+    /**
+     * @return $this
+     */
+    public function setDialogDescription(?string $dialogDescription): static
+    {
+        $this->dialogDescription = $dialogDescription;
+
+        return $this;
+    }
+
     public function getRealName(): string
     {
         return $this->realName ?? '';
@@ -513,7 +557,7 @@ abstract class Editable extends Model\AbstractModel implements Model\Document\Ed
         // targeting prefix if configured on the document. hasBlocks() determines if
         // there are any parent blocks for the current element
         $targetGroupEditableName = null;
-        if ($document && class_exists(TargetingDocumentInterface::class) && $document instanceof TargetingDocumentInterface) {
+        if ($document && interface_exists(TargetingDocumentInterface::class) && $document instanceof TargetingDocumentInterface) {
             $targetGroupEditableName = $document->getTargetGroupEditableName($name);
 
             if (!$blockState->hasBlocks()) {
@@ -626,7 +670,7 @@ abstract class Editable extends Model\AbstractModel implements Model\Document\Ed
         // if element not nested inside a hierarchical element (e.g. block), add the
         // targeting prefix if configured on the document. hasBlocks() determines if
         // there are any parent blocks for the current element
-        if (class_exists(TargetingDocumentInterface::class) && $document instanceof TargetingDocumentInterface && !$blockState->hasBlocks()) {
+        if (interface_exists(TargetingDocumentInterface::class) && $document instanceof TargetingDocumentInterface && !$blockState->hasBlocks()) {
             $name = $document->getTargetGroupEditableName($name);
         }
 

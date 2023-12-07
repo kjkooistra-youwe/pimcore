@@ -16,11 +16,13 @@ declare(strict_types=1);
 
 namespace Pimcore\Bundle\CoreBundle\Command;
 
+use Pimcore\Cache;
 use Pimcore\Console\AbstractCommand;
 use Pimcore\DataObject\ClassBuilder\PHPClassDumperInterface;
 use Pimcore\DataObject\ClassBuilder\PHPFieldCollectionClassDumperInterface;
 use Pimcore\DataObject\ClassBuilder\PHPObjectBrickClassDumperInterface;
 use Pimcore\DataObject\ClassBuilder\PHPObjectBrickContainerClassDumperInterface;
+use Pimcore\DataObject\ClassBuilder\PHPSelectOptionsEnumDumperInterface;
 use Pimcore\Model\DataObject;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputInterface;
@@ -41,20 +43,19 @@ class ClassesDefinitionsBuildCommand extends AbstractCommand
         protected PHPFieldCollectionClassDumperInterface $collectionClassDumper,
         protected PHPObjectBrickClassDumperInterface $brickClassDumper,
         protected PHPObjectBrickContainerClassDumperInterface $brickContainerClassDumper,
+        protected PHPSelectOptionsEnumDumperInterface $selectOptionsEnumDumper,
     ) {
         parent::__construct();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $cacheStatus = \Pimcore\Cache::isEnabled();
-        \Pimcore\Cache::disable();
+        $cacheStatus = Cache::isEnabled();
+        Cache::disable();
         $objectClassesFolders = array_unique([PIMCORE_CLASS_DEFINITION_DIRECTORY, PIMCORE_CUSTOM_CONFIGURATION_CLASS_DEFINITION_DIRECTORY]);
 
         foreach ($objectClassesFolders as $objectClassesFolder) {
             $files = glob($objectClassesFolder.'/*.php');
-
-            $changes = [];
 
             foreach ($files as $file) {
                 $class = include $file;
@@ -76,8 +77,13 @@ class ClassesDefinitionsBuildCommand extends AbstractCommand
             $this->collectionClassDumper->dumpPHPClass($fcDefinition);
         }
 
+        $selectOptionConfigurations = new DataObject\SelectOptions\Config\Listing();
+        foreach ($selectOptionConfigurations as $selectOptionConfiguration) {
+            $this->selectOptionsEnumDumper->dumpPHPEnum($selectOptionConfiguration);
+        }
+
         if ($cacheStatus) {
-            \Pimcore\Cache::enable();
+            Cache::enable();
         }
 
         return 0;

@@ -219,7 +219,7 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
                 // create a thumbnail first
                 $autoName = false;
 
-                $thumbConfig = $image->getThumbnailConfig($thumbnailName);
+                $thumbConfig = $image->getThumbnail($thumbnailName)->getConfig();
                 if (!$thumbConfig && $this->cropPercent) {
                     $thumbConfig = new Asset\Image\Thumbnail\Config();
                 }
@@ -428,7 +428,7 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
     {
         $image = $this->getImage();
         if ($image instanceof Asset\Image) {
-            $thumbConfig = $image->getThumbnailConfig($conf);
+            $thumbConfig = $image->getThumbnail($conf)->getConfig();
             if ($thumbConfig && $this->cropPercent) {
                 $this->applyCustomCropping($thumbConfig);
                 $thumbConfig->generateAutoName();
@@ -686,5 +686,21 @@ class Image extends Model\Document\Editable implements IdRewriterInterface, Edit
         }
 
         return $finalVars;
+    }
+
+    /**
+     * @internal
+     *
+     * https://github.com/pimcore/pimcore/issues/15932
+     * used for non-nullable properties stored with null
+     *
+     * @TODO: Remove in Pimcore 12
+     *
+     */
+    public function __unserialize(array $data): void
+    {
+        foreach (get_object_vars($this) as $property => $value) {
+            $this->$property = $data["\0*\0".$property] ?? $value;
+        }
     }
 }
