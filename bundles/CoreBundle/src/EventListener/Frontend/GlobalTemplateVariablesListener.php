@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 namespace Pimcore\Bundle\CoreBundle\EventListener\Frontend;
 
+use Exception;
 use Pimcore\Bundle\CoreBundle\EventListener\Traits\PimcoreContextAwareTrait;
 use Pimcore\Http\Request\Resolver\DocumentResolver;
 use Pimcore\Http\Request\Resolver\EditmodeResolver;
@@ -27,6 +28,7 @@ use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Twig\Environment;
+use function count;
 
 /**
  * @internal
@@ -68,13 +70,17 @@ class GlobalTemplateVariablesListener implements EventSubscriberInterface, Logge
             $this->twig->addGlobal('document', $this->documentResolver->getDocument($request));
             $this->twig->addGlobal('editmode', $this->editmodeResolver->isEditmode($request));
             $this->globalsStack[] = $globals;
-        } catch (\Exception) {
+        } catch (Exception) {
             $this->globalsStack[] = false;
         }
     }
 
     public function onKernelResponse(ResponseEvent $event): void
     {
+        if (!$this->matchesPimcoreContext($event->getRequest(), PimcoreContextResolver::CONTEXT_DEFAULT)) {
+            return;
+        }
+
         if (count($this->globalsStack)) {
             $globals = array_pop($this->globalsStack);
             if ($globals !== false) {

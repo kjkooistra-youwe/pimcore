@@ -16,6 +16,8 @@ declare(strict_types=1);
 
 namespace Pimcore\Model\Document\Editable;
 
+use InvalidArgumentException;
+use Pimcore;
 use Pimcore\Bundle\PersonalizationBundle\Model\Document\Targeting\TargetingDocumentInterface;
 use Pimcore\Bundle\PersonalizationBundle\Targeting\Document\DocumentTargetingConfigurator;
 use Pimcore\Document\Editable\EditableHandler;
@@ -25,6 +27,10 @@ use Pimcore\Model\Asset;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\Document;
 use Pimcore\Model\Element;
+use function array_key_exists;
+use function in_array;
+use function is_array;
+use function is_string;
 
 /**
  * @method \Pimcore\Model\Document\Editable\Dao getDao()
@@ -92,7 +98,7 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
     public function frontend()
     {
         // TODO inject services via DI when editables are built through container
-        $container = \Pimcore::getContainer();
+        $container = Pimcore::getContainer();
         $editableHandler = $container->get(EditableHandler::class);
 
         if (empty($this->config['controller']) && !empty($this->config['template'])) {
@@ -155,11 +161,27 @@ class Renderlet extends Model\Document\Editable implements IdRewriterInterface, 
      */
     public function setDataFromResource(mixed $data): static
     {
-        $data = \Pimcore\Tool\Serialize::unserialize($data);
+        if (is_array($data)) {
+            $processedData = $data;
+        } elseif (is_string($data)) {
+            $unserializedData = \Pimcore\Tool\Serialize::unserialize($data);
+            if (!is_array($unserializedData)) {
+                throw new InvalidArgumentException('Unserialized data must be an array.');
+            }
+            $processedData = $unserializedData;
+        } else {
+            throw new InvalidArgumentException('Data must be a string or an array.');
+        }
 
-        $this->id = $data['id'];
-        $this->type = (string) $data['type'];
-        $this->subtype = $data['subtype'];
+        foreach (['id', 'type', 'subtype'] as $key) {
+            if (!array_key_exists($key, $processedData)) {
+                throw new InvalidArgumentException("Key '{$key}' is missing in the data array.");
+            }
+        }
+
+        $this->id = $processedData['id'];
+        $this->type = (string) $processedData['type'];
+        $this->subtype = $processedData['subtype'];
 
         $this->setElement();
 

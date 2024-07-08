@@ -15,6 +15,8 @@
 
 namespace Pimcore\Model\Asset\Image;
 
+use Exception;
+use Pimcore;
 use Pimcore\Event\AssetEvents;
 use Pimcore\Event\FrontendEvents;
 use Pimcore\Logger;
@@ -23,8 +25,11 @@ use Pimcore\Model\Asset\Image;
 use Pimcore\Model\Asset\Image\Thumbnail\Config;
 use Pimcore\Model\Asset\Thumbnail\ImageThumbnailTrait;
 use Pimcore\Model\Exception\NotFoundException;
+use Pimcore\Model\Exception\ThumbnailFormatNotSupportedException;
+use Pimcore\Model\Exception\ThumbnailMaxScalingFactorException;
 use Pimcore\Tool;
 use Symfony\Component\EventDispatcher\GenericEvent;
+use function is_string;
 
 final class Thumbnail implements ThumbnailInterface
 {
@@ -52,15 +57,17 @@ final class Thumbnail implements ThumbnailInterface
         $frontend = $args['frontend'] ?? \Pimcore\Tool::isFrontend();
 
         $pathReference = null;
-        if ($this->getConfig()) {
-            if ($this->useOriginalFile($this->asset->getFilename()) && $this->getConfig()->isSvgTargetFormatPossible()) {
-                // we still generate the raster image, to get the final size of the thumbnail
-                // we use getRealFullPath() here, to avoid double encoding (getFullPath() returns already encoded path)
-                $pathReference = [
-                    'src' => $this->asset->getRealFullPath(),
-                    'type' => 'asset',
-                ];
-            }
+        if (
+            $this->getConfig() &&
+            $this->useOriginalFile($this->asset->getFilename()) &&
+            $this->getConfig()->isSvgTargetFormatPossible()
+        ) {
+            // we still generate the raster image, to get the final size of the thumbnail
+            // we use getRealFullPath() here, to avoid double encoding (getFullPath() returns already encoded path)
+            $pathReference = [
+                'src' => $this->asset->getRealFullPath(),
+                'type' => 'asset',
+            ];
         }
 
         if (!$pathReference) {
@@ -78,7 +85,7 @@ final class Thumbnail implements ThumbnailInterface
                 'pathReference' => $pathReference,
                 'frontendPath' => $path,
             ]);
-            \Pimcore::getEventDispatcher()->dispatch($event, FrontendEvents::ASSET_IMAGE_THUMBNAIL);
+            Pimcore::getEventDispatcher()->dispatch($event, FrontendEvents::ASSET_IMAGE_THUMBNAIL);
             $path = $event->getArgument('frontendPath');
         }
 
@@ -88,7 +95,7 @@ final class Thumbnail implements ThumbnailInterface
     protected function hasListeners(string $eventName): bool
     {
         if (!isset(self::$hasListenersCache[$eventName])) {
-            self::$hasListenersCache[$eventName] = \Pimcore::getEventDispatcher()->hasListeners($eventName);
+            self::$hasListenersCache[$eventName] = Pimcore::getEventDispatcher()->hasListeners($eventName);
         }
 
         return self::$hasListenersCache[$eventName];
@@ -96,20 +103,19 @@ final class Thumbnail implements ThumbnailInterface
 
     protected function useOriginalFile(string $filename): bool
     {
-        if ($this->getConfig()) {
-            if (!$this->getConfig()->isRasterizeSVG() && preg_match("@\.svgz?$@", $filename)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->getConfig() && preg_match("@\.svgz?$@", $filename) && !$this->getConfig()->isRasterizeSVG();
     }
 
     /**
+     * @throws ThumbnailFormatNotSupportedException
+     * @throws ThumbnailMaxScalingFactorException
+     *
      * @internal
      */
     public function generate(bool $deferredAllowed = true): void
     {
+        $this->validate();
+
         $deferred = false;
         $generated = false;
 
@@ -124,7 +130,7 @@ final class Thumbnail implements ThumbnailInterface
                 try {
                     $deferred = $deferredAllowed && $this->deferred;
                     $this->pathReference = Thumbnail\Processor::process($this->asset, $this->config, null, $deferred, $generated);
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     Logger::error("Couldn't create thumbnail of image " . $this->asset->getRealFullPath() . ': ' . $e);
                 }
             }
@@ -142,7 +148,7 @@ final class Thumbnail implements ThumbnailInterface
                 'deferred' => $deferred,
                 'generated' => $generated,
             ]);
-            \Pimcore::getEventDispatcher()->dispatch($event, AssetEvents::IMAGE_THUMBNAIL);
+            Pimcore::getEventDispatcher()->dispatch($event, AssetEvents::IMAGE_THUMBNAIL);
         }
     }
 
@@ -221,7 +227,7 @@ final class Thumbnail implements ThumbnailInterface
             $options['previewDataUri'] =  $image->getLowQualityPreviewDataUri() ?: $emptyGif;
         }
 
-        $isAutoFormat = $thumbConfig instanceof Config ? strtolower($thumbConfig->getFormat()) === 'source' : false;
+        $isAutoFormat = $thumbConfig instanceof Config && strtolower($thumbConfig->getFormat()) === 'source';
 
         if ($isAutoFormat) {
             // ensure the default image is not WebP
@@ -260,7 +266,7 @@ final class Thumbnail implements ThumbnailInterface
 
         // currently only max-width is supported, the key of the media is WIDTHw (eg. 400w) according to the srcset specification
         ksort($mediaConfigs, SORT_NUMERIC);
-        array_push($mediaConfigs, $thumbConfig->getItems()); //add the default config at the end - picturePolyfill v4
+        $mediaConfigs[] = $thumbConfig->getItems(); //add the default config at the end - picturePolyfill v4
 
         foreach ($mediaConfigs as $mediaQuery => $config) {
             $thumbConfig->setItems($config);
@@ -292,7 +298,7 @@ final class Thumbnail implements ThumbnailInterface
         if (isset($options['previewDataUri'])) {
             $attributes['src'] = $options['previewDataUri'];
         } else {
-            $path = $this->getPath();
+            $path = ($options['useFrontendPath'] ?? false) ? $this->getFrontendPath() : $this->getPath();
             $attributes['src'] = $this->addCacheBuster($path, $options, $image);
         }
 
@@ -326,7 +332,10 @@ final class Thumbnail implements ThumbnailInterface
         }
 
         // get copyright from asset
-        if ($image->getMetadata('copyright') && (!isset($options['disableAutoCopyright']) || !$options['disableAutoCopyright'])) {
+        if (
+            (!isset($options['disableAutoCopyright']) || !$options['disableAutoCopyright']) &&
+            $image->getMetadata('copyright')
+        ) {
             if (!empty($altText)) {
                 $altText .= ' | ';
             }
@@ -372,11 +381,15 @@ final class Thumbnail implements ThumbnailInterface
     /**
      *
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function getMedia(string $name, int $highRes = 1): ?ThumbnailInterface
     {
         $thumbConfig = $this->getConfig();
+        if ($thumbConfig === null) {
+            return null;
+        }
+
         $mediaConfigs = $thumbConfig->getMedias();
 
         if (isset($mediaConfigs[$name])) {
@@ -386,12 +399,11 @@ final class Thumbnail implements ThumbnailInterface
             $thumbConfigRes->setMedias([]);
             /** @var Image $asset */
             $asset = $this->getAsset();
-            $thumb = $asset->getThumbnail($thumbConfigRes);
 
-            return $thumb;
-        } else {
-            throw new \Exception("Media query '" . $name . "' doesn't exist in thumbnail configuration: " . $thumbConfig->getName());
+            return $asset->getThumbnail($thumbConfigRes);
         }
+
+        throw new Exception("Media query '" . $name . "' doesn't exist in thumbnail configuration: " . $thumbConfig->getName());
     }
 
     /**
@@ -434,11 +446,32 @@ final class Thumbnail implements ThumbnailInterface
             // encode comma in thumbnail path as srcset is a comma separated list
             $srcSetValues[] = str_replace(',', '%2C', $this->addCacheBuster($thumb . ' ' . $descriptor, $options, $image));
 
-            if ($this->useOriginalFile($this->asset->getFilename()) && $this->getConfig()->isSvgTargetFormatPossible()) {
+            if (
+                $this->useOriginalFile($this->asset->getFilename()) &&
+                $this->getConfig()?->isSvgTargetFormatPossible()
+            ) {
                 break;
             }
         }
 
         return implode(', ', $srcSetValues);
+    }
+
+    /**
+     * @throws ThumbnailFormatNotSupportedException
+     * @throws ThumbnailMaxScalingFactorException
+     */
+    private function validate(): void
+    {
+        if(!$this->asset || !$this->config) {
+            return;
+        }
+        if (!$this->checkAllowedFormats($this->config->getFormat(), $this->asset)) {
+            throw new ThumbnailFormatNotSupportedException();
+        }
+
+        if (!$this->checkMaxScalingFactor($this->config->getHighResolution())) {
+            throw new ThumbnailMaxScalingFactorException();
+        }
     }
 }

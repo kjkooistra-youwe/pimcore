@@ -21,6 +21,7 @@ use Pimcore\Model\DataObject\ClassDefinition\Data\LazyLoadingSupportInterface;
 use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\DataObject\Localizedfield;
 use Pimcore\Model\DataObject\ObjectAwareFieldInterface;
+use function in_array;
 
 /**
  * @method Dao getDao()
@@ -31,7 +32,7 @@ abstract class AbstractData extends Model\AbstractModel implements Model\DataObj
     use Model\DataObject\Traits\LazyLoadedRelationTrait;
     use Model\Element\Traits\DirtyIndicatorTrait;
 
-    protected int $index;
+    protected int $index = 0;
 
     protected ?string $fieldname = null;
 

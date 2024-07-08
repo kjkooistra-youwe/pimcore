@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 namespace Pimcore\Model\Element;
 
+use __PHP_Incomplete_Class;
 use DeepCopy\DeepCopy;
 use DeepCopy\Filter\Doctrine\DoctrineCollectionFilter;
 use DeepCopy\Filter\SetNullFilter;
@@ -23,6 +24,7 @@ use DeepCopy\Matcher\PropertyNameMatcher;
 use DeepCopy\Matcher\PropertyTypeMatcher;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Query\QueryBuilder as DoctrineQueryBuilder;
+use Exception;
 use League\Csv\EscapeFormula;
 use Pimcore;
 use Pimcore\Db;
@@ -44,9 +46,20 @@ use Pimcore\Model\Element\DeepCopy\PimcoreClassDefinitionReplaceFilter;
 use Pimcore\Model\Element\DeepCopy\UnmarshalMatcher;
 use Pimcore\Model\Tool\TmpStore;
 use Pimcore\Tool\Serialize;
+use ReflectionProperty;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Contracts\Translation\TranslatorInterface;
+use Throwable;
+use UnitEnum;
+use function count;
+use function in_array;
+use function is_array;
+use function is_null;
+use function is_object;
+use function is_scalar;
+use function is_string;
+use function strlen;
 
 /**
  * @method \Pimcore\Model\Element\Dao getDao()
@@ -81,7 +94,7 @@ class Service extends Model\AbstractModel
     /**
      * @internal
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public static function getTypePath(ElementInterface $element): string
     {
@@ -96,7 +109,7 @@ class Service extends Model\AbstractModel
 
         $type = $element->getType();
         if ($type !== DataObject::OBJECT_TYPE_FOLDER) {
-            $type = self::getElementType($element) ?? throw new \Exception('unknown type');
+            $type = self::getElementType($element) ?? throw new Exception('unknown type');
         }
         $path .= '/' . $type;
 
@@ -106,7 +119,7 @@ class Service extends Model\AbstractModel
     /**
      * @internal
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public static function getSortIndexPath(ElementInterface $element): string
     {
@@ -292,7 +305,7 @@ class Service extends Model\AbstractModel
     /**
      *
      *
-     * @throws \Exception
+     * @throws Exception
      *
      * @internal
      */
@@ -304,7 +317,7 @@ class Service extends Model\AbstractModel
             foreach ($data as $advancedElement) {
                 if (!$advancedElement instanceof DataObject\Data\ObjectMetadata
                     && !$advancedElement instanceof DataObject\Data\ElementMetadata) {
-                    throw new \Exception('only supported for advanced many-to-many (+object) relations');
+                    throw new Exception('only supported for advanced many-to-many (+object) relations');
                 }
 
                 $elementId = null;
@@ -375,7 +388,7 @@ class Service extends Model\AbstractModel
     /**
      *
      *
-     * @throws \Exception
+     * @throws Exception
      *
      * @internal
      */
@@ -606,8 +619,9 @@ class Service extends Model\AbstractModel
     }
 
     /**
-     * @internal
+     * @todo remove in pimcore/pimcore 12.0
      *
+     * @internal
      *
      */
     public static function gridElementData(ElementInterface $element): array
@@ -716,7 +730,7 @@ class Service extends Model\AbstractModel
      */
     public static function renewReferences(mixed $data, bool $initial = true, string $key = null): mixed
     {
-        if ($data instanceof \__PHP_Incomplete_Class) {
+        if ($data instanceof __PHP_Incomplete_Class) {
             Logger::err(sprintf('Renew References: Cannot read data (%s) of incomplete class.', is_null($key) ? 'not available' : $key));
 
             return null;
@@ -730,7 +744,7 @@ class Service extends Model\AbstractModel
             return $data;
         }
         if (is_object($data)) {
-            if ($data instanceof \UnitEnum) {
+            if ($data instanceof UnitEnum) {
                 return $data;
             }
 
@@ -765,7 +779,7 @@ class Service extends Model\AbstractModel
                 foreach ($properties as $name => $value) {
                     //do not renew object reference of ObjectAwareFieldInterface - as object might point to a
                     //specific version of the object and must not be reloaded with DB version of object
-                    if (($data instanceof ObjectAwareFieldInterface || $data instanceof DataObject\Localizedfield) && $name === 'object') {
+                    if ($data instanceof ObjectAwareFieldInterface && $name === 'object') {
                         continue;
                     }
 
@@ -803,7 +817,7 @@ class Service extends Model\AbstractModel
         // correct wrong path (root-node problem)
         $path = str_replace('//', '/', $path);
 
-        if (str_contains($path, '%')) {
+        if (str_contains($path, '%') && mb_check_encoding(rawurldecode($path), 'UTF-8')) {
             $path = rawurldecode($path);
         }
 
@@ -843,13 +857,13 @@ class Service extends Model\AbstractModel
     /**
      *
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public static function createFolderByPath(string $path, array $options = []): Asset\Folder|DataObject\Folder|Document\Folder|null
     {
         $calledClass = static::class;
         if ($calledClass === __CLASS__) {
-            throw new \Exception('This method must be called from a extended class. e.g Asset\\Service, DataObject\\Service, Document\\Service');
+            throw new Exception('This method must be called from a extended class. e.g Asset\\Service, DataObject\\Service, Document\\Service');
         }
 
         $type = str_replace('\Service', '', $calledClass);
@@ -969,7 +983,7 @@ class Service extends Model\AbstractModel
             'key' => $key,
             'type' => $type,
         ]);
-        \Pimcore::getEventDispatcher()->dispatch($event, SystemEvents::SERVICE_PRE_GET_VALID_KEY);
+        Pimcore::getEventDispatcher()->dispatch($event, SystemEvents::SERVICE_PRE_GET_VALID_KEY);
         $key = trim($event->getArgument('key'));
 
         // replace all control/format/private/surrogate/unassigned and 4 byte unicode characters
@@ -1019,7 +1033,7 @@ class Service extends Model\AbstractModel
      *
      *
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public static function getUniqueKey(ElementInterface $element, int $nr = 0): ?string
     {
@@ -1127,9 +1141,9 @@ class Service extends Model\AbstractModel
             public function matches($object, $property): bool
             {
                 try {
-                    $reflectionProperty = new \ReflectionProperty($object, $property);
+                    $reflectionProperty = new ReflectionProperty($object, $property);
                     $myValue = $reflectionProperty->getValue($object);
-                } catch (\Throwable) {
+                } catch (Throwable) {
                     return false;
                 }
 
@@ -1272,7 +1286,6 @@ class Service extends Model\AbstractModel
 
     public static function getElementFromSession(string $type, int $elementId, string $sessionId, ?string $postfix = ''): Asset|Document|AbstractObject|null
     {
-        $element = null;
         $tmpStoreKey = self::getSessionKey($type, $elementId, $sessionId, $postfix);
 
         $tmpStore = TmpStore::get($tmpStoreKey);
@@ -1286,7 +1299,7 @@ class Service extends Model\AbstractModel
                     'conversion' => 'unmarshal',
                 ];
 
-                $copier = Self::getDeepCopyInstance($element, $context);
+                $copier = self::getDeepCopyInstance($element, $context);
 
                 if ($element instanceof Concrete) {
                     $copier->addFilter(
@@ -1307,7 +1320,7 @@ class Service extends Model\AbstractModel
             }
         }
 
-        return $element;
+        return null;
     }
 
     /**
@@ -1424,7 +1437,7 @@ class Service extends Model\AbstractModel
             'context' => $context,
         ]);
 
-        \Pimcore::getEventDispatcher()->dispatch($event, SystemEvents::SERVICE_PRE_GET_DEEP_COPY);
+        Pimcore::getEventDispatcher()->dispatch($event, SystemEvents::SERVICE_PRE_GET_DEEP_COPY);
 
         return $event->getArgument('copier');
     }

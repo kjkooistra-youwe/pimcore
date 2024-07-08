@@ -17,6 +17,7 @@ declare(strict_types=1);
 namespace Pimcore\Model\DataObject\SelectOptions\Config\Listing;
 
 use Pimcore\Model\DataObject\SelectOptions\Config;
+use function count;
 
 /**
  * @internal
@@ -28,7 +29,7 @@ class Dao extends Config\Dao
     public function loadList(): array
     {
         $configs = [];
-        foreach ($this->loadIdList() as $id) {
+        foreach ($this->loadIdListByReadTargets() as $id) {
             $configs[] = Config::getById($id);
         }
 

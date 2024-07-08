@@ -17,7 +17,8 @@ declare(strict_types=1);
 
 namespace Pimcore\Document;
 
-use Pimcore\Document\Renderer\DocumentRenderer;
+use Exception;
+use Pimcore\Document\Renderer\DocumentRendererInterface;
 use Pimcore\Http\Request\Resolver\StaticPageResolver;
 use Pimcore\Logger;
 use Pimcore\Model\Document;
@@ -28,8 +29,11 @@ use Symfony\Component\Lock\LockFactory;
 
 class StaticPageGenerator
 {
-    public function __construct(protected DocumentRenderer $documentRenderer, private LockFactory $lockFactory, protected SystemSettingsConfig $settingsConfig)
-    {
+    public function __construct(
+        protected DocumentRendererInterface $documentRenderer,
+        private LockFactory $lockFactory,
+        protected SystemSettingsConfig $settingsConfig
+    ) {
     }
 
     public function getStoragePath(Document\PageSnippet $document): string
@@ -95,7 +99,7 @@ class StaticPageGenerator
             }
 
             $storage->write($storagePath, $response);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Logger::debug('Error generating static Page ' . $storagePath .': ' . $e->getMessage());
 
             return false;
