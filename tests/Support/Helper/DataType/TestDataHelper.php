@@ -35,11 +35,6 @@ use Pimcore\Tests\Support\Helper\AbstractTestDataHelper;
 use Pimcore\Tests\Support\Util\TestHelper;
 use Pimcore\Tool\Authentication;
 use TypeError;
-use function array_slice;
-use function count;
-use function get_class;
-use function is_array;
-use function is_null;
 
 class TestDataHelper extends AbstractTestDataHelper
 {
@@ -153,6 +148,18 @@ class TestDataHelper extends AbstractTestDataHelper
             $expected->format('Y-m-d'),
             $value->format('Y-m-d')
         );
+    }
+
+    public function assertDatePeriod(Concrete $object, string $field, int $seed = 1): void
+    {
+        $getter = 'get' . ucfirst($field);
+
+        /** @var \Carbon\CarbonPeriod $value */
+        $value = $object->$getter();
+
+        $expected = new \Carbon\CarbonPeriod('2018-04-21', '3 days', '2018-04-27');
+
+        $this->assertIsEqual($object, $field, $expected, $value);
     }
 
     public function assertEmail(Concrete $object, string $field, int $seed = 1): void
@@ -1015,6 +1022,15 @@ class TestDataHelper extends AbstractTestDataHelper
         $date->setDate(2000, 12, 24);
 
         $object->$setter($date);
+    }
+
+    public function fillDateRange(Concrete $object, string $field, int $seed = 1): void
+    {
+        $setter = 'set' . ucfirst($field);
+
+        $period = new \Carbon\CarbonPeriod('2018-04-21', '3 days', '2018-04-27');
+
+        $object->$setter($period);
     }
 
     public function fillEmail(Concrete $object, string $field, int $seed = 1): void

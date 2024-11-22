@@ -20,7 +20,6 @@ use Exception;
 use Pimcore\Model\DataObject\ClassDefinition;
 use Pimcore\Model\DataObject\Classificationstore;
 use Pimcore\Tests\Support\Test\ModelTestCase;
-use function count;
 
 abstract class AbstractClassificationStoreTest extends ModelTestCase
 {
@@ -128,6 +127,10 @@ abstract class AbstractClassificationStoreTest extends ModelTestCase
                         break;
                     case 'date':
                         $definition = new ClassDefinition\Data\Date();
+
+                        break;
+                    case 'dateRange':
+                        $definition = new ClassDefinition\Data\DateRange();
 
                         break;
                     case 'datetime':

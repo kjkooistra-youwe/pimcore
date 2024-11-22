@@ -30,7 +30,6 @@ use Pimcore\Model\Exception\ThumbnailFormatNotSupportedException;
 use Pimcore\Tool\Storage;
 use Symfony\Component\EventDispatcher\GenericEvent;
 use Symfony\Component\Lock\LockFactory;
-use function is_string;
 
 /**
  * @property Model\Asset\Document|null $asset
@@ -145,8 +144,9 @@ final class ImageThumbnail implements ImageThumbnailInterface
                 try {
                     $converter = \Pimcore\Document::getInstance();
                     $converter->load($this->asset);
-                    $converter->saveImage($tempFile, $this->page);
-                    $storage->write($cacheFilePath, file_get_contents($tempFile));
+                    if (false !== $converter->saveImage($tempFile, $this->page)) {
+                        $storage->write($cacheFilePath, file_get_contents($tempFile));
+                    }
                 } finally {
                     $lock->release();
                 }

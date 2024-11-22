@@ -28,10 +28,6 @@ use Symfony\Component\Translation\MessageCatalogueInterface;
 use Symfony\Component\Translation\TranslatorBagInterface;
 use Symfony\Contracts\Translation\LocaleAwareInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
-use function array_key_exists;
-use function call_user_func_array;
-use function get_class;
-use function strlen;
 
 class Translator implements TranslatorInterface, TranslatorBagInterface, LocaleAwareInterface, WarmableInterface
 {
@@ -289,10 +285,11 @@ class Translator implements TranslatorInterface, TranslatorBagInterface, LocaleA
                 }
 
                 if ($fallbackValue && $normalizedId != $fallbackValue) {
+                    $isIntl = $catalogue->defines($normalizedId, $domain . $catalogue::INTL_DOMAIN_SUFFIX);
                     // update fallback value in original catalogue otherwise multiple calls to the same id will not work
-                    $this->getCatalogue($locale)->set($normalizedId, $fallbackValue, $domain);
+                    $this->getCatalogue($locale)->set($normalizedId, $fallbackValue, $domain . ($isIntl ? $catalogue::INTL_DOMAIN_SUFFIX : ''));
 
-                    return strtr($fallbackValue, $parameters);
+                    return $this->translator->trans($normalizedId, $parameters, $domain, $locale);
                 }
             }
         }

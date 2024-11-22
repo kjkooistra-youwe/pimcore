@@ -17,14 +17,10 @@ declare(strict_types=1);
 namespace Pimcore\Model\DataObject\ClassDefinition\Data;
 
 use Exception;
-use Pimcore\Cache;
-use Pimcore\Cache\RuntimeCache;
-use Pimcore\Logger;
 use Pimcore\Model\DataObject;
 use Pimcore\Model\DataObject\ClassDefinition\Data;
 use Pimcore\Model\Element\ValidationException;
 use Pimcore\Normalizer\NormalizerInterface;
-use function is_array;
 
 class QuantityValueRange extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface, EqualComparisonInterface, VarExporterInterface, NormalizerInterface
 {
@@ -290,19 +286,20 @@ class QuantityValueRange extends Data implements ResourcePersistenceAwareInterfa
             throw new ValidationException('Expected an instance of QuantityValueRange');
         }
 
+        $minimum = $data?->getMinimum();
+        $maximum = $data?->getMaximum();
+
         if ($omitMandatoryCheck === false && $this->getMandatory()
             && ($data === null
-                || $data->getMinimum() === null
-                || $data->getMaximum() === null
+                || $minimum === null
+                || $maximum === null
                 || $data->getUnitId() === null
             )
         ) {
             throw new ValidationException(sprintf('Empty mandatory field [ %s ]', $fieldName));
         }
 
-        if (!empty($data)) {
-            $minimum = $data->getMinimum();
-            $maximum = $data->getMaximum();
+        if ($minimum || $maximum) {
 
             if (!is_numeric($minimum) || !is_numeric($maximum)) {
                 throw new ValidationException(sprintf('Invalid dimension unit data: %s', $fieldName));
@@ -325,42 +322,10 @@ class QuantityValueRange extends Data implements ResourcePersistenceAwareInterfa
             return;
         }
 
-        $table = null;
-
-        try {
-            if (RuntimeCache::isRegistered(DataObject\QuantityValue\Unit::CACHE_KEY)) {
-                $table = RuntimeCache::get(DataObject\QuantityValue\Unit::CACHE_KEY);
-            }
-
-            if (!is_array($table)) {
-                $table = Cache::load(DataObject\QuantityValue\Unit::CACHE_KEY);
-
-                if (is_array($table)) {
-                    RuntimeCache::set(DataObject\QuantityValue\Unit::CACHE_KEY, $table);
-                }
-            }
-
-            if (!is_array($table)) {
-                $table = [];
-                $list = new DataObject\QuantityValue\Unit\Listing();
-                $list->setOrderKey(['baseunit', 'factor', 'abbreviation']);
-                $list->setOrder(['ASC', 'ASC', 'ASC']);
-
-                foreach ($list->getUnits() as $item) {
-                    $table[$item->getId()] = $item;
-                }
-
-                Cache::save($table, DataObject\QuantityValue\Unit::CACHE_KEY, [], null, 995, true);
-                RuntimeCache::set(DataObject\QuantityValue\Unit::CACHE_KEY, $table);
-            }
-        } catch (Exception $e) {
-            Logger::error((string) $e);
-        }
+        $table = DataObject\QuantityValue\Service::getQuantityValueUnitsTable();
 
         if (is_array($table)) {
             $this->validUnits = [];
-
-            /** @var DataObject\QuantityValue\Unit $unit */
             foreach ($table as $unit) {
                 $this->validUnits[] = $unit->getId();
             }

@@ -23,14 +23,15 @@ use Pimcore\Model\DataObject\Concrete;
 use Pimcore\Model\DataObject\Fieldcollection\Definition;
 use Pimcore\Normalizer\NormalizerInterface;
 use Pimcore\Tool\Serialize;
-use function is_array;
 
 class Table extends Data implements ResourcePersistenceAwareInterface, QueryResourcePersistenceAwareInterface, EqualComparisonInterface, VarExporterInterface, NormalizerInterface
 {
     use DataObject\Traits\SimpleComparisonTrait;
     use DataObject\Traits\SimpleNormalizerTrait;
     use DataObject\Traits\DataHeightTrait;
-    use DataObject\Traits\DataWidthTrait;
+    use DataObject\Traits\DataWidthTrait{
+        setWidth as protected setWidthTrait;
+    }
 
     /**
      * @internal
@@ -72,6 +73,15 @@ class Table extends Data implements ResourcePersistenceAwareInterface, QueryReso
      *
      */
     public array $columnConfig = [];
+
+    /**
+     * @internal
+     *
+     */
+    public function setWidth(int|string|null $width): static
+    {
+        return $this->setWidthTrait($width ?: 320);
+    }
 
     public function getCols(): ?int
     {

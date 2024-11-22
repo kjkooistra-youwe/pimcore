@@ -32,16 +32,6 @@ use Pimcore\Model\DataObject\ClassDefinition\Data\Relations\AbstractRelations;
 use Pimcore\Model\DataObject\Exception\InheritanceParentNotFoundException;
 use Pimcore\Model\Element\DirtyIndicatorInterface;
 use Pimcore\SystemSettingsConfig;
-use function array_key_exists;
-use function array_merge;
-use function call_user_func_array;
-use function get_called_class;
-use function get_class;
-use function in_array;
-use function is_array;
-use function is_null;
-use function is_string;
-use function strlen;
 
 /**
  * @method Model\DataObject\Concrete\Dao getDao()
@@ -51,12 +41,6 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
 {
     use Model\DataObject\Traits\LazyLoadedRelationTrait;
     use Model\Element\Traits\ScheduledTasksTrait;
-
-    /**
-     * @internal
-     *
-     */
-    protected ?array $__rawRelationData = null;
 
     /**
      * @internal
@@ -83,13 +67,6 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
      * @internal
      */
     protected ?ClassDefinition $class = null;
-
-    /**
-     * @internal
-     *
-     * @var string|null
-     */
-    protected $classId = null;
 
     /**
      * @internal
@@ -411,25 +388,6 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
         return $this->class;
     }
 
-    public function getClassId(): ?string
-    {
-        if (isset($this->classId)) {
-            return (string)$this->classId;
-        }
-
-        return null;
-    }
-
-    /**
-     * @return $this
-     */
-    public function setClassId(string $classId): static
-    {
-        $this->classId = $classId;
-
-        return $this;
-    }
-
     public function getClassName(): ?string
     {
         return $this->className;
@@ -660,8 +618,6 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
     }
 
     /**
-     * @return $this
-     *
      * @throws Exception
      */
     public function save(array $parameters = []): static
@@ -679,8 +635,6 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
 
         try {
             parent::save($parameters);
-            //Reset Relational data to force a reload
-            $this->__rawRelationData = null;
 
             if ($this instanceof DirtyIndicatorInterface) {
                 $this->resetDirtyMap();
@@ -854,19 +808,5 @@ class Concrete extends DataObject implements LazyLoadedFieldsInterface
         $filteredData = array_filter($unfilteredData, $filterFn);
 
         return $filteredData;
-    }
-
-    /**
-     * @internal
-     *
-     */
-    public function __getRawRelationData(): array
-    {
-        if ($this->__rawRelationData === null) {
-            $db = Db::get();
-            $this->__rawRelationData = $db->fetchAllAssociative('SELECT * FROM object_relations_' . $this->getClassId() . ' WHERE src_id = ?', [$this->getId()]);
-        }
-
-        return $this->__rawRelationData;
     }
 }

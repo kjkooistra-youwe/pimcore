@@ -28,7 +28,6 @@ use Pimcore\Model\DataObject\Localizedfield;
 use Pimcore\Model\Document;
 use Pimcore\Model\Element;
 use Pimcore\Normalizer\NormalizerInterface;
-use function is_array;
 
 class ManyToOneRelation extends AbstractRelations implements QueryResourcePersistenceAwareInterface, VarExporterInterface, NormalizerInterface, PreGetDataInterface, PreSetDataInterface
 {
@@ -96,6 +95,9 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
         return $this->objectsAllowed;
     }
 
+    /**
+     * @return $this
+     */
     public function setObjectsAllowed(bool $objectsAllowed): static
     {
         $this->objectsAllowed = $objectsAllowed;
@@ -108,6 +110,9 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
         return $this->documentsAllowed;
     }
 
+    /**
+     * @return $this
+     */
     public function setDocumentsAllowed(bool $documentsAllowed): static
     {
         $this->documentsAllowed = $documentsAllowed;
@@ -120,6 +125,9 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
         return $this->documentTypes ?: [];
     }
 
+    /**
+     * @return $this
+     */
     public function setDocumentTypes(array $documentTypes): static
     {
         $this->documentTypes = Element\Service::fixAllowedTypes($documentTypes, 'documentTypes');
@@ -132,6 +140,9 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
         return $this->assetsAllowed;
     }
 
+    /**
+     * @return $this
+     */
     public function setAssetsAllowed(bool $assetsAllowed): static
     {
         $this->assetsAllowed = $assetsAllowed;
@@ -144,6 +155,9 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
         return $this->assetTypes ?: [];
     }
 
+    /**
+     * @return $this
+     */
     public function setAssetTypes(array $assetTypes): static
     {
         $this->assetTypes = Element\Service::fixAllowedTypes($assetTypes, 'assetTypes');
@@ -385,6 +399,9 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
         return $this->assetInlineDownloadAllowed;
     }
 
+    /**
+     * @return $this
+     */
     public function setAssetUploadPath(string $assetUploadPath): static
     {
         $this->assetUploadPath = $assetUploadPath;
@@ -535,12 +552,14 @@ class ManyToOneRelation extends AbstractRelations implements QueryResourcePersis
     public function getFilterConditionExt(mixed $value, string $operator, array $params = []): string
     {
         $name = $params['name'] . '__id';
+        $prefix = $params['brickPrefix'] ?? '';
         if (preg_match('/^(asset|object|document)\|(\d+)/', $value, $matches)) {
             $typeField = $params['name'] . '__type';
             $typeCondition = '`' . $typeField . '` = ' . "'" . $matches[1] . "'";
             $value = $matches[2];
 
-            return '(' . $typeCondition . ' AND ' . $this->getRelationFilterCondition($value, $operator, $name) . ')';
+            return '(' . $prefix . $typeCondition . ' AND ' . $prefix
+                . $this->getRelationFilterCondition($value, $operator, $name) . ')';
         }
 
         return $this->getRelationFilterCondition($value, $operator, $name);

@@ -18,7 +18,6 @@ namespace Pimcore\Model\DataObject\Traits;
 
 use Pimcore\Model\DataObject\ClassDefinition;
 use Pimcore\Model\DataObject\ClassDefinition\Data;
-use function is_array;
 
 /**
  * @internal
@@ -28,7 +27,7 @@ trait FieldDefinitionEnrichmentDataTrait
     use FieldDefinitionEnrichmentModelTrait;
 
     /**
-     * @params array<string, Data> $fields
+     * @param array<string, Data> $fields
      *
      * @return array<string, Data>
      */
