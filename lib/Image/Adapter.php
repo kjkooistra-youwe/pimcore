@@ -187,7 +187,7 @@ abstract class Adapter implements AdapterInterface
         }
 
         if ($cropX !== null && $cropY !== null) {
-            $this->crop($cropX, $cropY, $width, $height);
+            $this->crop((int)$cropX, (int)$cropY, $width, $height);
         } else {
             Logger::error('Cropping not processed, because X or Y is not defined or null, proceeding with next step');
         }
@@ -302,7 +302,7 @@ abstract class Adapter implements AdapterInterface
     /**
      * @deprecated Provided by AdapterInterface::save() instead
      */
-    abstract public function save(string $path, string $format = null, int $quality = null): static;
+    abstract public function save(string $path, ?string $format = null, ?int $quality = null): static;
 
     abstract protected function destroy(): void;
 

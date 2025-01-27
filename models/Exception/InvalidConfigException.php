@@ -14,24 +14,10 @@ declare(strict_types=1);
  *  @license    http://www.pimcore.org/license     GPLv3 and PCL
  */
 
-namespace Pimcore\Http\Exception;
+namespace Pimcore\Model\Exception;
 
-use Exception;
-use Symfony\Component\HttpFoundation\Response;
+use RuntimeException;
 
-class ResponseException extends Exception
+class InvalidConfigException extends RuntimeException
 {
-    protected Response $response;
-
-    public function __construct(Response $response, ?Exception $previous = null)
-    {
-        parent::__construct('', 0, $previous);
-
-        $this->response = $response;
-    }
-
-    public function getResponse(): Response
-    {
-        return $this->response;
-    }
 }
