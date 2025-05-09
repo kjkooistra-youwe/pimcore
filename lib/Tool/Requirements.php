@@ -2,16 +2,13 @@
 declare(strict_types=1);
 
 /**
- * Pimcore
- *
- * This source file is available under two different licenses:
- * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Commercial License (PCL)
+ * This source file is available under the terms of the
+ * Pimcore Open Core License (POCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ *  @copyright  Copyright (c) Pimcore GmbH (https://www.pimcore.com)
+ *  @license    Pimcore Open Core License (POCL)
  */
 
 namespace Pimcore\Tool;
@@ -389,7 +386,7 @@ final class Requirements
             'state' => $ffmpegBin ? Check::STATE_OK : Check::STATE_WARNING,
         ]);
 
-        // Chromium or Gotenberg
+        // Gotenberg
         try {
             $htmlToImage = \Pimcore\Image\HtmlToImage::isSupported();
         } catch (Exception $e) {
@@ -580,6 +577,13 @@ final class Requirements
             'name' => 'zlib / gzip',
             'link' => 'https://www.php.net/zlib',
             'state' => function_exists('gzcompress') ? Check::STATE_OK : Check::STATE_ERROR,
+        ]);
+
+        // openssl
+        $checks[] = new Check([
+            'name' => 'OpenSSL',
+            'link' => 'https://www.php.net/openssl',
+            'state' => function_exists('openssl_verify') ? Check::STATE_OK : Check::STATE_ERROR,
         ]);
 
         // Intl

@@ -2,16 +2,13 @@
 declare(strict_types=1);
 
 /**
- * Pimcore
- *
- * This source file is available under two different licenses:
- * - GNU General Public License version 3 (GPLv3)
- * - Pimcore Commercial License (PCL)
+ * This source file is available under the terms of the
+ * Pimcore Open Core License (POCL)
  * Full copyright and license information is available in
  * LICENSE.md which is distributed with this source code.
  *
- *  @copyright  Copyright (c) Pimcore GmbH (http://www.pimcore.org)
- *  @license    http://www.pimcore.org/license     GPLv3 and PCL
+ *  @copyright  Copyright (c) Pimcore GmbH (https://www.pimcore.com)
+ *  @license    Pimcore Open Core License (POCL)
  */
 
 namespace Pimcore\Workflow\Notification;
@@ -26,6 +23,7 @@ use Pimcore\Model\Element\ElementInterface;
 use Pimcore\Model\User;
 use Pimcore\Tool;
 use Pimcore\Workflow\EventSubscriber\NotificationSubscriber;
+use Pimcore\Workflow\Transition;
 use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Templating\EngineInterface;
 use Symfony\Component\Workflow\WorkflowInterface;
@@ -59,7 +57,7 @@ class NotificationEmailService extends AbstractNotificationService
         WorkflowInterface $workflow,
         string $subjectType,
         ElementInterface $subject,
-        string $action,
+        Transition $transition,
         string $mailType,
         string $mailPath
     ): void {
@@ -98,7 +96,7 @@ class NotificationEmailService extends AbstractNotificationService
                             $subjectType,
                             $subject,
                             $workflow,
-                            $action,
+                            $transition->getLabel(),
                             $language,
                             $localizedMailPath,
                             $deeplink
@@ -113,7 +111,7 @@ class NotificationEmailService extends AbstractNotificationService
                             $subjectType,
                             $subject,
                             $workflow,
-                            $action,
+                            $transition->getLabel(),
                             $language,
                             $localizedMailPath,
                             $deeplink
@@ -122,8 +120,8 @@ class NotificationEmailService extends AbstractNotificationService
                         break;
                 }
             }
-        } catch (Exception) {
-            Logger::error('Error sending Workflow change notification email.');
+        } catch (Exception $e) {
+            Logger::error('Error sending Workflow change notification email: ' . (string)$e);
         }
     }
 
