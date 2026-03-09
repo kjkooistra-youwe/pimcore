@@ -1095,6 +1095,10 @@ class Imagick extends Adapter
 
     private function checkFormatSupport(string $format): bool
     {
+        if (strtolower($format) === 'avif') {
+            return false;
+        }
+
         try {
             // we can't use \Imagick::queryFormats() here, because this doesn't consider configured delegates
             $image = new \Imagick();
